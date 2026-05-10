@@ -1,0 +1,1360 @@
+{
+    "data":  {
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "2100",
+                                            "name":  "%windir%\\System32\\svchost.exe -k WerSvcGroup"
+                                        },
+                                        {
+                                            "process_id":  "2512",
+                                            "name":  "%SANDBOX_DLL_LOADER_X86% %SAMPLEPATH% %WORKDIR% 483",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "2580",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,DllCanUnloadNow"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2588",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,DllGetClassObject"
+                                                             }
+                                                         ]
+                                        },
+                                        {
+                                            "process_id":  "2712",
+                                            "name":  "wmiadap.exe /F /T /R"
+                                        },
+                                        {
+                                            "process_id":  "2760",
+                                            "name":  "%windir%\\system32\\wbem\\wmiprvse.exe"
+                                        }
+                                    ],
+                 "mbc":  [
+                             {
+                                 "id":  "B0046.001",
+                                 "objective":  "Discovery",
+                                 "behavior":  "Code Discovery",
+                                 "method":  "Enumerate PE Sections",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "0"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.005",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Query Registry Key",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "4"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0001.032",
+                                 "objective":  "Anti-Behavioral Analysis",
+                                 "behavior":  "Debugger Detection",
+                                 "method":  "Timing/Delay Check GetTickCount",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "8"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0009",
+                                 "objective":  "Anti-Behavioral Analysis",
+                                 "behavior":  "Virtual Machine Detection",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "18"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.006",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Query Registry Value",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "21"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1082",
+                                 "objective":  "Discovery",
+                                 "behavior":  "System Information Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "29"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0027",
+                                 "objective":  "Cryptography",
+                                 "behavior":  "Encrypt Data",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "37"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "signature_matches":  [
+                                           {
+                                               "id":  "0",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "enumerate PE sections",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "@Ana06",
+                                                               "@mr-tz"
+                                                           ],
+                                               "match_data":  [
+                                                                  "mnemonic: movzx"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: enumerate PE sections\n    namespace: load-code/pe\n    authors:\n      - \"@Ana06\"\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: unsupported  # requires offset, operand[1].offset, characteristic, mnemonic, basicblock features\n    mbc:\n      - Discovery::Code Discovery::Enumerate PE Sections [B0046.001]\n    references:\n      - https://0x00sec.org/t/reflective-dll-injection/3080\n      - https://www.ired.team/offensive-security/code-injection-process-injection/reflective-dll-injection\n    examples:\n      - E4C33AC3638EEF68311F8AC0D72483C7:0x401510\n  features:\n    - and:\n      - os: windows\n      # there should be some complexity to functions like this\n      - count(basic blocks): 3 or more\n      - optional:\n        - offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n      - instruction:\n        - or:\n          - mnemonic: mov\n          - mnemonic: movzx\n        - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n      - basic block:\n        - or:\n          - and:\n            - description: IMAGE_FIRST_SECTION(nt_header)\n            - instruction:\n              - or:\n                - mnemonic: add\n                - mnemonic: mov\n                - mnemonic: movzx\n              - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n            - operand[1].offset: 0x18 = FileHeader.SizeOfOptionalHeader\n          - and:\n            - description: (DWORD)dll_raw + dos_header-\u003ee_lfanew + sizeof(IMAGE_NT_HEADERS) + sizeof(IMAGE_SECTION_HEADER) * i\n            - number: 0x28 = sizeof(IMAGE_SECTION_HEADER)\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0xF8 = sizeof(IMAGE_NT_HEADERS32)\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x108 = sizeof(IMAGE_NT_HEADERS64)\n      - 2 or more:\n        - operand[1].offset: 0xC = IMAGE_SECTION_HEADER.VirtualAddress\n        - operand[1].offset: 0x14 = IMAGE_SECTION_HEADER.PointerToRawData\n        - operand[1].offset: 0x10 = IMAGE_SECTION_HEADER.SizeOfRawData\n        # there\u0027s also offset 0x8 = IMAGE_SECTION_HEADER.Misc.PhysicalAddress, but it\u0027s likely too common\n      - not:\n        # non-zeroing XOR was observed in FPs\n        - characteristic: nzxor\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://0x00sec.org/t/reflective-dll-injection/3080"
+                                                            },
+                                                            {
+                                                                "ref":  "https://www.ired.team/offensive-security/code-injection-process-injection/reflective-dll-injection"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "1",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "delete service",
+                                               "description":  "host-interaction/service/delete",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "get service handle",
+                                                                  "api: OpenService",
+                                                                  "api: DeleteService"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: delete service\n    namespace: host-interaction/service/delete\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Persistence::Create or Modify System Process::Windows Service [T1543.003]\n    examples:\n      - E544A4D616B60147D9774B48C2B65EF2:0x402140\n      - Practical Malware Analysis Lab 03-02.dll_:0x10004B18\n  features:\n    - and:\n      - optional:\n        - match: get service handle\n      - api: advapi32.DeleteService\n"
+                                           },
+                                           {
+                                               "id":  "2",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "change user account password",
+                                               "description":  "host-interaction/accounts",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: NetUserChangePassword"
+                                                              ],
+                                               "rule_src":  "# generated using capa explorer for IDA Pro\nrule:\n  meta:\n    name: change user account password\n    namespace: host-interaction/accounts\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    att\u0026ck:\n      - Persistence::Account Manipulation [T1098]\n  features:\n    - or:\n      - api: netapi32.NetUserChangePassword\n"
+                                           },
+                                           {
+                                               "id":  "4",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "query or enumerate registry key",
+                                               "description":  "host-interaction/registry",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "create or open registry key",
+                                                                  "api: RegEnumKeyEx",
+                                                                  "api: RegOpenKeyEx"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: query or enumerate registry key\n    namespace: host-interaction/registry\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::Query Registry [T1012]\n    mbc:\n      - Operating System::Registry::Query Registry Key [C0036.005]\n    examples:\n      - 493167E85E45363D09495D0841C30648:0x404930\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x402608\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegEnumKey\n        - api: advapi32.RegEnumKeyEx\n        - api: advapi32.RegQueryInfoKeyA\n        - api: ZwQueryKey\n        - api: ZwEnumerateKey\n        - api: NtQueryKey\n        - api: NtEnumerateKey\n        - api: RtlCheckRegistryKey\n        - api: SHEnumKeyEx\n        - api: SHQueryInfoKey\n        - api: SHRegEnumUSKey\n        - api: SHRegQueryInfoUSKey\n        - api: Microsoft.Win32.RegistryKey::GetSubKeyNames\n        - api: Microsoft.Win32.RegistryKey::OpenBaseKey\n        - api: Microsoft.Win32.RegistryKey::OpenRemoteBaseKey\n        - api: Microsoft.Win32.RegistryKey::OpenSubKey\n"
+                                           },
+                                           {
+                                               "id":  "5",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "enumerate services",
+                                               "description":  "host-interaction/service/list",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: EnumServicesStatusEx"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: enumerate services\n    namespace: host-interaction/service/list\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Service Discovery [T1007]\n    examples:\n      - Practical Malware Analysis Lab 05-01.dll_:0x1000B823\n  features:\n    - or:\n      - api: advapi32.EnumServicesStatus\n      - api: advapi32.EnumServicesStatusEx\n      - api: advapi32.EnumDependentServices\n"
+                                           },
+                                           {
+                                               "id":  "7",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get domain information",
+                                               "description":  "host-interaction/network/domain : Detect collection of Windows domain information",
+                                               "authors":  [
+                                                               "awillia2@cisco.com",
+                                                               "anushka.virgaonkar@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: DsRoleGetPrimaryDomainInformation"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get domain information\n    namespace: host-interaction/network/domain\n    authors:\n      - awillia2@cisco.com\n      - anushka.virgaonkar@mandiant.com\n      - michael.hunhoff@mandiant.com\n    description: Detect collection of Windows domain information\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Network Configuration Discovery [T1016]\n    examples:\n      - 9B7CCAA2AE6A5B96E3110EBCBC4311F6:0x1001C184\n  features:\n    - or:\n      - api: netapi32.DsRoleGetPrimaryDomainInformation\n      - api: System.DirectoryServices.ActiveDirectory.Domain::GetComputerDomain\n      - property/read: System.Net.NetworkInformation.IPGlobalProperties::DomainName\n"
+                                           },
+                                           {
+                                               "id":  "8",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check for time delay via GetTickCount",
+                                               "description":  "anti-analysis/anti-debugging/debugger-detection",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "mnemonic: cmp",
+                                                                  "mnemonic: sub"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check for time delay via GetTickCount\n    namespace: anti-analysis/anti-debugging/debugger-detection\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic features\n    mbc:\n      - Anti-Behavioral Analysis::Debugger Detection::Timing/Delay Check GetTickCount [B0001.032]\n    examples:\n      - Practical Malware Analysis Lab 16-03.exe_:0x4013d0\n  features:\n    - and:\n      - count(api(kernel32.GetTickCount)): 2 or more\n      - basic block:\n        - and:\n          - mnemonic: sub\n          - mnemonic: cmp\n"
+                                           },
+                                           {
+                                               "id":  "9",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create service",
+                                               "description":  "host-interaction/service/create",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: CreateService",
+                                                                  "api: OpenSCManager"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create service\n    namespace: host-interaction/service/create\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Persistence::Create or Modify System Process::Windows Service [T1543.003]\n      - Execution::System Services::Service Execution [T1569.002]\n    examples:\n      - Practical Malware Analysis Lab 03-02.dll_:0x10004706\n  features:\n    - and:\n      - api: advapi32.CreateService\n      - optional:\n        - api: advapi32.OpenSCManager\n"
+                                           },
+                                           {
+                                               "id":  "10",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get session user name",
+                                               "description":  "host-interaction/session",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetUserName"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get session user name\n    namespace: host-interaction/session\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::System Owner/User Discovery [T1033]\n      - Discovery::Account Discovery [T1087]\n    examples:\n      - Practical Malware Analysis Lab 14-01.exe_:0x401285\n  features:\n    - or:\n      - api: advapi32.GetUserName\n      - api: secur32.GetUserNameEx\n      - basic block:\n        - and:\n          # - match: get session information (see #463)\n          - api: wtsapi32.WTSQuerySessionInformation\n          - number: 5 = WTSUserName\n      - call:\n        - and:\n          - api: wtsapi32.WTSQuerySessionInformation\n          - number: 5 = WTSUserName\n      - api: System.Security.Principal.WindowsIdentity::GetCurrent\n      - property/read: System.Environment::UserName\n"
+                                           },
+                                           {
+                                               "id":  "11",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "list user account groups",
+                                               "description":  "host-interaction/accounts : enumerates all the groups present on the system/domain",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: NetGroupEnum",
+                                                                  "api: NetLocalGroupEnum"
+                                                              ],
+                                               "rule_src":  "# generated using capa explorer for IDA Pro\nrule:\n  meta:\n    name: list user account groups\n    namespace: host-interaction/accounts\n    authors:\n      - michael.hunhoff@mandiant.com\n    description: enumerates all the groups present on the system/domain\n    scopes:\n      static: basic block\n      dynamic: call\n    att\u0026ck:\n      - Discovery::Permission Groups Discovery [T1069]\n  features:\n    - or:\n      - api: netapi32.NetGroupEnum\n      - api: netapi32.NetLocalGroupEnum\n"
+                                           },
+                                           {
+                                               "id":  "12",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get CPU information",
+                                               "description":  "host-interaction/hardware/cpu",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "joakim@intezer.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: RegOpenKeyEx",
+                                                                  "query or enumerate registry value",
+                                                                  "regex: /Hardware\\\\Description\\\\System\\\\CentralProcessor/i"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get CPU information\n    namespace: host-interaction/hardware/cpu\n    authors:\n      - moritz.raabe@mandiant.com\n      - joakim@intezer.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::System Information Discovery [T1082]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13145B5A\n  features:\n    - or:\n      - and:\n        - os: windows\n        - match: query or enumerate registry value\n        - string: /Hardware\\\\Description\\\\System\\\\CentralProcessor/i\n      - and:\n        - os: linux\n        - match: host-interaction/file-system/read\n        - string: \"/proc/cpuinfo\"\n      - and:\n        - os: linux\n        - api: system\n        - substring: \"/proc/cpuinfo\"\n"
+                                           },
+                                           {
+                                               "id":  "14",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "implement COM DLL",
+                                               "description":  "executable/pe",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: implement COM DLL\n    namespace: executable/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    references:\n      - https://learn.microsoft.com/en-us/windows/win32/api/combaseapi/nf-combaseapi-dllgetclassobject\n  features:\n    - and:\n      - export: DllGetClassObject\n      - optional:\n        - export: DllRegisterServer\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://learn.microsoft.com/en-us/windows/win32/api/combaseapi/nf-combaseapi-dllgetclassobject"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "15",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "start service",
+                                               "description":  "host-interaction/service/start",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: StartService"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: start service\n    namespace: host-interaction/service/start\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Persistence::Create or Modify System Process::Windows Service [T1543.003]\n    examples:\n      - E544A4D616B60147D9774B48C2B65EF2:0x401FA0\n  features:\n    - and:\n      - optional:\n        - match: get service handle\n      - api: advapi32.StartService\n"
+                                           },
+                                           {
+                                               "id":  "16",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "delete user account group",
+                                               "description":  "host-interaction/accounts",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: NetGroupDel",
+                                                                  "api: NetLocalGroupDel"
+                                                              ],
+                                               "rule_src":  "# generated using capa explorer for IDA Pro\nrule:\n  meta:\n    name: delete user account group\n    namespace: host-interaction/accounts\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    att\u0026ck:\n      - Persistence::Account Manipulation [T1098]\n  features:\n    - or:\n      - api: netapi32.NetLocalGroupDel\n      - api: netapi32.NetGroupDel\n"
+                                           },
+                                           {
+                                               "id":  "17",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "delete user account from group",
+                                               "description":  "host-interaction/accounts",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: NetLocalGroupDelMembers",
+                                                                  "api: NetGroupDelUser"
+                                                              ],
+                                               "rule_src":  "# generated using capa explorer for IDA Pro\nrule:\n  meta:\n    name: delete user account from group\n    namespace: host-interaction/accounts\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    att\u0026ck:\n      - Persistence::Account Manipulation [T1098]\n  features:\n    - or:\n      - api: netapi32.NetLocalGroupDelMembers\n      - api: netapi32.NetLocalGroupDelMember\n      - api: netapi32.NetGroupDelUser\n"
+                                           },
+                                           {
+                                               "id":  "18",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "reference anti-VM strings",
+                                               "description":  "anti-analysis/anti-vm/vm-detection",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "regex: /HARDWARE\\\\DESCRIPTION\\\\System\\\\CentralProcessor/i"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: reference anti-VM strings\n    namespace: anti-analysis/anti-vm/vm-detection\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    att\u0026ck:\n      - Defense Evasion::Virtualization/Sandbox Evasion::System Checks [T1497.001]\n    mbc:\n      - Anti-Behavioral Analysis::Virtual Machine Detection [B0009]\n    references:\n      - https://github.com/ctxis/CAPE/blob/master/modules/signatures/antivm_*\n      - https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/AntiVM/Generic.cpp\n    examples:\n      - Practical Malware Analysis Lab 17-02.dll_\n  features:\n    - or:\n      - string: /HARDWARE\\\\ACPI\\\\(DSDT|FADT|RSDT)\\\\BOCHS/i\n      - string: /HARDWARE\\\\DESCRIPTION\\\\System\\\\(SystemBiosVersion|VideoBiosVersion)/i\n      - string: /HARDWARE\\\\DESCRIPTION\\\\System\\\\CentralProcessor/i\n      - string: /HARDWARE\\\\DEVICEMAP\\\\Scsi\\\\Scsi Port 0\\\\Scsi Bus 0\\\\Target Id 0\\\\Logical Unit Id 0/i\n      - string: /SYSTEM\\\\(ControlSet\\d{3}|CurrentControlSet)\\\\Enum\\\\IDE/i\n      - string: /SYSTEM\\\\(ControlSet\\d{3}|CurrentControlSet)\\\\Services\\\\Disk\\\\Enum\\\\/i\n      - string: /SYSTEM\\\\(ControlSet\\d{3}|CurrentControlSet)\\\\Control\\\\SystemInformation\\\\SystemManufacturer/i\n      - string: /A M I/i\n      - string: /Hyper-V/i\n      - string: /Kernel-VMDetection-Private/i\n      # https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/AntiVM/Generic.cpp#L699\n      - string: /KVMKVMKVM/i\n        description: KVM\n      - string: /Microsoft Hv/i\n        description: Microsoft Hyper-V or Windows Virtual PC\n      # https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/AntiVM/Generic.cpp#L8\n      - string: /avghookx\\.dll/i\n        description: AVG\n      - string: /avghooka\\.dll/i\n        description: AVG\n      - string: /snxhk\\.dll/i\n        description: Avast\n      - string: /pstorec\\.dll/i\n        description: SunBelt Sandbox\n      - string: /vmcheck\\.dll/i\n        description: Virtual PC\n      - string: /wpespy\\.dll/i\n        description: WPE Pro\n      - string: /cmdvrt64\\.dll/i\n        description: Comodo Container\n      - string: /cmdvrt32\\.dll/i\n        description: Comodo Container\n      # https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/AntiVM/Generic.cpp#L46\n      - string: /sample\\.exe/i\n      - string: /bot\\.exe/i\n      - string: /sandbox\\.exe/i\n      - string: /malware\\.exe/i\n      - string: /test\\.exe/i\n      - string: /klavme\\.exe/i\n      - string: /myapp\\.exe/i\n      - string: /testapp\\.exe/i\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://github.com/ctxis/CAPE/blob/master/modules/signatures/antivm_*"
+                                                            },
+                                                            {
+                                                                "ref":  "https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/AntiVM/Generic.cpp"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "19",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "delete user account",
+                                               "description":  "host-interaction/accounts",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: NetUserDel"
+                                                              ],
+                                               "rule_src":  "# generated using capa explorer for IDA Pro\nrule:\n  meta:\n    name: delete user account\n    namespace: host-interaction/accounts\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    att\u0026ck:\n      - Impact::Account Access Removal [T1531]\n  features:\n    - or:\n      - api: netapi32.NetUserDel\n"
+                                           },
+                                           {
+                                               "id":  "20",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "list groups for user account",
+                                               "description":  "host-interaction/accounts : enumerates all the groups to which a user account belongs",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: NetUserGetLocalGroups",
+                                                                  "api: NetUserGetGroups"
+                                                              ],
+                                               "rule_src":  "# generated using capa explorer for IDA Pro\nrule:\n  meta:\n    name: list groups for user account\n    namespace: host-interaction/accounts\n    authors:\n      - michael.hunhoff@mandiant.com\n    description: enumerates all the groups to which a user account belongs\n    scopes:\n      static: basic block\n      dynamic: call\n    att\u0026ck:\n      - Discovery::Account Discovery [T1087]\n  features:\n    - or:\n      - api: netapi32.NetUserGetGroups\n      - api: netapi32.NetUserGetLocalGroups\n"
+                                           },
+                                           {
+                                               "id":  "21",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "query or enumerate registry value",
+                                               "description":  "host-interaction/registry",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: RegQueryValueEx",
+                                                                  "create or open registry key",
+                                                                  "api: RegOpenKeyEx"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: query or enumerate registry value\n    namespace: host-interaction/registry\n    authors:\n      - william.ballenthin@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::Query Registry [T1012]\n    mbc:\n      - Operating System::Registry::Query Registry Value [C0036.006]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13145B5A\n      - Practical Malware Analysis Lab 03-02.dll_:0x100047AD\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegGetValue\n        - api: advapi32.RegEnumValue\n        - api: advapi32.RegQueryValue\n        - api: advapi32.RegQueryValueEx\n        - api: advapi32.RegQueryMultipleValues\n        - api: ZwQueryValueKey\n        - api: ZwEnumerateValueKey\n        - api: NtQueryValueKey\n        - api: NtEnumerateValueKey\n        - api: RtlQueryRegistryValues\n        - api: SHGetValue\n        - api: SHEnumValue\n        - api: SHRegGetInt\n        - api: SHRegGetPath\n        - api: SHRegGetValue\n        - api: SHQueryValueEx\n        - api: SHRegGetUSValue\n        - api: SHOpenRegStream\n        - api: SHRegEnumUSValue\n        - api: SHOpenRegStream2\n        - api: SHRegQueryUSValue\n        - api: SHRegGetBoolUSValue\n        - api: SHRegGetValueFromHKCUHKLM\n        - api: SHRegGetBoolValueFromHKCUHKLM\n        - api: Microsoft.Win32.RegistryKey::GetValue\n        - api: Microsoft.Win32.RegistryKey::GetValueKind\n        - api: Microsoft.Win32.RegistryKey::GetValueNames\n        - api: Microsoft.Win32.Registry::GetValue\n"
+                                           },
+                                           {
+                                               "id":  "22",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "parse PE header",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "mnemonic: cmp",
+                                                                  "IMAGE_DOS_SIGNATURE (MZ)",
+                                                                  "IMAGE_NT_SIGNATURE (PE)"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: parse PE header\n    namespace: load-code/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic, operand[1].offset features\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x403DD0\n  features:\n    - and:\n      - os: windows\n      - and:\n        - mnemonic: cmp\n        - or:\n          - number: 0x4550 = IMAGE_NT_SIGNATURE (PE)\n          - and:\n            - number: 0x50\n            - number: 0x45\n        - or:\n          - number: 0x5A4D = IMAGE_DOS_SIGNATURE (MZ)\n          - and:\n            - number: 0x4D\n            - number: 0x5A\n        - optional:\n          - and:\n            - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x30 = IMAGE_NT_HEADERS64.OptionalHeader.ImageBase\n          - basic block:\n            - and:\n              - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n              - 3 or more:\n                - operand[1].offset: 0x4 = IMAGE_NT_HEADERS.FileHeader.Machine\n                - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n                - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n                - operand[1].offset: 0x16 = IMAGE_NT_HEADERS.FileHeader.Characteristics\n                - operand[1].offset: 0x28 = IMAGE_NT_HEADERS.OptionalHeader.AddressOfEntryPoint  # for 32 and 64 bit\n                - or:\n                  - and:\n                    - arch: i386\n                    - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                  - and:\n                    - arch: amd64\n                    - operand[1].offset: 0x30 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n"
+                                           },
+                                           {
+                                               "id":  "23",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get user security identifier",
+                                               "description":  "host-interaction/session",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: LookupAccountName"
+                                                              ],
+                                               "rule_src":  "# generated using capa explorer for IDA Pro\nrule:\n  meta:\n    name: get user security identifier\n    namespace: host-interaction/session\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    att\u0026ck:\n      - Discovery::Account Discovery [T1087]\n    examples:\n      - mimikatz.exe_:0x40DC42\n  features:\n    - or:\n      - api: advapi32.LookupAccountName\n      - api: advapi32.LsaLookupNames\n      - api: advapi32.LsaLookupNames2\n"
+                                           },
+                                           {
+                                               "id":  "24",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "modify service",
+                                               "description":  "host-interaction/service/modify",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: ChangeServiceConfig"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: modify service\n    namespace: host-interaction/service/modify\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Persistence::Create or Modify System Process::Windows Service [T1543.003]\n      - Execution::System Services::Service Execution [T1569.002]\n    examples:\n      - 7D16EFD0078F22C17A4BD78B0F0CC468:0x401000\n  features:\n    - and:\n      - optional:\n        - match: get service handle\n      - or:\n        - api: advapi32.ChangeServiceConfig\n        - api: advapi32.ChangeServiceConfig2\n"
+                                           },
+                                           {
+                                               "id":  "25",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "list domain servers",
+                                               "description":  "host-interaction/domain",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: NetServerEnum"
+                                                              ],
+                                               "rule_src":  "# generated using capa explorer for IDA Pro\nrule:\n  meta:\n    name: list domain servers\n    namespace: host-interaction/domain\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Network Configuration Discovery::Internet Connection Discovery [T1016.001]\n  features:\n    - or:\n      - api: netapi32.NetServerEnum\n"
+                                           },
+                                           {
+                                               "id":  "26",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "add user account to group",
+                                               "description":  "host-interaction/accounts",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: NetGroupAddUser",
+                                                                  "api: NetLocalGroupAddMembers"
+                                                              ],
+                                               "rule_src":  "# generated using capa explorer for IDA Pro\nrule:\n  meta:\n    name: add user account to group\n    namespace: host-interaction/accounts\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    att\u0026ck:\n      - Persistence::Account Manipulation [T1098]\n  features:\n    - or:\n      - api: netapi32.NetLocalGroupAddMembers\n      - api: netapi32.NetLocalGroupAddMember\n      - api: netapi32.NetGroupAddUser\n      - api: netapi32.NetGroupSetUsers\n"
+                                           },
+                                           {
+                                               "id":  "27",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "add user account group",
+                                               "description":  "host-interaction/accounts",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: NetLocalGroupAdd",
+                                                                  "api: NetGroupAdd"
+                                                              ],
+                                               "rule_src":  "# generated using capa explorer for IDA Pro\nrule:\n  meta:\n    name: add user account group\n    namespace: host-interaction/accounts\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    att\u0026ck:\n      - Persistence::Account Manipulation [T1098]\n  features:\n    - or:\n      - api: netapi32.NetLocalGroupAdd\n      - api: netapi32.NetGroupAdd\n"
+                                           },
+                                           {
+                                               "id":  "28",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get domain controller name",
+                                               "description":  "host-interaction/network/domain : Looks for calls to Windows APIs that can be used to determine the name of the domain controller for a Windows domain that a computer is connected to.",
+                                               "authors":  [
+                                                               "awillia2@cisco.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: NetGetDCName",
+                                                                  "api: DsGetDcName",
+                                                                  "api: NetApiBufferFree"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get domain controller name\n    namespace: host-interaction/network/domain\n    authors:\n      - awillia2@cisco.com\n    description: Looks for calls to Windows APIs that can be used to determine the name of the domain controller for a Windows domain that a computer is connected to.\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::System Network Configuration Discovery [T1016]\n    references:\n      - https://docs.microsoft.com/en-us/windows/win32/api/lmaccess/nf-lmaccess-netgetdcname\n      - https://docs.microsoft.com/en-us/windows/win32/api/dsgetdc/nf-dsgetdc-dsgetdcnamea\n      - https://chuongdong.com/reverse%20engineering/2021/05/23/MountLockerRansomware/\n    examples:\n      - 3808f21e56dede99bc914d90aeabe47a:0x140007144\n  features:\n    - and:\n      - or:\n        - api: NetGetDCName\n        - api: DsGetDcName\n      - optional:\n        - api: NetApiBufferFree\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://docs.microsoft.com/en-us/windows/win32/api/lmaccess/nf-lmaccess-netgetdcname"
+                                                            },
+                                                            {
+                                                                "ref":  "https://docs.microsoft.com/en-us/windows/win32/api/dsgetdc/nf-dsgetdc-dsgetdcnamea"
+                                                            },
+                                                            {
+                                                                "ref":  "https://chuongdong.com/reverse%20engineering/2021/05/23/MountLockerRansomware/"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "29",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get hostname",
+                                               "description":  "host-interaction/os/hostname",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "joakim@intezer.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetComputerName"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get hostname\n    namespace: host-interaction/os/hostname\n    authors:\n      - moritz.raabe@mandiant.com\n      - joakim@intezer.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Information Discovery [T1082]\n    mbc:\n      - Discovery::System Information Discovery [E1082]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x4052A0\n      - 7351f8a40c5450557b24622417fc478d:0x405438\n  features:\n    - or:\n      - api: kernel32.GetComputerName\n      - api: kernel32.GetComputerNameEx\n      - api: GetComputerObjectName\n      - api: ws2_32.gethostname\n      - api: gethostname\n      - property/read: System.Environment::MachineName\n"
+                                           },
+                                           {
+                                               "id":  "30",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "query service status",
+                                               "description":  "host-interaction/service",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: QueryServiceStatus"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: query service status\n    namespace: host-interaction/service\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Service Discovery [T1007]\n    examples:\n      - 9DC209F66DA77858E362E624D0BE86B3:0x403C70\n  features:\n    - or:\n      - api: advapi32.QueryServiceStatusEx\n      - api: advapi32.QueryServiceStatus\n"
+                                           },
+                                           {
+                                               "id":  "31",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "continue service",
+                                               "description":  "host-interaction/service",
+                                               "authors":  [
+                                                               "@mr-tz"
+                                                           ],
+                                               "match_data":  [
+                                                                  "SERVICE_CONTROL_CONTINUE",
+                                                                  "api: ControlService"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: continue service\n    namespace: host-interaction/service\n    authors:\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Persistence::Create or Modify System Process::Windows Service [T1543.003]\n    examples:\n      - Practical Malware Analysis Lab 17-02.dll_:0x1000bd79\n  features:\n    - and:\n      - optional:\n        - match: get service handle\n      - or:\n        - basic block:\n          - and:\n            - number: 0x3 = SERVICE_CONTROL_CONTINUE\n            - or:\n              - api: advapi32.ControlService\n              - api: advapi32.ControlServiceEx\n        - call:\n          - and:\n            - number: 0x3 = SERVICE_CONTROL_CONTINUE\n            - or:\n              - api: advapi32.ControlService\n              - api: advapi32.ControlServiceEx\n"
+                                           },
+                                           {
+                                               "id":  "33",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "pause service",
+                                               "description":  "host-interaction/service",
+                                               "authors":  [
+                                                               "@mr-tz"
+                                                           ],
+                                               "match_data":  [
+                                                                  "SERVICE_CONTROL_PAUSE",
+                                                                  "api: ControlService"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: pause service\n    namespace: host-interaction/service\n    authors:\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Persistence::Create or Modify System Process::Windows Service [T1543.003]\n    examples:\n      - Practical Malware Analysis Lab 17-02.dll_:0x1000bccd\n  features:\n    - and:\n      - optional:\n        - match: get service handle\n      - or:\n        - basic block:\n          - and:\n            - number: 0x2 = SERVICE_CONTROL_PAUSE\n            - or:\n              - api: advapi32.ControlService\n              - api: advapi32.ControlServiceEx\n        - call:\n          - and:\n            - number: 0x2 = SERVICE_CONTROL_PAUSE\n            - or:\n              - api: advapi32.ControlService\n              - api: advapi32.ControlServiceEx\n"
+                                           },
+                                           {
+                                               "id":  "34",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "list user accounts for group",
+                                               "description":  "host-interaction/accounts",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: NetLocalGroupGetMembers",
+                                                                  "api: NetGroupGetUsers"
+                                                              ],
+                                               "rule_src":  "# generated using capa explorer for IDA Pro\nrule:\n  meta:\n    name: list user accounts for group\n    namespace: host-interaction/accounts\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    att\u0026ck:\n      - Discovery::Permission Groups Discovery [T1069]\n  features:\n    - or:\n      - api: netapi32.NetLocalGroupGetMembers\n      - api: netapi32.NetGroupGetUsers\n"
+                                           },
+                                           {
+                                               "id":  "35",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "add user account",
+                                               "description":  "host-interaction/accounts",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: NetUserAdd"
+                                                              ],
+                                               "rule_src":  "# generated using capa explorer for IDA Pro\nrule:\n  meta:\n    name: add user account\n    namespace: host-interaction/accounts\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    att\u0026ck:\n      - Persistence::Create Account [T1136]\n  features:\n    - or:\n      - api: netapi32.NetUserAdd\n"
+                                           },
+                                           {
+                                               "id":  "36",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "connect network resource",
+                                               "description":  "communication/http : connect to disk or print resource",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: WNetCancelConnection2",
+                                                                  "api: WNetAddConnection2"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: connect network resource\n    namespace: communication/http\n    authors:\n      - michael.hunhoff@mandiant.com\n    description: connect to disk or print resource\n    scopes:\n      static: function\n      dynamic: span of calls\n  features:\n    - and:\n      - or:\n        - api: mpr.WNetAddConnection\n        - api: mpr.WNetAddConnection2\n        - api: mpr.WNetAddConnection3\n      - optional:\n        - api: mpr.WNetCancelConnection\n        - api: mpr.WNetCancelConnection2\n"
+                                           },
+                                           {
+                                               "id":  "37",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "encrypt data using DPAPI",
+                                               "description":  "data-manipulation/encryption/dpapi",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: CryptUnprotectMemory",
+                                                                  "api: CryptProtectMemory"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: encrypt data using DPAPI\n    namespace: data-manipulation/encryption/dpapi\n    authors:\n      - william.ballenthin@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Defense Evasion::Obfuscated Files or Information [T1027]\n    mbc:\n      - Cryptography::Encrypt Data [C0027]\n    examples:\n      - 6cc148363200798a12091b97a17181a1:0x1400CE9A0\n  features:\n    - or:\n      - api: CryptProtectMemory\n      - api: CryptUnprotectMemory\n      - api: crypt32.CryptProtectData\n      - api: crypt32.CryptUnprotectData\n      - api: System.Security.Cryptography.ProtectedData::Unprotect\n      - api: System.Security.Cryptography.ProtectedData::Protect\n      - api: SystemFunction040\n      - api: SystemFunction041\n      - basic block:\n        - and:\n          - match: link function at runtime on Windows\n          - or:\n            # RtlEncryptMemory is available as SystemFunction040 export in Advapi32.dll\n            # CryptProtectMemory is a wrapper function for SystemFunction040\n            - string: \"SystemFunction040\"\n            # RtlDecryptMemory is available as SystemFunction041 export in Advapi32.dll\n            # CryptUnprotectMemory is a wrapper function for SystemFunction041\n            - string: \"SystemFunction041\"\n"
+                                           }
+                                       ],
+                 "processes_terminated":  [
+                                              "%windir%\\System32\\svchost.exe -k WerSvcGroup",
+                                              "wmiadap.exe /F /T /R"
+                                          ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1543.003",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "delete service",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "1"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1098",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "change user account password",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "2"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1012",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "query or enumerate registry key",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "4"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1007",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "enumerate services",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "5"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1016",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get domain information",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "7"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1543.003",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "create service",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "9"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1569.002",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "create service",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "9"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1033",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get session user name",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "10"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1087",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get session user name",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "10"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1069",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "list user account groups",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "11"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get CPU information",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "12"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1543.003",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "start service",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "15"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1098",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "delete user account group",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "16"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1098",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "delete user account from group",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "17"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1497.001",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "reference anti-VM strings",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "18"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1531",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "delete user account",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "19"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1087",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "list groups for user account",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "20"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1012",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "query or enumerate registry value",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "21"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "parse PE header",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "22"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1087",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get user security identifier",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "23"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1543.003",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "modify service",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "24"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1569.002",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "modify service",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "24"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1016.001",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "list domain servers",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "25"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1098",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "add user account to group",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "26"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1098",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "add user account group",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "27"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1016",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get domain controller name",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "28"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get hostname",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "29"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1007",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "query service status",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "30"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1543.003",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "continue service",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "31"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1543.003",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "pause service",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "33"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1069",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "list user accounts for group",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "34"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1136",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "add user account",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "35"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1027",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "encrypt data using DPAPI",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "37"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "verdicts":  [
+                                  "UNKNOWN_VERDICT"
+                              ],
+                 "attack_techniques":  {
+                                           "T1543.003":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "delete service",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "1"
+                                                                              }
+                                                                          ]
+                                                             },
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "create service",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "9"
+                                                                              }
+                                                                          ]
+                                                             },
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "start service",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "15"
+                                                                              }
+                                                                          ]
+                                                             },
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "modify service",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "24"
+                                                                              }
+                                                                          ]
+                                                             },
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "continue service",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "31"
+                                                                              }
+                                                                          ]
+                                                             },
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "pause service",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "33"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1098":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "change user account password",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "2"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "delete user account group",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "16"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "delete user account from group",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "17"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "add user account to group",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "26"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "add user account group",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "27"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1012":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "query or enumerate registry key",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "4"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "query or enumerate registry value",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "21"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1007":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "enumerate services",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "5"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "query service status",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "30"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1016":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get domain information",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "7"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get domain controller name",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "28"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1569.002":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "create service",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "9"
+                                                                              }
+                                                                          ]
+                                                             },
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "modify service",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "24"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1033":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get session user name",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "10"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1087":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get session user name",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "10"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "list groups for user account",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "20"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get user security identifier",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "23"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1069":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "list user account groups",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "11"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "list user accounts for group",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "34"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1082":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get CPU information",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "12"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get hostname",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "29"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1497.001":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "reference anti-VM strings",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "18"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1531":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "delete user account",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "19"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "parse PE header",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "22"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1016.001":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "list domain servers",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "25"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1136":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "add user account",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "35"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1027":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "encrypt data using DPAPI",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "37"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

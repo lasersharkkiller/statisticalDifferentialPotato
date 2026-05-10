@@ -1,0 +1,188 @@
+{
+    "data":  {
+                 "signature_matches":  [
+                                           {
+                                               "id":  "0",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "resolve function by parsing PE exports",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "sara-rn"
+                                                           ],
+                                               "match_data":  [
+                                                                  "loop"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: resolve function by parsing PE exports\n    namespace: load-code/pe\n    authors:\n      - sara-rn\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic, offset, mnemonic features\n    examples:\n      - 73CE04892E5F39EC82B00C02FC04C70F:0x406BA1\n  features:\n    - and:\n      - os: windows\n      - or:\n        - characteristic: loop\n        - mnemonic: movzx\n      - and:\n        - offset: 0x3C = IMAGE_DOS_HEADER.PE.e_lfanew\n        - or:\n          - and:\n            - arch: i386\n            - offset: 0x78 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n          - and:\n            - arch: amd64\n            - offset: 0x88 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n        - 3 or more:\n          - offset: 0x14 = IMAGE_EXPORT_DIRECTORY.NumberOfFunctions\n          - offset: 0x24 = IMAGE_EXPORT_DIRECTORY.AddressOfNameOrdinals\n          - offset: 0x20 = IMAGE_EXPORT_DIRECTORY.AddressOfNames\n          - offset: 0x18 = IMAGE_EXPORT_DIRECTORY.NumberOfNames\n          - offset: 0x1C = IMAGE_EXPORT_DIRECTORY.AddressOfFunctions\n      - optional:\n        - or:\n          - api: LoadLibrary\n          - api: strcmp\n"
+                                           },
+                                           {
+                                               "id":  "1",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "link function at runtime on Windows",
+                                               "description":  "linking/runtime-linking",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetProcAddress"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: link function at runtime on Windows\n    namespace: linking/runtime-linking\n    authors:\n      - moritz.raabe@mandiant.com\n      - mehunhoff@google.com\n    scopes:\n      static: instruction\n      dynamic: call\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x404130\n      - Practical Malware Analysis Lab 01-04.exe_:0x401350\n  features:\n    - and:\n      - os: windows\n      - or:\n        - api: kernel32.GetProcAddress\n        - api: ntdll.LdrGetProcedureAddress\n        - api: ntdll.LdrGetProcedureAddressEx\n        - api: ntdll.LdrGetProcedureAddressForCaller\n        - api: MmGetSystemRoutineAddress\n"
+                                           },
+                                           {
+                                               "id":  "2",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "reference absolute stream path on Windows",
+                                               "description":  "host-interaction/file-system",
+                                               "authors":  [
+                                                               "blas.kojusner@mandiant.com",
+                                                               "william.ballenthin@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "regex: /^(\\\\\\\\\\?\\\\)?([\\w]\\:|\\\\)(\\\\((?![\\\u003c\\\u003e\\\"\\/\\|\\*\\?\\:\\\\])[\\x20-\\x5B\\x5D-\\x7E])+)+\\:\\$?[a-zA-Z0-9_]+/"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: reference absolute stream path on Windows\n    namespace: host-interaction/file-system\n    authors:\n      - blas.kojusner@mandiant.com\n      - william.ballenthin@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    references:\n      - https://learn.microsoft.com/en-us/windows/win32/fileio/file-streams\n    examples:\n      - 51828683DC26BFABD3994494099AE97D:0x11A9\n  features:\n    - and:\n      - string: /^(\\\\\\\\\\?\\\\)?([\\w]\\:|\\\\)(\\\\((?![\\\u003c\\\u003e\\\"\\/\\|\\*\\?\\:\\\\])[\\x20-\\x5B\\x5D-\\x7E])+)+\\:\\$?[a-zA-Z0-9_]+/\n        # ^(\\\\\\\\\\?\\\\)? -\u003e Check for path starting with \"\\\\?\\\"\n        # ([\\w]\\:|\\\\) -\u003e Check for absolute path beginning\n        # (\\\\((?![\\\u003c\\\u003e\\\"\\/\\|\\*\\?\\:\\\\])[\\x20-\\x5B\\x5D-\\x7E])+)+ -\u003e Check for valid path and filename\n        #   \\\\ -\u003e Check for double backslash path separator\n        #   (?![\\\u003c\\\u003e\\\"\\/\\|\\*\\?\\:\\\\]) -\u003e path component must not start with \u003c, \u003e, \", ...\n        #   [\\x20-\\x5B\\x5D-\\x7E] -\u003e path component must be printable ASCII, except backslash path separator\n        # : -\u003e Check for start of stream filename\n        # \\$?[a-zA-Z0-9_]+ -\u003e Check for valid stream filename\n        ### Example Matches:\n        ### \\\\\\\\server\\\\share\\\\file:stream\n        ### \\\\\\\\server\\\\share\\\\dir.ext\\\\file.ext:stream \n        ### \\\\\\\\server\\\\share\\\\dir\\\\file.ext:stream.ext\n        ### \\\\\\\\?\\\\C:\\\\dir1\\\\dir2\\\\file:stream\n        ### C:\\\\dir\\\\file:stream.ext\n        ### d:\\\\myfile.dat:stream1\n        ### c:\\\\string:myfile.dat\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://learn.microsoft.com/en-us/windows/win32/fileio/file-streams"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "linked against CPP regex library",
+                                               "description":  "linking/static/cppregex",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "regex_error(error_syntax)",
+                                                                  "regex_error(error_collate): The expression contained an invalid collating element name."
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: linked against CPP regex library\n    namespace: linking/static/cppregex\n    authors:\n      - william.ballenthin@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    references:\n      - http://www.cplusplus.com/reference/regex/regex_error/\n  features:\n    - or:\n      - string: \"regex_error(error_syntax)\"\n        description: C++ STL regex library\n      - string: \"regex_error(error_collate): The expression contained an invalid collating element name.\"\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "http://www.cplusplus.com/reference/regex/regex_error/"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "5",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "parse credit card information",
+                                               "description":  "collection/credit-card",
+                                               "authors":  [
+                                                               "@_re_fox"
+                                                           ],
+                                               "match_data":  [
+                                                                  "\u0027?\u0027 (Track 1 \u0026 2 end sentinel)",
+                                                                  "mnemonic: cmp",
+                                                                  "\u0027B\u0027 (Format code)"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: parse credit card information\n    namespace: collection/credit-card\n    authors:\n      - \"@_re_fox\"\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic features\n    mbc:\n      - Data::Check String [C0019]\n    examples:\n      - 1d8fd13c890060464019c0f07b928b1a:0x402860\n  features:\n    - and:\n      - 3 or more:\n        - instruction:\n          - mnemonic: cmp\n          - number: 0x5E = \u0027^\u0027 (Track 1 separator)\n        - instruction:\n          - mnemonic: cmp\n          - number: 0x3D = \u0027=\u0027 (Track 2 separator)\n        - instruction:\n          - mnemonic: cmp\n          - number: 0x25 = \u0027%\u0027 (Track 1 start sentinel)\n        - instruction:\n          - mnemonic: cmp\n          - number: 0x42 = \u0027B\u0027 (Format code)\n        - instruction:\n          - mnemonic: cmp\n          - number: 0x44 = \u0027D\u0027 (Format code)\n        - instruction:\n          - mnemonic: cmp\n          - number: 0x3F = \u0027?\u0027 (Track 1 \u0026 2 end sentinel)\n        - instruction:\n          - mnemonic: cmp\n          - number: 0x3B = \u0027;\u0027 (Track 2 start sentinel)\n      - not:\n        - description: if a function also compares these non-hex characters it\u0027s most likely NOT parsing CC data\n        - and:\n          - instruction:\n            - mnemonic: cmp\n            - number: 0x6D = \u0027m\u0027\n          - instruction:\n            - mnemonic: cmp\n            - number: 0x6E = \u0027n\u0027\n          - instruction:\n            - mnemonic: cmp\n            - number: 0x6F = \u0027o\u0027\n          - instruction:\n            - mnemonic: cmp\n            - number: 0x70 = \u0027p\u0027\n"
+                                           },
+                                           {
+                                               "id":  "6",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "resolve DNS",
+                                               "description":  "communication/dns",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com",
+                                                               "johnk3r",
+                                                               "joakim@intezer.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetAddrInfo"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: resolve DNS\n    namespace: communication/dns\n    authors:\n      - william.ballenthin@mandiant.com\n      - johnk3r\n      - joakim@intezer.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Communication::DNS Communication::Resolve [C0011.001]\n    examples:\n      - 17264e3126a97c319a6a0c61e6da951e:0x5FDC25D0\n  features:\n    - or:\n      - api: gethostbyname\n      - api: ws2_32.gethostbyname\n      - api: ws2_32.#52 = gethostbyname\n      - api: DnsQuery_A\n      - api: DnsQuery_W\n      - api: DnsQuery_UTF8\n      - api: DnsQueryEx\n      - api: GetAddrInfo\n      - api: ws2_32.#24 = GetAddrInfoW\n      - api: GetAddrInfoEx\n      - api: getaddrinfo\n      - api: ws2_32.#98 = getaddrinfo\n      - api: getnameinfo\n      - api: ws2_32.#99 = getnameinfo\n      - api: gethostent\n      - api: System.Net.Dns::GetHostAddresses\n"
+                                           },
+                                           {
+                                               "id":  "7",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "linked against CPP standard library",
+                                               "description":  "linking/static",
+                                               "authors":  [
+                                                               "@mr-tz"
+                                                           ],
+                                               "match_data":  [
+                                                                  "Copyright (c) by P.J. Plauger, licensed by Dinkumware, Ltd. ALL RIGHTS RESERVED."
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: linked against CPP standard library\n    namespace: linking/static\n    authors:\n      - \"@mr-tz\"\n    scopes:\n      static: file\n      dynamic: file\n    references:\n      - https://en.wikipedia.org/wiki/P._J._Plauger\n      - https://www.dinkumware.com/\n    examples:\n      - 03b236b23b1ec37c663527c1f53af3fe\n  features:\n    - or:\n      - string: \"Copyright (c) by P.J. Plauger, licensed by Dinkumware, Ltd. ALL RIGHTS RESERVED.\"\n      - string: \"Copyright (c) 1992-2004 by P.J. Plauger, licensed by Dinkumware, Ltd. ALL RIGHTS RESERVED.\"\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://en.wikipedia.org/wiki/P._J._Plauger"
+                                                            },
+                                                            {
+                                                                "ref":  "https://www.dinkumware.com/"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "8",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "contains PDB path",
+                                               "description":  "executable/pe/pdb",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "regex: /:\\\\.*\\.pdb/"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: contains PDB path\n    namespace: executable/pe/pdb\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    examples:\n      - 464EF2CA59782CE697BC329713698CCC  # level32.exe\n  features:\n    - string: /:\\\\.*\\.pdb/\n"
+                                           }
+                                       ],
+                 "mbc":  [
+                             {
+                                 "id":  "C0019",
+                                 "objective":  "Data",
+                                 "behavior":  "Check String",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "5"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0011.001",
+                                 "objective":  "Communication",
+                                 "behavior":  "DNS Communication",
+                                 "method":  "Resolve",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "6"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "link function at runtime on Windows",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "1"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "attack_techniques":  {
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "link function at runtime on Windows",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "1"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

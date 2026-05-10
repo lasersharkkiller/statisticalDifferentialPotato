@@ -1,0 +1,1204 @@
+{
+    "data":  {
+                 "signature_matches":  [
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "access PEB ldr_data",
+                                               "description":  "linking/runtime-linking",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: access PEB ldr_data\n    namespace: linking/runtime-linking\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: unsupported  # requires offset features\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    references:\n      - https://www.geoffchappell.com/studies/windows/km/ntoskrnl/inc/api/ntpsapi_x/peb_ldr_data.htm\n      - https://github.com/d35ha/CallObfuscator/blob/5834aff9ff4511f1408ae4ce80b79737af4ae77b/ShellCode/shell_x64.asm#L8\n    examples:\n      - 3FDFB2D522E7DEECAAAF2F87420F7E75:0x4117B7\n  features:\n    - or:\n      - and:\n        - arch: i386\n        - description: x32\n\n        - match: PEB access\n\n        # x86 Windows uses fs:0 to access the TIB which contains SEH information at offset 0\n        # checking for fs:0 and a (possibly unrelated) number or offset often results in false positives\n\n        - offset: 0x0C = PEB.LDR_DATA\n\n        - or:\n          - description: resolve a module list\n          - offset: 0x0C = PEB.LDR_DATA.InLoadOrderModuleList\n          - offset: 0x14 = PEB.LDR_DATA.InMemoryOrderModuleList\n          - offset: 0x1C = PEB.LDR_DATA.InInitializationOrderModuleList\n\n      - and:\n        - arch: amd64\n        - description: x64\n\n        - match: PEB access\n\n        - offset: 0x18 = PEB.LDR_DATA\n\n        - or:\n          - description: resolve a module list\n          - offset: 0x10 = PEB.LDR_DATA.InLoadOrderModuleList\n          - offset: 0x20 = PEB.LDR_DATA.InMemoryOrderModuleList\n          - offset: 0x30 = PEB.LDR_DATA.InInitializationOrderModuleList\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://www.geoffchappell.com/studies/windows/km/ntoskrnl/inc/api/ntpsapi_x/peb_ldr_data.htm"
+                                                            },
+                                                            {
+                                                                "ref":  "https://github.com/d35ha/CallObfuscator/blob/5834aff9ff4511f1408ae4ce80b79737af4ae77b/ShellCode/shell_x64.asm#L8"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "set thread local storage value",
+                                               "description":  "host-interaction/thread/tls",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: set thread local storage value\n    namespace: host-interaction/thread/tls\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Process::Set Thread Local Storage Value [C0041]\n    examples:\n      - 03B236B23B1EC37C663527C1F53AF3FE:0x18000AE21\n  features:\n    - and:\n      - api: kernel32.TlsSetValue\n      - optional:\n        - match: allocate thread local storage\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "set environment variable",
+                                               "description":  "host-interaction/environment-variable",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: set environment variable\n    namespace: host-interaction/environment-variable\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Operating System::Environment Variable::Set Variable [C0034.001]\n    examples:\n      - 0731679c5f99e8ee65d8b29a3cabfc6b:0x43EA81\n  features:\n    - or:\n      - api: kernel32.SetEnvironmentStrings\n      - api: kernel32.SetEnvironmentVariable\n      - api: System.Environment::SetEnvironmentVariable\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "query or enumerate registry value",
+                                               "description":  "host-interaction/registry",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: query or enumerate registry value\n    namespace: host-interaction/registry\n    authors:\n      - william.ballenthin@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::Query Registry [T1012]\n    mbc:\n      - Operating System::Registry::Query Registry Value [C0036.006]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13145B5A\n      - Practical Malware Analysis Lab 03-02.dll_:0x100047AD\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegGetValue\n        - api: advapi32.RegEnumValue\n        - api: advapi32.RegQueryValue\n        - api: advapi32.RegQueryValueEx\n        - api: advapi32.RegQueryMultipleValues\n        - api: ZwQueryValueKey\n        - api: ZwEnumerateValueKey\n        - api: NtQueryValueKey\n        - api: NtEnumerateValueKey\n        - api: RtlQueryRegistryValues\n        - api: SHGetValue\n        - api: SHEnumValue\n        - api: SHRegGetInt\n        - api: SHRegGetPath\n        - api: SHRegGetValue\n        - api: SHQueryValueEx\n        - api: SHRegGetUSValue\n        - api: SHOpenRegStream\n        - api: SHRegEnumUSValue\n        - api: SHOpenRegStream2\n        - api: SHRegQueryUSValue\n        - api: SHRegGetBoolUSValue\n        - api: SHRegGetValueFromHKCUHKLM\n        - api: SHRegGetBoolValueFromHKCUHKLM\n        - api: Microsoft.Win32.RegistryKey::GetValue\n        - api: Microsoft.Win32.RegistryKey::GetValueKind\n        - api: Microsoft.Win32.RegistryKey::GetValueNames\n        - api: Microsoft.Win32.Registry::GetValue\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "interact with driver via IOCTL",
+                                               "description":  "host-interaction/driver",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: interact with driver via IOCTL\n    namespace: host-interaction/driver\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: instruction\n      dynamic: call\n    examples:\n      - Practical Malware Analysis Lab 10-03.exe_:0x40108c\n  features:\n    - or:\n      - api: DeviceIoControl\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get system information on Windows",
+                                               "description":  "host-interaction/os/info",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "joakim@intezer.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get system information on Windows\n    namespace: host-interaction/os/info\n    authors:\n      - moritz.raabe@mandiant.com\n      - joakim@intezer.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::System Information Discovery [T1082]\n    examples:\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x140002280\n  features:\n    - and:\n      - os: windows\n      - or:\n        - api: kernel32.GetSystemInfo\n        - api: kernel32.GetNativeSystemInfo\n        - api: NtQuerySystemInformation\n        - api: NtQuerySystemInformationEx\n        - api: ntdll.RtlGetNativeSystemInformation\n        - api: ZwQuerySystemInformation\n        - api: ZwQuerySystemInformationEx\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get ntdll base address",
+                                               "description":  "linking/runtime-linking",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get ntdll base address\n    namespace: linking/runtime-linking\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: unsupported  # requires offset features\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    references:\n      - https://idafchev.github.io/exploit/2017/09/26/writing_windows_shellcode.html\n      - https://www.geoffchappell.com/studies/windows/win32/ntdll/structs/ldr_data_table_entry.htm\n    examples:\n      - 67f8302a2fd28d15f62d6d20d748bfe350334e5353cbdef112bd1f8231b5599d:0x40694A\n  features:\n    - and:\n      # PEB -\u003e PEB.Ldr -\u003e PEB_LDR_DATA.InLoadOrderModuleList.Flink\n      - match: access PEB ldr_data\n      # -\u003e current module\n      - count(offset(0)): 1\n      # -\u003e ntdll -\u003e LDR_DATA_TABLE_ENTRY.DllBase\n      - or:\n        - and:\n          - arch: i386\n          - offset: 0x18 = LDR_DATA_TABLE_ENTRY.DllBase\n        - and:\n          - arch: amd64\n          - offset: 0x30 = LDR_DATA_TABLE_ENTRY.DllBase\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://idafchev.github.io/exploit/2017/09/26/writing_windows_shellcode.html"
+                                                            },
+                                                            {
+                                                                "ref":  "https://www.geoffchappell.com/studies/windows/win32/ntdll/structs/ldr_data_table_entry.htm"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "query or enumerate registry key",
+                                               "description":  "host-interaction/registry",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: query or enumerate registry key\n    namespace: host-interaction/registry\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::Query Registry [T1012]\n    mbc:\n      - Operating System::Registry::Query Registry Key [C0036.005]\n    examples:\n      - 493167E85E45363D09495D0841C30648:0x404930\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x402608\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegEnumKey\n        - api: advapi32.RegEnumKeyEx\n        - api: advapi32.RegQueryInfoKeyA\n        - api: ZwQueryKey\n        - api: ZwEnumerateKey\n        - api: NtQueryKey\n        - api: NtEnumerateKey\n        - api: RtlCheckRegistryKey\n        - api: SHEnumKeyEx\n        - api: SHQueryInfoKey\n        - api: SHRegEnumUSKey\n        - api: SHRegQueryInfoUSKey\n        - api: Microsoft.Win32.RegistryKey::GetSubKeyNames\n        - api: Microsoft.Win32.RegistryKey::OpenBaseKey\n        - api: Microsoft.Win32.RegistryKey::OpenRemoteBaseKey\n        - api: Microsoft.Win32.RegistryKey::OpenSubKey\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "query environment variable",
+                                               "description":  "host-interaction/environment-variable",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "@_re_fox"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: query environment variable\n    namespace: host-interaction/environment-variable\n    authors:\n      - michael.hunhoff@mandiant.com\n      - \"@_re_fox\"\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Information Discovery [T1082]\n    mbc:\n      - Discovery::System Information Discovery [E1082]\n    examples:\n      - Practical Malware Analysis Lab 14-02.exe_:0x401880\n      - 0761142efbda6c4b1e801223de723578:0x65483490\n  features:\n    - or:\n      - api: kernel32.GetEnvironmentVariable\n      - api: kernel32.GetEnvironmentStrings\n      - api: kernel32.ExpandEnvironmentStrings\n      - api: msvcr90.getenv\n      - api: msvcrt.getenv\n      - api: System.Environment::GetEnvironmentVariable\n      - api: System.Environment::GetEnvironmentVariables\n      - api: System.Environment::ExpandEnvironmentVariables\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "listen for remote procedure calls",
+                                               "description":  "communication/rpc/server",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "# generated using capa explorer for IDA Pro\nrule:\n  meta:\n    name: listen for remote procedure calls\n    namespace: communication/rpc/server\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n  features:\n    - or:\n      - api: rpcrt4.RpcServerListen\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check for PEB BeingDebugged flag",
+                                               "description":  "anti-analysis/anti-debugging/debugger-detection",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check for PEB BeingDebugged flag\n    namespace: anti-analysis/anti-debugging/debugger-detection\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: unsupported  # requires offset features\n    mbc:\n      - Anti-Behavioral Analysis::Debugger Detection::Process Environment Block BeingDebugged [B0001.035]\n    references:\n      - Practical Malware Analysis, Chapter 16, p. 353\n    examples:\n      - Practical Malware Analysis Lab 16-01.exe_:0x403530\n  features:\n    - and:\n      - match: PEB access\n      - offset: 2 = PEB.BeingDebugged\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "Practical Malware Analysis, Chapter 16, p. 353"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get thread local storage value",
+                                               "description":  "host-interaction/process",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get thread local storage value\n    namespace: host-interaction/process\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n  features:\n    - and:\n      - api: kernel32.TlsGetValue\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create thread",
+                                               "description":  "host-interaction/thread/create",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "joakim@intezer.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create thread\n    namespace: host-interaction/thread/create\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - joakim@intezer.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: span of calls\n    mbc:\n      - Process::Create Thread [C0038]\n    examples:\n      - 946A99F36A46D335DEC080D9A4371940:0x10001DA0\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x408020\n  features:\n    - or:\n      - and:\n        - os: windows\n        - or:\n          - api: kernel32.CreateThread\n          - api: _beginthread\n          - api: _beginthreadex\n          - api: PsCreateSystemThread\n          - api: SHCreateThread\n          - api: SHCreateThreadWithHandle\n          - api: kernel32.CreateRemoteThread\n          - api: kernel32.CreateRemoteThreadEx\n          - api: RtlCreateUserThread\n          - api: ntdll.NtCreateThread\n          - api: ntdll.NtCreateThreadEx\n          - api: ntdll.ZwCreateThread\n          - api: ntdll.ZwCreateThreadEx\n      - and:\n        - or:\n          - os: linux\n          - os: android\n        - api: pthread_create\n      - and:\n        - api: System.Threading.Thread::Start\n        - optional:\n          - api: System.Threading.Thread::ctor\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "link function at runtime on Windows",
+                                               "description":  "linking/runtime-linking",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: link function at runtime on Windows\n    namespace: linking/runtime-linking\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: instruction\n      dynamic: call\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x404130\n      - Practical Malware Analysis Lab 01-04.exe_:0x401350\n  features:\n    - and:\n      - os: windows\n      - or:\n        - api: kernel32.GetProcAddress\n        - api: ntdll.LdrGetProcedureAddress\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "set file attributes",
+                                               "description":  "host-interaction/file-system/meta",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: set file attributes\n    namespace: host-interaction/file-system/meta\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    att\u0026ck:\n      - Defense Evasion::File and Directory Permissions Modification [T1222]\n    mbc:\n      - File System::Set File Attributes [C0050]\n    examples:\n      - 946A99F36A46D335DEC080D9A4371940:0x100015f0\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x4028B6\n  features:\n    - or:\n      - api: kernel32.SetFileAttributes\n      - api: ZwSetInformationFile\n      - api: NtSetInformationFile\n      - api: System.IO.File::SetAttributes\n      - api: System.IO.File::SetCreationTime\n      - api: System.IO.File::SetCreationTimeUtc\n      - api: System.IO.File::SetLastAccessTime\n      - api: System.IO.File::SetLastAccessTimeUtc\n      - api: System.IO.File::SetLastWriteTime\n      - api: System.IO.File::SetLastWriteTimeUtc\n      - property/write: System.IO.FileSystemInfo::Attributes\n      - api: utime\n      - api: utimes\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "allocate thread local storage",
+                                               "description":  "host-interaction/thread/tls",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: allocate thread local storage\n    namespace: host-interaction/thread/tls\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Process::Allocate Thread Local Storage [C0040]\n    examples:\n      - 03B236B23B1EC37C663527C1F53AF3FE:0x18000ADF6\n  features:\n    - or:\n      - api: kernel32.TlsAlloc\n"
+                                           },
+                                           {
+                                               "id":  "stealth_network",
+                                               "name":  "stealth_network",
+                                               "description":  "Network activity detected but not expressed in monitor API logs",
+                                               "match_data":  [
+                                                                  "{\"ip\": \"168.61.215.74\"}",
+                                                                  "{\"ip\": \"184.29.183.29\"}",
+                                                                  "{\"ip\": \"13.95.31.18\"}",
+                                                                  "{\"ip\": \"4.245.163.56\"}",
+                                                                  "{\"ip\": \"20.59.87.225\"}",
+                                                                  "{\"ip\": \"51.11.168.232\"}",
+                                                                  "{\"ip\": \"20.190.190.131\"}",
+                                                                  "{\"ip\": \"96.7.156.177\"}",
+                                                                  "{\"ip\": \"23.196.145.221\"}",
+                                                                  "{\"ip\": \"199.232.210.172\"}",
+                                                                  "{\"ip\": \"204.79.197.203\"}",
+                                                                  "{\"ip\": \"8.8.8.8\"}",
+                                                                  "{\"domain\": \"dns.msftncsi.com\"}",
+                                                                  "{\"domain\": \"wpad.hostonly\"}",
+                                                                  "{\"domain\": \"_ldap._tcp.dc._msdcs.WORKGROUP.hostonly\"}",
+                                                                  "{\"domain\": \"api.msn.com\"}",
+                                                                  "{\"domain\": \"ctldl.windowsupdate.com\"}",
+                                                                  "{\"domain\": \"ocsp.digicert.com\"}",
+                                                                  "{\"domain\": \"cdn.onenote.net\"}",
+                                                                  "{\"domain\": \"login.live.com\"}",
+                                                                  "{\"domain\": \"settings-win.data.microsoft.com\"}",
+                                                                  "{\"domain\": \"slscr.update.microsoft.com\"}",
+                                                                  "{\"domain\": \"fe3cr.delivery.mp.microsoft.com\"}",
+                                                                  "{\"domain\": \"fs.microsoft.com\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "queries_keyboard_layout",
+                                               "name":  "queries_keyboard_layout",
+                                               "description":  "Queries the keyboard layout",
+                                               "match_data":  [
+                                                                  "{\"type\": \"call\", \"pid\": 2692, \"cid\": 9}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "static_pe_pdbpath",
+                                               "name":  "static_pe_pdbpath",
+                                               "description":  "The PE file contains a PDB path",
+                                               "match_data":  [
+                                                                  "{\"pdbpath\": \"lsass.pdb\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "antidebug_setunhandledexceptionfilter",
+                                               "name":  "antidebug_setunhandledexceptionfilter",
+                                               "description":  "SetUnhandledExceptionFilter detected (possible anti-debug)",
+                                               "match_data":  [
+                                                                  "{\"type\": \"call\", \"pid\": 2692, \"cid\": 3}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "network_http",
+                                               "name":  "network_http",
+                                               "description":  "Performs some HTTP requests",
+                                               "match_data":  [
+                                                                  "{\"url\": \"http://ocsp.digicert.com/MFEwTzBNMEswSTAJBgUrDgMCGgUABBQ50otx%2Fh0Ztl%2Bz8SiPI7wEWVxDlQQUTiJUIBiV5uNu5g%2F6%2BrkS7QYXjzkCEApDqVCbATUviZV57HIIulA%3D\"}",
+                                                                  "{\"url\": \"http://ocsp.digicert.com/MFEwTzBNMEswSTAJBgUrDgMCGgUABBSAUQYBMq2awn1Rh6Doh%2FsBYgFV7gQUA95QNVbRTLtm8KPiGxvDl7I90VUCEAJ0LqoXyo4hxxe7H%2Fz9DKA%3D\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_LOW"
+                                           },
+                                           {
+                                               "id":  "packer_unknown_pe_section_name",
+                                               "name":  "packer_unknown_pe_section_name",
+                                               "description":  "The binary contains an unknown PE section name indicative of packing",
+                                               "match_data":  [
+                                                                  "{\"unknown section\": {\"name\": \".didat\", \"raw_address\": \"0x0000b000\", \"virtual_address\": \"0x0000e000\", \"virtual_size\": \"0x00000030\", \"size_of_data\": \"0x00000200\", \"characteristics\": \"IMAGE_SCN_CNT_INITI"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_LOW"
+                                           },
+                                           {
+                                               "id":  "contains_pe_overlay",
+                                               "name":  "contains_pe_overlay",
+                                               "description":  "The PE file contains an overlay",
+                                               "match_data":  [
+                                                                  "{\"overlay\": \"Contains overlay at offset 0x0000bc00 with size: 9384 bytes\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_LOW"
+                                           },
+                                           {
+                                               "id":  "procmem_yara",
+                                               "name":  "procmem_yara",
+                                               "description":  "Yara detections observed in process dumps, payloads or dropped files",
+                                               "match_data":  [
+                                                                  "{\"Hit\": \"PID 2692 triggered the Yara rule \u0027shellcode_get_eip\u0027 with data \u0027[\u0027{ E8 00 00 00 00 59 }\u0027]\u0027\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_MEDIUM"
+                                           },
+                                           {
+                                               "id":  "static_pe_anomaly",
+                                               "name":  "static_pe_anomaly",
+                                               "description":  "Anomalous binary characteristics",
+                                               "match_data":  [
+                                                                  "{\"anomaly\": \"Entrypoint of binary is located outside of any mapped sections\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_MEDIUM"
+                                           }
+                                       ],
+                 "processes_injected":  [
+                                            "\\\\?\\C:\\Windows\\system32\\wbem\\WMIADAP.EXE"
+                                        ],
+                 "files_dropped":  [
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERF00D.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERF00D.tmp.WERInternalMetadata.xml"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERF0C8.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERF0C8.tmp.csv"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERF0F8.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERF0F8.tmp.txt"
+                                       },
+                                       {
+                                           "path":  "C:\\Windows\\System32\\spp\\store\\2.0\\data.dat.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERFC14.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERFC14.tmp.WERInternalMetadata.xml"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERFC73.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERFC73.tmp.csv"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERFC83.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERFC83.tmp.txt"
+                                       },
+                                       {
+                                           "path":  "C:\\Windows\\System32\\spp\\store\\2.0\\cache\\cache.dat"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER220A.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER220A.tmp.WERInternalMetadata.xml"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER22B5.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER22B5.tmp.csv"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER22E5.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER22E5.tmp.txt"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER27B8.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER27B8.tmp.WERInternalMetadata.xml"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER27C8.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER27C8.tmp.csv"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER27C9.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER27C9.tmp.txt"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER3757.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER3757.tmp.WERInternalMetadata.xml"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER3812.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER3812.tmp.csv"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER3842.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER3842.tmp.txt"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER410C.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER410C.tmp.WERInternalMetadata.xml"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER410D.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER410D.tmp.csv"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER411E.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER411E.tmp.txt"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER269D.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER269D.tmp.WERInternalMetadata.xml"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER2769.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER2769.tmp.csv"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER2798.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER2798.tmp.txt"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER27F6.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER27F6.tmp.WERInternalMetadata.xml"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER27F7.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER27F7.tmp.csv"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER2808.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER2808.tmp.txt"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERF898.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERF898.tmp.WERInternalMetadata.xml"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERF983.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERF983.tmp.csv"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERF9B2.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERF9B2.tmp.txt"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERFA10.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERFA10.tmp.WERInternalMetadata.xml"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERFA21.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERFA21.tmp.csv"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERFA22.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERFA22.tmp.txt"
+                                       }
+                                   ],
+                 "memory_dumps":  [
+                                      {
+                                          "file_name":  "2692.dmp",
+                                          "process":  "C:\\Users\\Bruno\\Desktop\\software.exe",
+                                          "size":  "52686848",
+                                          "base_address":  "2147352576"
+                                      }
+                                  ],
+                 "mutexes_created":  [
+                                         "\\BaseNamedObjects\\Local\\SM0:5488:304:WilStaging_02"
+                                     ],
+                 "registry_keys_set":  [
+                                           {
+                                               "key":  "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Services\\MpKsl5e17e1d0\\Parameters"
+                                           },
+                                           {
+                                               "key":  "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Services\\MpKsl5e17e1d0\\Parameters\\Wdf"
+                                           },
+                                           {
+                                               "key":  "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Services\\MpKsl5e17e1d0\\Parameters\\Wdf\\WdfMajorVersion",
+                                               "value":  "1"
+                                           },
+                                           {
+                                               "key":  "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Services\\MpKsl5e17e1d0\\Parameters\\Wdf\\WdfMinorVersion",
+                                               "value":  "11"
+                                           }
+                                       ],
+                 "mbc":  [
+                             {
+                                 "id":  "C0041",
+                                 "objective":  "Process",
+                                 "behavior":  "Set Thread Local Storage Value",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "set thread local storage value"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0034.001",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Environment Variable",
+                                 "method":  "Set Variable",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "set environment variable"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.006",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Query Registry Value",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "query or enumerate registry value"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.005",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Query Registry Key",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "query or enumerate registry key"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1082",
+                                 "objective":  "Discovery",
+                                 "behavior":  "System Information Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "query environment variable"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0001.035",
+                                 "objective":  "Anti-Behavioral Analysis",
+                                 "behavior":  "Debugger Detection",
+                                 "method":  "Process Environment Block BeingDebugged",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "check for PEB BeingDebugged flag"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0038",
+                                 "objective":  "Process",
+                                 "behavior":  "Create Thread",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "create thread"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0050",
+                                 "objective":  "File System",
+                                 "behavior":  "Set File Attributes",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "set file attributes"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0040",
+                                 "objective":  "Process",
+                                 "behavior":  "Allocate Thread Local Storage",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "allocate thread local storage"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "OC0006"
+                             },
+                             {
+                                 "id":  "C0002"
+                             },
+                             {
+                                 "id":  "C0005.001"
+                             },
+                             {
+                                 "id":  "OB0001"
+                             },
+                             {
+                                 "id":  "OB0002"
+                             },
+                             {
+                                 "id":  "OB0006"
+                             },
+                             {
+                                 "id":  "F0001"
+                             }
+                         ],
+                 "command_executions":  [
+                                            "\"%SAMPLEPATH%\\lsass.exe\" ",
+                                            "C:\\Windows\\System32\\wuapihost.exe -Embedding",
+                                            "\"%SAMPLEPATH%\\d957a03c6ea35cbf0c90b0b088df07e7803a1a3eeb4ba889038f88db066bbdc4.exe\" "
+                                        ],
+                 "files_deleted":  [
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERF00D.tmp.WERInternalMetadata.xml",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERF0C8.tmp.csv",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERF0F8.tmp.txt",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERFC14.tmp.WERInternalMetadata.xml",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERFC73.tmp.csv",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERFC83.tmp.txt",
+                                       "C:\\Windows\\System32\\spp\\store\\2.0\\cache\\cache.dat",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER220A.tmp.WERInternalMetadata.xml",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER22B5.tmp.csv",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER22E5.tmp.txt",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER27B8.tmp.WERInternalMetadata.xml",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER27C8.tmp.csv",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER27C9.tmp.txt",
+                                       "%USERPROFILE%\\AppData\\Local\\Microsoft\\Windows\\INetCache\\IE\\KLT1I0ZU\\update50[1].xml",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER3757.tmp.WERInternalMetadata.xml",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER3812.tmp.csv",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER3842.tmp.txt",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER410C.tmp.WERInternalMetadata.xml",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER410D.tmp.csv",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER411E.tmp.txt",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER269D.tmp.WERInternalMetadata.xml",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER2769.tmp.csv",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER2798.tmp.txt",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER27F6.tmp.WERInternalMetadata.xml",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER27F7.tmp.csv",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER2808.tmp.txt",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERF898.tmp.WERInternalMetadata.xml",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERF983.tmp.csv",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERF9B2.tmp.txt",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERFA10.tmp.WERInternalMetadata.xml",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERFA21.tmp.csv",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERFA22.tmp.txt",
+                                       "C:\\Windows\\System32\\wbem\\Performance\\WmiApRpl.h",
+                                       "C:\\Windows\\System32\\wbem\\Performance\\WmiApRpl.ini",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER3E33.tmp",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER40B4.tmp"
+                                   ],
+                 "processes_terminated":  [
+                                              "C:\\Windows\\System32\\wuapihost.exe",
+                                              "%SAMPLEPATH%\\lsass.exe",
+                                              "%SAMPLEPATH%\\d957a03c6ea35cbf0c90b0b088df07e7803a1a3eeb4ba889038f88db066bbdc4.exe"
+                                          ],
+                 "verdicts":  [
+                                  "CLEAN"
+                              ],
+                 "files_written":  [
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER3E33.tmp",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER3E33.tmp.csv",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER40B4.tmp",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER40B4.tmp.txt"
+                                   ],
+                 "modules_loaded":  [
+                                        "%SAMPLEPATH%\\d957a03c6ea35cbf0c90b0b088df07e7803a1a3eeb4ba889038f88db066bbdc4.exe"
+                                    ],
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "2692",
+                                            "name":  "\"C:\\Users\\\u003cUSER\u003e\\Desktop\\software.exe\""
+                                        },
+                                        {
+                                            "process_id":  "3476",
+                                            "name":  "%WINDIR%\\explorer.exe",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "8",
+                                                                 "name":  "%SAMPLEPATH%\\lsass.exe"
+                                                             }
+                                                         ]
+                                        },
+                                        {
+                                            "process_id":  "620",
+                                            "name":  "C:\\Windows\\System32\\svchost.exe",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "2692",
+                                                                 "name":  "C:\\Windows\\System32\\wuapihost.exe"
+                                                             }
+                                                         ]
+                                        },
+                                        {
+                                            "process_id":  "6776",
+                                            "name":  "\u0027C:\\Users\\user\\Desktop\\lsass.exe\u0027 "
+                                        },
+                                        {
+                                            "process_id":  "4",
+                                            "name":  "C:\\ProgramData\\Microsoft\\Windows Defender\\Definition Updates\\{FB98DDB0-12A6-4219-939B-AA32BC351C9C}\\MpKslDrv.sys"
+                                        },
+                                        {
+                                            "process_id":  "5488",
+                                            "name":  "C:\\Windows\\System32\\svchost.exe -k WerSvcGroup"
+                                        }
+                                    ],
+                 "verdict_confidence":  1,
+                 "files_opened":  [
+                                      "C:\\ProgramData\\Microsoft\\",
+                                      "C:\\ProgramData\\Microsoft\\Windows\\",
+                                      "C:\\ProgramData\\Microsoft\\Windows\\WER",
+                                      "C:\\ProgramData\\Microsoft\\Windows\\WER\\",
+                                      "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER3E33.tmp",
+                                      "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER3E33.tmp.csv",
+                                      "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER40B4.tmp",
+                                      "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER40B4.tmp.txt",
+                                      "C:\\Windows\\SYSTEM32\\WLDP.DLL",
+                                      "C:\\Windows\\SYSTEM32\\msvcp110_win.dll",
+                                      "C:\\Windows\\SYSTEM32\\ntmarta.dll",
+                                      "C:\\Windows\\SYSTEM32\\ole32.dll",
+                                      "C:\\Windows\\SYSTEM32\\policymanager.dll",
+                                      "C:\\Windows\\system32\\",
+                                      "MountPointManager",
+                                      "\\Device\\KsecDD",
+                                      "c:\\windows\\system32\\CRYPTSP.dll",
+                                      "c:\\windows\\system32\\WerEtw.dll",
+                                      "c:\\windows\\system32\\bcrypt.dll",
+                                      "c:\\windows\\system32\\dbgcore.DLL",
+                                      "c:\\windows\\system32\\dbghelp.dll",
+                                      "c:\\windows\\system32\\faultrep.dll",
+                                      "c:\\windows\\system32\\wer.dll",
+                                      "c:\\windows\\system32\\wersvc.dll"
+                                  ],
+                 "registry_keys_opened":  [
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Wdf\\Kmdf\\KmdfLibrary\\Versions\\1",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Services\\MpKsl5e17e1d0",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Services\\MpKsl5e17e1d0\\Parameters\\Wdf",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Segment Heap",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\FileSystem\\",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\SafeBoot\\Option",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Srp\\GP\\DLL",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Wdf\\Kmdf\\KmdfLibrary\\Versions"
+                                          ],
+                 "tags":  [
+                              "OBFUSCATED",
+                              "IDLE"
+                          ],
+                 "ip_traffic":  [
+                                    {
+                                        "destination_ip":  "a83f:8110:0:0:1b00:100:2800:0",
+                                        "destination_port":  53,
+                                        "transport_layer_protocol":  "UDP"
+                                    },
+                                    {
+                                        "destination_ip":  "131.253.33.203",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "a83f:8110:0:0:b0:b403:0:0",
+                                        "destination_port":  53,
+                                        "transport_layer_protocol":  "UDP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.216.147.76",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "20.80.129.13",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "a83f:8110:6500:7300:6f00:7500:7200:6300",
+                                        "destination_port":  53,
+                                        "transport_layer_protocol":  "UDP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.216.147.64",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "20.99.132.105",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "a83f:8110:cce1:d301:10:0:0:0",
+                                        "destination_port":  53,
+                                        "transport_layer_protocol":  "UDP"
+                                    },
+                                    {
+                                        "destination_ip":  "20.99.184.37",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "a83f:8110:100:0:0:0:e00:0",
+                                        "destination_port":  53,
+                                        "transport_layer_protocol":  "UDP"
+                                    },
+                                    {
+                                        "destination_ip":  "192.229.211.108",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "a83f:8110:0:0:2000:0:0:0",
+                                        "destination_port":  53,
+                                        "transport_layer_protocol":  "UDP"
+                                    },
+                                    {
+                                        "destination_ip":  "192.168.0.1",
+                                        "destination_port":  137,
+                                        "transport_layer_protocol":  "UDP"
+                                    },
+                                    {
+                                        "destination_ip":  "20.99.186.246",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "20.99.185.48",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.196.145.221",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "104.98.118.155",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "a83f:8110:0:0:2d88:21:0:0",
+                                        "destination_port":  53,
+                                        "transport_layer_protocol":  "UDP"
+                                    },
+                                    {
+                                        "destination_ip":  "192.168.0.38",
+                                        "destination_port":  137,
+                                        "transport_layer_protocol":  "UDP"
+                                    },
+                                    {
+                                        "destination_ip":  "20.99.133.109",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.55.140.42",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.196.193.245",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.41.4.201",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    }
+                                ],
+                 "processes_created":  [
+                                           "\"C:\\Users\\\u003cUSER\u003e\\Desktop\\software.exe\"",
+                                           "%SAMPLEPATH%\\lsass.exe",
+                                           "C:\\Windows\\System32\\wuapihost.exe",
+                                           "%SAMPLEPATH%\\d957a03c6ea35cbf0c90b0b088df07e7803a1a3eeb4ba889038f88db066bbdc4.exe"
+                                       ],
+                 "dns_lookups":  [
+                                     {
+                                         "hostname":  "res.public.onecdn.static.microsoft",
+                                         "resolved_ips":  [
+                                                              "104.98.118.155",
+                                                              "104.98.118.154",
+                                                              "104.98.118.161",
+                                                              "104.98.118.179",
+                                                              "104.98.118.178",
+                                                              "104.98.118.171",
+                                                              "104.98.118.147",
+                                                              "104.98.118.160",
+                                                              "104.98.118.163",
+                                                              "23.41.4.201",
+                                                              "23.41.4.199"
+                                                          ]
+                                     },
+                                     {
+                                         "hostname":  "www.microsoft.com",
+                                         "resolved_ips":  [
+                                                              "23.55.140.42"
+                                                          ]
+                                     }
+                                 ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "access PEB ldr_data",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "access PEB ldr_data"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1012",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "query or enumerate registry value",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "query or enumerate registry value"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get system information on Windows",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "get system information on Windows"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get ntdll base address",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "get ntdll base address"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1012",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "query or enumerate registry key",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "query or enumerate registry key"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "query environment variable",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "query environment variable"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "link function at runtime on Windows",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "link function at runtime on Windows"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1222",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "set file attributes",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "set file attributes"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1071",
+                                                     "signature_description":  "Adversaries may communicate using application layer protocols to avoid detection/network filtering by blending in with existing traffic."
+                                                 },
+                                                 {
+                                                     "id":  "T1027",
+                                                     "signature_description":  "Adversaries may attempt to make an executable or file difficult to discover or analyze by encrypting, encoding, or otherwise obfuscating its contents on the system or in transit."
+                                                 },
+                                                 {
+                                                     "id":  "T1027.002",
+                                                     "signature_description":  "Adversaries may perform software packing or virtual machine software protection to conceal their code."
+                                                 },
+                                                 {
+                                                     "id":  "T1543.003",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Creates or modifies windows services"
+                                                 },
+                                                 {
+                                                     "id":  "T1547.008",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Spawns drivers"
+                                                 },
+                                                 {
+                                                     "id":  "T1055",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Spawns processes"
+                                                 },
+                                                 {
+                                                     "id":  "T1057",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Queries a list of all running processes"
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Queries a list of all running drivers"
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Queries the volume information (name, serial number etc) of a device"
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Reads software policies"
+                                                 }
+                                             ],
+                 "attack_techniques":  {
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "access PEB ldr_data",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "access PEB ldr_data"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get ntdll base address",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "get ntdll base address"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "link function at runtime on Windows",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "link function at runtime on Windows"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1012":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "query or enumerate registry value",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "query or enumerate registry value"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "query or enumerate registry key",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "query or enumerate registry key"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1082":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get system information on Windows",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "get system information on Windows"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "query environment variable",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "query environment variable"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Queries a list of all running drivers"
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Queries the volume information (name, serial number etc) of a device"
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Reads software policies"
+                                                         }
+                                                     ],
+                                           "T1222":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "set file attributes",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "set file attributes"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1071":  [
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "Adversaries may communicate using application layer protocols to avoid detection/network filtering by blending in with existing traffic."
+                                                         }
+                                                     ],
+                                           "T1027":  [
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "Adversaries may attempt to make an executable or file difficult to discover or analyze by encrypting, encoding, or otherwise obfuscating its contents on the system or in transit."
+                                                         }
+                                                     ],
+                                           "T1027.002":  [
+                                                             {
+                                                                 "severity":  "UNKNOWN",
+                                                                 "description":  "Adversaries may perform software packing or virtual machine software protection to conceal their code."
+                                                             }
+                                                         ],
+                                           "T1543.003":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "Creates or modifies windows services"
+                                                             }
+                                                         ],
+                                           "T1547.008":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "Spawns drivers"
+                                                             }
+                                                         ],
+                                           "T1055":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Spawns processes"
+                                                         }
+                                                     ],
+                                           "T1057":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Queries a list of all running processes"
+                                                         }
+                                                     ]
+                                       }
+             }
+}

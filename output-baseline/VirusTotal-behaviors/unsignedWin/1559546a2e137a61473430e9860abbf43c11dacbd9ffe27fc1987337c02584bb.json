@@ -1,0 +1,4054 @@
+{
+  "data": {
+    "files_dropped": [
+      {
+        "path": "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER.0dc09a85-7168-4c60-be05-68139d749b26.tmp.WERInternalMetadata.xml",
+        "sha256": "e473cb54d0652efd0f2b46874bbc5c673b31df224248b5c9ffd9a00065bef44a",
+        "type": "XML",
+        "process_name": "C:\\Windows\\System32\\WerFault.exe",
+        "process_id": "6832"
+      },
+      {
+        "path": "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER.23eb4c00-17aa-4546-be02-d16950b5d907.tmp.WERInternalMetadata.xml",
+        "sha256": "cc9d86922c698c8fa88fd99d2965002f2a2413bf51809cc0f5d294915395eded",
+        "type": "XML",
+        "process_name": "C:\\Windows\\System32\\WerFault.exe",
+        "process_id": "3700"
+      },
+      {
+        "path": "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER.b994d280-aaf4-403f-b031-44b7863176f1.tmp.WERInternalMetadata.xml",
+        "sha256": "c27ec7b2fd248f81f357ca65e98118c6047c7f6409ff222a044d405ea7798a52",
+        "type": "XML",
+        "process_name": "C:\\Windows\\System32\\WerFault.exe",
+        "process_id": "4672"
+      }
+    ],
+    "signature_matches": [
+      {
+        "id": "0",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "allocate or change RWX memory",
+        "description": "host-interaction/process/inject",
+        "authors": [
+          "@mr-tz",
+          "mehunhoff@google.com"
+        ],
+        "match_data": [
+          "api: VirtualAlloc",
+          "allocate memory",
+          "PAGE_EXECUTE_READWRITE"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: allocate or change RWX memory\n    namespace: host-interaction/process/inject\n    authors:\n      - \"@mr-tz\"\n      - mehunhoff@google.com\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - Memory::Allocate Memory [C0007]\n    examples:\n      - Practical Malware Analysis Lab 03-03.exe_:0x4010EA\n      # ntdll\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x140001ABA\n  features:\n    - or:\n      - basic block:\n        - and:\n          - or:\n            - match: allocate memory\n            - match: change memory protection\n          - or:\n            - number: 0x40 = PAGE_EXECUTE_READWRITE\n            # lea     r9d, [rcx+40h]  ; flProtect\n            # call    cs:VirtualAlloc\n            - instruction:\n              - mnemonic: lea\n              - offset: 0x40 = PAGE_EXECUTE_READWRITE\n      - call:\n        - and:\n          - or:\n            - match: allocate memory\n            - match: change memory protection\n          - number: 0x40 = PAGE_EXECUTE_READWRITE\n"
+      },
+      {
+        "id": "1",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "link function at runtime on Windows",
+        "description": "linking/runtime-linking",
+        "authors": [
+          "moritz.raabe@mandiant.com",
+          "mehunhoff@google.com"
+        ],
+        "match_data": [
+          "api: GetProcAddress"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: link function at runtime on Windows\n    namespace: linking/runtime-linking\n    authors:\n      - moritz.raabe@mandiant.com\n      - mehunhoff@google.com\n    scopes:\n      static: instruction\n      dynamic: call\n    att&ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x404130\n      - Practical Malware Analysis Lab 01-04.exe_:0x401350\n  features:\n    - and:\n      - os: windows\n      - or:\n        - api: kernel32.GetProcAddress\n        - api: ntdll.LdrGetProcedureAddress\n        - api: ntdll.LdrGetProcedureAddressEx\n        - api: ntdll.LdrGetProcedureAddressForCaller\n        - api: MmGetSystemRoutineAddress\n"
+      },
+      {
+        "id": "2",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "parse PE header",
+        "description": "load-code/pe",
+        "authors": [
+          "moritz.raabe@mandiant.com"
+        ],
+        "match_data": [
+          "mnemonic: cmp",
+          "IMAGE_DOS_SIGNATURE (MZ)",
+          "IMAGE_NT_SIGNATURE (PE)"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: parse PE header\n    namespace: load-code/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic, operand[1].offset features\n    att&ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x403DD0\n  features:\n    - and:\n      - os: windows\n      - and:\n        - mnemonic: cmp\n        - or:\n          - number: 0x4550 = IMAGE_NT_SIGNATURE (PE)\n          - and:\n            - number: 0x50\n            - number: 0x45\n        - or:\n          - number: 0x5A4D = IMAGE_DOS_SIGNATURE (MZ)\n          - and:\n            - number: 0x4D\n            - number: 0x5A\n        - optional:\n          - and:\n            - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x30 = IMAGE_NT_HEADERS64.OptionalHeader.ImageBase\n          - basic block:\n            - and:\n              - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n              - 3 or more:\n                - operand[1].offset: 0x4 = IMAGE_NT_HEADERS.FileHeader.Machine\n                - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n                - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n                - operand[1].offset: 0x16 = IMAGE_NT_HEADERS.FileHeader.Characteristics\n                - operand[1].offset: 0x28 = IMAGE_NT_HEADERS.OptionalHeader.AddressOfEntryPoint  # for 32 and 64 bit\n                - or:\n                  - and:\n                    - arch: i386\n                    - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                  - and:\n                    - arch: amd64\n                    - operand[1].offset: 0x30 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n"
+      },
+      {
+        "id": "4",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "create or open mutex on Windows",
+        "description": "host-interaction/mutex",
+        "authors": [
+          "moritz.raabe@mandiant.com",
+          "anushka.virgaonkar@mandiant.com",
+          "mehunhoff@google.com"
+        ],
+        "match_data": [
+          "api: CreateMutexEx"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: create or open mutex on Windows\n    namespace: host-interaction/mutex\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n      - mehunhoff@google.com\n    scopes:\n      static: instruction\n      dynamic: call\n    mbc:\n      - Process::Create Mutex [C0042]\n    examples:\n      - Practical Malware Analysis Lab 01-01.dll_:0x10001010\n  features:\n    - or:\n      - api: kernel32.OpenMutex\n      - api: kernel32.CreateMutex\n      - api: kernel32.CreateMutexEx\n      - api: ntdll.NtCreateMutant\n      - api: ntdll.NtOpenMutant\n      - and:\n        - format: dotnet\n        - or:\n          - api: System.Threading.Mutex::ctor\n          - api: System.Threading.Mutex::OpenExisting\n          - api: System.Threading.Mutex::TryOpenExisting\n"
+      },
+      {
+        "id": "5",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "allocate thread local storage",
+        "description": "host-interaction/thread/tls",
+        "authors": [
+          "michael.hunhoff@mandiant.com"
+        ],
+        "match_data": [
+          "api: TlsAlloc"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: allocate thread local storage\n    namespace: host-interaction/thread/tls\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Process::Allocate Thread Local Storage [C0040]\n    examples:\n      - 03B236B23B1EC37C663527C1F53AF3FE:0x18000ADF6\n  features:\n    - or:\n      - api: kernel32.TlsAlloc\n"
+      },
+      {
+        "id": "6",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "log keystrokes via polling",
+        "description": "collection/keylog",
+        "authors": [
+          "michael.hunhoff@mandiant.com"
+        ],
+        "match_data": [
+          "api: GetKeyboardState",
+          "api: GetKeyState"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: log keystrokes via polling\n    namespace: collection/keylog\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att&ck:\n      - Collection::Input Capture::Keylogging [T1056.001]\n    mbc:\n      - Collection::Keylogging::Polling [F0002.002]\n    examples:\n      - Practical Malware Analysis Lab 11-03.dll_:0x10001030\n  features:\n    - or:\n      - api: user32.GetAsyncKeyState\n      - api: user32.GetKeyState\n      - api: user32.GetKeyboardState\n      - api: user32.VkKeyScan\n      - api: user32.VkKeyScanEx\n      - api: user32.GetKeyNameText\n"
+      },
+      {
+        "id": "9",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "print debug messages",
+        "description": "host-interaction/log/debug/write-event",
+        "authors": [
+          "michael.hunhoff@mandiant.com"
+        ],
+        "match_data": [
+          "api: OutputDebugString"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: print debug messages\n    namespace: host-interaction/log/debug/write-event\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    examples:\n      - 493167E85E45363D09495D0841C30648:0x401000\n  features:\n    - or:\n      - api: DbgPrint\n      - api: kernel32.OutputDebugString\n      - and:\n        - os: android\n        - api: __android_log_print\n"
+      },
+      {
+        "id": "12",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "set thread local storage value",
+        "description": "host-interaction/thread/tls",
+        "authors": [
+          "michael.hunhoff@mandiant.com"
+        ],
+        "match_data": [
+          "api: TlsSetValue"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: set thread local storage value\n    namespace: host-interaction/thread/tls\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Process::Set Thread Local Storage Value [C0041]\n    examples:\n      - 03B236B23B1EC37C663527C1F53AF3FE:0x18000AE21\n  features:\n    - and:\n      - api: kernel32.TlsSetValue\n      - optional:\n        - match: allocate thread local storage\n"
+      },
+      {
+        "id": "14",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "check if file exists",
+        "description": "host-interaction/file-system/exists",
+        "authors": [
+          "moritz.raabe@mandiant.com",
+          "michael.hunhoff@mandiant.com"
+        ],
+        "match_data": [
+          "api: GetLastError",
+          "mnemonic: cmp",
+          "ERROR_FILE_NOT_FOUND"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: check if file exists\n    namespace: host-interaction/file-system/exists\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att&ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    examples:\n      - 31600AD0D1A7EA615690DF111AE36C73:0x401284\n  features:\n    - or:\n      - basic block:\n        - and:\n          - api: kernel32.GetFileAttributes\n          - instruction:\n            - mnemonic: cmp\n            - number: 0xFFFFFFFF = INVALID_FILE_ATTRIBUTES\n      - basic block:\n        - and:\n          - api: kernel32.GetLastError\n          - instruction:\n            - mnemonic: cmp\n            - number: 2 = ERROR_FILE_NOT_FOUND\n      - api: shlwapi.PathFileExists\n      - api: System.IO.File::Exists\n      - property/read: System.IO.FileSystemInfo::Exists\n"
+      },
+      {
+        "id": "15",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "create thread",
+        "description": "host-interaction/thread/create",
+        "authors": [
+          "moritz.raabe@mandiant.com",
+          "michael.hunhoff@mandiant.com",
+          "joakim@intezer.com",
+          "anushka.virgaonkar@mandiant.com"
+        ],
+        "match_data": [
+          "api: _beginthreadex"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: create thread\n    namespace: host-interaction/thread/create\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - joakim@intezer.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: span of calls\n    mbc:\n      - Process::Create Thread [C0038]\n    examples:\n      - 946A99F36A46D335DEC080D9A4371940:0x10001DA0\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x408020\n  features:\n    - or:\n      - and:\n        - os: windows\n        - or:\n          - api: kernel32.CreateThread\n          - api: _beginthread\n          - api: _beginthreadex\n          - api: PsCreateSystemThread\n          - api: SHCreateThread\n          - api: SHCreateThreadWithHandle\n          - api: kernel32.CreateRemoteThread\n          - api: kernel32.CreateRemoteThreadEx\n          - api: RtlCreateUserThread\n          - api: ntdll.NtCreateThread\n          - api: ntdll.NtCreateThreadEx\n          - api: ntdll.ZwCreateThread\n          - api: ntdll.ZwCreateThreadEx\n      - and:\n        - or:\n          - os: linux\n          - os: android\n        - api: pthread_create\n      - and:\n        - api: System.Threading.Thread::Start\n        - optional:\n          - api: System.Threading.Thread::ctor\n"
+      },
+      {
+        "id": "16",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "check for time delay via GetTickCount",
+        "description": "anti-analysis/anti-debugging/debugger-detection",
+        "authors": [
+          "michael.hunhoff@mandiant.com"
+        ],
+        "match_data": [
+          "mnemonic: sub",
+          "mnemonic: cmp"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: check for time delay via GetTickCount\n    namespace: anti-analysis/anti-debugging/debugger-detection\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic features\n    mbc:\n      - Anti-Behavioral Analysis::Debugger Detection::Timing/Delay Check GetTickCount [B0001.032]\n    examples:\n      - Practical Malware Analysis Lab 16-03.exe_:0x4013d0\n  features:\n    - and:\n      - count(api(kernel32.GetTickCount)): 2 or more\n      - basic block:\n        - and:\n          - mnemonic: sub\n          - mnemonic: cmp\n"
+      },
+      {
+        "id": "17",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "query or enumerate registry value",
+        "description": "host-interaction/registry",
+        "authors": [
+          "william.ballenthin@mandiant.com",
+          "michael.hunhoff@mandiant.com",
+          "anushka.virgaonkar@mandiant.com"
+        ],
+        "match_data": [
+          "api: RegGetValue",
+          "create or open registry key",
+          "api: RegQueryValueEx"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: query or enumerate registry value\n    namespace: host-interaction/registry\n    authors:\n      - william.ballenthin@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att&ck:\n      - Discovery::Query Registry [T1012]\n    mbc:\n      - Operating System::Registry::Query Registry Value [C0036.006]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13145B5A\n      - Practical Malware Analysis Lab 03-02.dll_:0x100047AD\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegGetValue\n        - api: advapi32.RegEnumValue\n        - api: advapi32.RegQueryValue\n        - api: advapi32.RegQueryValueEx\n        - api: advapi32.RegQueryMultipleValues\n        - api: ZwQueryValueKey\n        - api: ZwEnumerateValueKey\n        - api: NtQueryValueKey\n        - api: NtEnumerateValueKey\n        - api: RtlQueryRegistryValues\n        - api: SHGetValue\n        - api: SHEnumValue\n        - api: SHRegGetInt\n        - api: SHRegGetPath\n        - api: SHRegGetValue\n        - api: SHQueryValueEx\n        - api: SHRegGetUSValue\n        - api: SHOpenRegStream\n        - api: SHRegEnumUSValue\n        - api: SHOpenRegStream2\n        - api: SHRegQueryUSValue\n        - api: SHRegGetBoolUSValue\n        - api: SHRegGetValueFromHKCUHKLM\n        - api: SHRegGetBoolValueFromHKCUHKLM\n        - api: Microsoft.Win32.RegistryKey::GetValue\n        - api: Microsoft.Win32.RegistryKey::GetValueKind\n        - api: Microsoft.Win32.RegistryKey::GetValueNames\n        - api: Microsoft.Win32.Registry::GetValue\n"
+      },
+      {
+        "id": "18",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "get thread local storage value",
+        "description": "host-interaction/process",
+        "authors": [
+          "michael.hunhoff@mandiant.com"
+        ],
+        "match_data": [
+          "api: TlsGetValue"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: get thread local storage value\n    namespace: host-interaction/process\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n  features:\n    - and:\n      - api: kernel32.TlsGetValue\n"
+      },
+      {
+        "id": "19",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "resolve function by parsing PE exports",
+        "description": "load-code/pe",
+        "authors": [
+          "sara-rn"
+        ],
+        "match_data": [
+          "mnemonic: movzx",
+          "loop"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: resolve function by parsing PE exports\n    namespace: load-code/pe\n    authors:\n      - sara-rn\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic, offset, mnemonic features\n    examples:\n      - 73CE04892E5F39EC82B00C02FC04C70F:0x406BA1\n  features:\n    - and:\n      - os: windows\n      - or:\n        - characteristic: loop\n        - mnemonic: movzx\n      - and:\n        - offset: 0x3C = IMAGE_DOS_HEADER.PE.e_lfanew\n        - or:\n          - and:\n            - arch: i386\n            - offset: 0x78 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n          - and:\n            - arch: amd64\n            - offset: 0x88 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n        - 3 or more:\n          - offset: 0x14 = IMAGE_EXPORT_DIRECTORY.NumberOfFunctions\n          - offset: 0x24 = IMAGE_EXPORT_DIRECTORY.AddressOfNameOrdinals\n          - offset: 0x20 = IMAGE_EXPORT_DIRECTORY.AddressOfNames\n          - offset: 0x18 = IMAGE_EXPORT_DIRECTORY.NumberOfNames\n          - offset: 0x1C = IMAGE_EXPORT_DIRECTORY.AddressOfFunctions\n      - optional:\n        - or:\n          - api: LoadLibrary\n          - api: strcmp\n"
+      },
+      {
+        "id": "20",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "link many functions at runtime",
+        "description": "linking/runtime-linking",
+        "authors": [
+          "moritz.raabe@mandiant.com",
+          "joakim@intezer.com"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: link many functions at runtime\n    namespace: linking/runtime-linking\n    authors:\n      - moritz.raabe@mandiant.com\n      - joakim@intezer.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att&ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - b7b5e1253710d8927cbe07d52d2d2e10:0x401000\n  features:\n    - or:\n      - count(match(link function at runtime on Windows)): 5 or more\n      - count(match(link function at runtime on Linux)): 5 or more\n"
+      },
+      {
+        "id": "21",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "check OS version",
+        "description": "host-interaction/os/version",
+        "authors": [
+          "michael.hunhoff@mandiant.com",
+          "johnk3r"
+        ],
+        "match_data": [
+          "mnemonic: cmp",
+          "Windows Vista / Windows Server 2008",
+          "Windows 2000"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: check OS version\n    namespace: host-interaction/os/version\n    authors:\n      - michael.hunhoff@mandiant.com\n      - johnk3r\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic features\n    att&ck:\n      - Discovery::System Information Discovery [T1082]\n    mbc:\n      - Discovery::System Information Discovery [E1082]\n    examples:\n      - 493167E85E45363D09495D0841C30648:0x401000\n  features:\n    - and:\n      - match: get OS version\n      - or:\n        - and:\n          - instruction:\n            - mnemonic: cmp\n            - number: 5 = Windows 2000\n          - optional:\n            - instruction:\n              - mnemonic: cmp\n              - or:\n                - number: 0\n                - number: 1 = Windows XP\n                - number: 2 = Windows XP 64-bit / Windows Server 2003 / Windows Server 2003 R2\n        - and:\n          - instruction:\n            - mnemonic: cmp\n            - number: 6 = Windows Vista / Windows Server 2008\n          - optional:\n            - instruction:\n              - mnemonic: cmp\n              - or:\n                - number: 0\n                - number: 1 = Windows Server 2008 R2 / Windows 7\n                - number: 2 = Windows Server 2012 / Windows 8\n                - number: 3 = Windows Server 2012 R2 / Windows 8.1\n        - and:\n          - instruction:\n            - mnemonic: cmp\n            - number: 10 = Windows Server 2016 / Windows Server 2019 / Windows 10\n          - optional:\n            - instruction:\n              - mnemonic: cmp\n              - number: 0\n"
+      },
+      {
+        "id": "22",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "get system information on Windows",
+        "description": "host-interaction/os/info",
+        "authors": [
+          "moritz.raabe@mandiant.com",
+          "joakim@intezer.com"
+        ],
+        "match_data": [
+          "api: GetSystemInfo"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: get system information on Windows\n    namespace: host-interaction/os/info\n    authors:\n      - moritz.raabe@mandiant.com\n      - joakim@intezer.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att&ck:\n      - Discovery::System Information Discovery [T1082]\n    examples:\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x140002280\n  features:\n    - and:\n      - os: windows\n      - or:\n        - api: kernel32.GetSystemInfo\n        - api: kernel32.GetNativeSystemInfo\n        - api: NtQuerySystemInformation\n        - api: NtQuerySystemInformationEx\n        - api: ntdll.RtlGetNativeSystemInformation\n        - api: ZwQuerySystemInformation\n        - api: ZwQuerySystemInformationEx\n"
+      },
+      {
+        "id": "static_pe_pdbpath",
+        "name": "static_pe_pdbpath",
+        "description": "The PE file contains a PDB path",
+        "match_data": [
+          "DUser.pdb"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "antidebug_setunhandledexceptionfilter",
+        "name": "antidebug_setunhandledexceptionfilter",
+        "description": "SetUnhandledExceptionFilter detected (possible anti-debug)",
+        "match_data": [
+          "Process rundll32.exe"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "stealth_timeout",
+        "name": "stealth_timeout",
+        "description": "Possible date expiration check, exits too soon after checking local time",
+        "match_data": [
+          "rundll32.exe, PID 5504",
+          "Process rundll32.exe"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "packer_unknown_pe_section_name",
+        "name": "packer_unknown_pe_section_name",
+        "description": "The binary contains an unknown PE section name indicative of packing",
+        "match_data": [
+          "fothk",
+          ".didat"
+        ],
+        "severity": "IMPACT_SEVERITY_LOW"
+      },
+      {
+        "id": "pe_compile_timestomping",
+        "name": "pe_compile_timestomping",
+        "description": "Binary compilation timestomping detected",
+        "match_data": [
+          "Compilation timestamp is in the future"
+        ],
+        "severity": "IMPACT_SEVERITY_MEDIUM"
+      },
+      {
+        "id": "311",
+        "description": "Creates a DirectInput object (often for capturing keystrokes)",
+        "match_data": [
+          "DirectDrawCreateEx"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO",
+        "refs": [
+          {
+            "ref": "#memory_dumps",
+            "value": "loaddll64.exe, 00000002.00000002.4196444707.00007FF9B1499000.00000002.00000001.01000000.00000004.sdmp"
+          }
+        ]
+      },
+      {
+        "id": "533",
+        "description": "May use bcdedit to modify the Windows boot settings",
+        "match_data": [
+          "bcdedit.exe|ac227fd116781fea",
+          "c:\\windows\\system32\\bcdedit.exe",
+          "bcdedit.exe"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "417",
+        "description": "PE file exports many functions",
+        "match_data": [
+          "More than 149 > 100 exports found"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "509",
+        "description": "Reads software policies",
+        "match_data": [
+          "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO",
+        "refs": [
+          {
+            "ref": "#registry_keys_opened",
+            "value": "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+          }
+        ]
+      },
+      {
+        "id": "3",
+        "description": "AV process strings found (often used to terminate AV products)",
+        "match_data": [
+          "msmpeng.exe",
+          "c:\\program files\\windows defender\\msmpeng.exe",
+          "c:\\programdata\\microsoft\\windows defender\\platform\\4.18.25010.11-0\\msmpeng.exe",
+          "MsMpEng.exe"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "653",
+        "description": "Sample file is different than original file name gathered from version info",
+        "match_data": [
+          "OriginalFilenameDUser.DLLj% vs init.dll"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "81",
+        "description": "One or more processes crash",
+        "match_data": [
+          "C:\\Windows\\System32\\WerFault.exe C:\\Windows\\system32\\WerFault.exe -u -p 1228 -s 356"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "219",
+        "description": "Runs a DLL by calling functions",
+        "match_data": [
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe C:\\Users\\user\\Desktop\\init.dll,AddGadgetMessageHandler"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "620",
+        "description": "Sample may be VM or Sandbox-aware, try analysis on a native machine",
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "229",
+        "description": "Spawns processes",
+        "match_data": [
+          "C:\\Windows\\System32\\loaddll64.exe loaddll64.exe \"C:\\Users\\user\\Desktop\\init.dll\"",
+          "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1",
+          "C:\\Windows\\System32\\cmd.exe cmd.exe /C rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",#1",
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe C:\\Users\\user\\Desktop\\init.dll,AddGadgetMessageHandler",
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe  \"C:\\Users\\user\\Desktop\\init.dll\",#1",
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe C:\\Users\\user\\Desktop\\init.dll,AddLayeredRef",
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe C:\\Users\\user\\Desktop\\init.dll,AdjustClipInsideRef",
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",AddGadgetMessageHandler",
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",AddLayeredRef",
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",AdjustClipInsideRef",
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",WaitMessageEx",
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",UtilSetBackground",
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",UtilGetColor",
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",UtilDrawOutlineRect",
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",UtilDrawBlendRect",
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",UtilBuildFont",
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",UnregisterGadgetProperty",
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",UnregisterGadgetMessageString",
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",UnregisterGadgetMessage",
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",SetWindowResizeFlag",
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",SetTransitionVisualProperties",
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",SetRestoreCachedLayeredRefFlag",
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",SetMinimumDCompVersion",
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",SetHardwareDeviceUsage",
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",SetGadgetStyle",
+          "C:\\Windows\\System32\\WerFault.exe C:\\Windows\\system32\\WerFault.exe -u -p 1228 -s 356",
+          "C:\\Windows\\System32\\WerFault.exe C:\\Windows\\system32\\WerFault.exe -u -p 3204 -s 356",
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",SetGadgetScale",
+          "C:\\Windows\\System32\\WerFault.exe C:\\Windows\\system32\\WerFault.exe -u -p 3240 -s 356",
+          "unknown unknown"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "419",
+        "description": "PE file has a high image base, often used for DLLs",
+        "match_data": [
+          "Image base 0x180000000 > 0x60000000"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "406",
+        "description": "Contains modern PE file flags such as dynamic base (ASLR) or NX",
+        "match_data": [
+          "HIGH_ENTROPY_VA, DYNAMIC_BASE, NX_COMPAT, GUARD_CF"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "187",
+        "description": "Tries to load missing DLLs",
+        "match_data": [
+          "apphelp.dll",
+          "kernel.appcore.dll"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "95",
+        "description": "Creates mutexes",
+        "match_data": [
+          "\\Sessions\\1\\BaseNamedObjects\\Local\\WERReportingForProcess3240",
+          "\\Sessions\\1\\BaseNamedObjects\\Local\\SM0:2368:120:WilError_03",
+          "\\Sessions\\1\\BaseNamedObjects\\Local\\WERReportingForProcess1228",
+          "\\Sessions\\1\\BaseNamedObjects\\Local\\WERReportingForProcess3204"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "416",
+        "description": "PE file contains a valid data directory to section mapping",
+        "match_data": [
+          "Data directory: IMAGE_DIRECTORY_ENTRY_IMPORT is in: .rdata",
+          "Data directory: IMAGE_DIRECTORY_ENTRY_RESOURCE is in: .rsrc",
+          "Data directory: IMAGE_DIRECTORY_ENTRY_BASERELOC is in: .reloc",
+          "Data directory: IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG is in: .rdata",
+          "Data directory: IMAGE_DIRECTORY_ENTRY_IAT is in: .rdata"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "203",
+        "description": "Binary contains paths to debug symbols",
+        "match_data": [
+          "32.pdb source: WerFault.exe, 00000023.00000002.4209574536.0000022634580000.00000004.00000020.00020000.00000000.sdmp",
+          "gdi32.pdb source: WerFault.exe, 00000023.00000003.3964431008.0000022634671000.00000004.00000020.00020000.00000000.sdmp, WerFault.exe, 00000025.00000003.4077047329.000002C21F930000.00000004.00000020.00",
+          "DefaultConsentt.pdb; source: WerFault.exe, 00000023.00000002.4209574536.0000022634580000.00000004.00000020.00020000.00000000.sdmp",
+          "sechost.pdb source: WerFault.exe, 00000023.00000003.4033727438.0000022636EB6000.00000004.00000020.00020000.00000000.sdmp, WerFault.exe, 00000023.00000003.3972364701.0000022636EB5000.00000004.00000020.",
+          "rpcrt4.pdb source: WerFault.exe, 00000023.00000003.4094453476.0000022637001000.00000004.00000020.00020000.00000000.sdmp",
+          "n.pdb source: WerFault.exe, 00000023.00000002.4209574536.0000022634580000.00000004.00000020.00020000.00000000.sdmp",
+          "ucrtbase.pdb source: WerFault.exe, 00000023.00000003.3964431008.000002263466B000.00000004.00000020.00020000.00000000.sdmp, WerFault.exe, 00000025.00000003.4077047329.000002C21F92A000.00000004.00000020",
+          "win.pdb source: WerFault.exe, 00000025.00000002.4196071255.000002C21F840000.00000004.00000020.00020000.00000000.sdmp",
+          "t.pdb source: WerFault.exe, 00000023.00000002.4209574536.0000022634580000.00000004.00000020.00020000.00000000.sdmp",
+          "rundll32.pdb0 source: WerFault.exe, 00000023.00000003.3943016333.00000226345D6000.00000004.00000020.00020000.00000000.sdmp, WerFault.exe, 00000025.00000003.4033896460.000002C21F895000.00000004.0000002",
+          "r.pdb source: WerFault.exe, 00000023.00000002.4209574536.0000022634580000.00000004.00000020.00020000.00000000.sdmp",
+          "msctf.pdb0 source: WerFault.exe, 00000023.00000003.3964431008.0000022634677000.00000004.00000020.00020000.00000000.sdmp, WerFault.exe, 00000025.00000003.4077047329.000002C21F936000.00000004.00000020.0",
+          "shcore.pdb source: WerFault.exe, 00000023.00000003.4094453476.0000022637007000.00000004.00000020.00020000.00000000.sdmp",
+          "gdi32.pdb0 source: WerFault.exe, 00000023.00000003.3964431008.0000022634671000.00000004.00000020.00020000.00000000.sdmp, WerFault.exe, 00000025.00000003.4077047329.000002C21F930000.00000004.00000020.0",
+          "msctf.pdb source: WerFault.exe, 00000023.00000003.3964431008.0000022634677000.00000004.00000020.00020000.00000000.sdmp, WerFault.exe, 00000025.00000003.4077047329.000002C21F936000.00000004.00000020.00",
+          "ost.pdb source: WerFault.exe, 0000002A.00000002.4211701426.000001F8D9150000.00000004.00000020.00020000.00000000.sdmp",
+          "DontShowUImsctf.pdb^ source: WerFault.exe, 00000025.00000002.4196071255.000002C21F840000.00000004.00000020.00020000.00000000.sdmp",
+          "DUser.pdbOGPS source: loaddll64.exe, 00000002.00000002.4196444707.00007FF9B1499000.00000002.00000001.01000000.00000004.sdmp, rundll32.exe, 00000010.00000002.4210833224.00007FF9B1499000.00000002.000000",
+          "2.pdb` source: WerFault.exe, 00000025.00000002.4196071255.000002C21F840000.00000004.00000020.00020000.00000000.sdmp",
+          "rpcrt4.pdb0 source: WerFault.exe, 00000023.00000003.4094453476.0000022637001000.00000004.00000020.00020000.00000000.sdmp",
+          "msvcp_win.pdb source: WerFault.exe, 00000023.00000003.4094453476.000002263700D000.00000004.00000020.00020000.00000000.sdmp, WerFault.exe, 0000002A.00000002.4211701426.000001F8D9150000.00000004.0000002",
+          "2.pdb source: WerFault.exe, 00000025.00000002.4196071255.000002C21F840000.00000004.00000020.00020000.00000000.sdmp",
+          "msvcp_win.pdb0 source: WerFault.exe, 00000023.00000003.4094453476.000002263700D000.00000004.00000020.00020000.00000000.sdmp",
+          "DefaultConsentwin.pdb source: WerFault.exe, 00000025.00000002.4196071255.000002C21F840000.00000004.00000020.00020000.00000000.sdmp",
+          "ForceQueuemsvcp_win.pdb)Zv8o% source: WerFault.exe, 0000002A.00000002.4211701426.000001F8D9150000.00000004.00000020.00020000.00000000.sdmp",
+          "combase.pdb source: WerFault.exe, 00000023.00000002.4209574536.0000022634580000.00000004.00000020.00020000.00000000.sdmp",
+          "ntdll.pdb source: WerFault.exe, 00000023.00000003.3993088980.00000226345DC000.00000004.00000020.00020000.00000000.sdmp, WerFault.exe, 00000025.00000003.4033896460.000002C21F89B000.00000004.00000020.00",
+          "sechost.pdb0 source: WerFault.exe, 00000023.00000003.3964431008.000002263467D000.00000004.00000020.00020000.00000000.sdmp",
+          "2.pdbR source: WerFault.exe, 00000025.00000002.4196071255.000002C21F840000.00000004.00000020.00020000.00000000.sdmp",
+          "r.pdb source: WerFault.exe, 00000023.00000002.4209574536.0000022634580000.00000004.00000020.00020000.00000000.sdmp, WerFault.exe, 00000025.00000002.4196071255.000002C21F840000.00000004.00000020.000200",
+          "rundll32.pdb source: WerFault.exe, 00000023.00000003.3943016333.00000226345D6000.00000004.00000020.00020000.00000000.sdmp, WerFault.exe, 00000025.00000003.4033896460.000002C21F895000.00000004.00000020",
+          "shcore.pdb0 source: WerFault.exe, 00000023.00000003.4094453476.0000022637007000.00000004.00000020.00020000.00000000.sdmp",
+          "DontShowUIimagehlp.pdb source: WerFault.exe, 00000023.00000002.4209574536.0000022634580000.00000004.00000020.00020000.00000000.sdmp, WerFault.exe, 0000002A.00000002.4211701426.000001F8D9150000.0000000",
+          "ForceHeapDumpr.pdbA source: WerFault.exe, 00000025.00000002.4196071255.000002C21F840000.00000004.00000020.00020000.00000000.sdmp",
+          "imagehlp.pdb source: WerFault.exe, 00000023.00000002.4209574536.0000022634580000.00000004.00000020.00020000.00000000.sdmp, WerFault.exe, 0000002A.00000002.4211701426.000001F8D9150000.00000004.00000020",
+          "LoggingDisabledn.pdb\\;C:\\Use source: WerFault.exe, 00000023.00000002.4209574536.0000022634580000.00000004.00000020.00020000.00000000.sdmp",
+          "DUser.pdb source: loaddll64.exe, 00000002.00000002.4196444707.00007FF9B1499000.00000002.00000001.01000000.00000004.sdmp, rundll32.exe, 00000010.00000002.4210833224.00007FF9B1499000.00000002.00000001.0",
+          "ntdll.pdb0 source: WerFault.exe, 00000023.00000003.3993088980.00000226345DC000.00000004.00000020.00020000.00000000.sdmp, WerFault.exe, 00000025.00000003.4033896460.000002C21F89B000.00000004.00000020.0",
+          "ForceMetadataost.pdb source: WerFault.exe, 0000002A.00000002.4211701426.000001F8D9150000.00000004.00000020.00020000.00000000.sdmp"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "-1201512004",
+        "description": "Sigma detected: Unsigned DLL Loaded by RunDLL32/RegSvr32",
+        "match_data": [
+          "Data: Company: Microsoft Corporation, Description: Windows DirectUser Engine, FileVersion: 10.0.26100.7309 (WinBuild.160101.0800), Hashes: SHA1=5302F2175588262B3733CE7126DB791B3B26FB79,MD5=A5CF67442E1"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "76",
+        "description": "Checks if the current process is being debugged",
+        "match_data": [
+          "DebugPort"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "199",
+        "description": "PE file contains sections with non-standard names",
+        "match_data": [
+          "section name: fothk",
+          "section name: .didat"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "234",
+        "description": "Binary contains a suspicious time stamp",
+        "match_data": [
+          "0xB1824A29 [Thu May 15 19:38:17 2064 UTC]"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "238",
+        "description": "URLs found in memory or binary data",
+        "match_data": [
+          "http://upx.sf.net",
+          "https://www.openssl.org/"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "871",
+        "description": "Sample execution stops while process was sleeping (likely an evasion)",
+        "match_data": [
+          "Thread delayed"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "236",
+        "description": "Creates temporary files",
+        "match_data": [
+          "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\a44ad346-e6cd-42f4-b183-84364ae1674b"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "340",
+        "description": "Tries to detect sandboxes and other dynamic analysis tools (process name or module or function)",
+        "match_data": [
+          "JOEBOXCONTROL.EXE",
+          "C:\\PROGRAM FILES (X86)\\JOEBOX\\CONTROL\\JOEBOXCONTROL.EXEAT"
+        ],
+        "severity": "IMPACT_SEVERITY_LOW"
+      },
+      {
+        "id": "177",
+        "description": "Launches processes in debugging mode, may be used to hinder debugging",
+        "match_data": [
+          "C:\\Windows\\System32\\WerFault.exe C:\\Windows\\system32\\WerFault.exe -u -p 3204 -s 356"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "411",
+        "description": "PE file contains a mix of data directories often seen in goodware",
+        "match_data": [
+          "data directory type: IMAGE_DIRECTORY_ENTRY_IMPORT",
+          "data directory type: IMAGE_DIRECTORY_ENTRY_RESOURCE",
+          "data directory type: IMAGE_DIRECTORY_ENTRY_BASERELOC",
+          "data directory type: IMAGE_DIRECTORY_ENTRY_DEBUG",
+          "data directory type: IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG",
+          "data directory type: IMAGE_DIRECTORY_ENTRY_IAT"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "715",
+        "description": "Classification label",
+        "match_data": [
+          "sus26.evad.winDLL@77/8@0/0"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "381",
+        "description": "Disables application error messsages (SetErrorMode)",
+        "match_data": [
+          "NOOPENFILEERRORBOX",
+          "FAILCRITICALERRORS | NOGPFAULTERRORBOX"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "626",
+        "description": "Sample tries to load a library which is not present or installed on the analysis machine, adding the library might reveal more behavior",
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "263",
+        "description": "May try to detect the virtual machine to hinder analysis (VM artifact strings found in memory)",
+        "match_data": [
+          "scsi\\diskqemu____________harddisk2.5+,scsi\\diskqemu____________harddisk,scsi\\diskqemu____,scsi\\qemu____________harddisk2,qemu____________harddisk2,gendisk",
+          "9swd/computer/mfg_qemu&prod_standard_pc_(q35_+_ich9__2009)x",
+          "acpi\\ven_qemu&dev_0002,acpi\\qemu0002,*qemu0002",
+          "swd/computer/mfg_qemu&prod_standard_pc_(q35_+_ich9__2009)x",
+          "VMware, Inc.",
+          "scsi/disk&ven_qemu&prod_harddisk/4&35424867&0&000000(e",
+          "QEMU HARDDISK",
+          "<SystemManufacturer>QEMU</SystemManufacturer>&",
+          "VirtualMachineID",
+          "<SystemManufacturer>QEMU</SystemManufacturer>llectionr",
+          "<SystemManufacturer>QEMU</SystemManufacturer>",
+          "Microsoft Hyper-V Virtualization Infrastructure Driver",
+          "QEMU USB Tablet",
+          "VMware PVSCSI StorPort driver (64-bit)",
+          "QEMU USB Tabletvk",
+          "BiosVendor:SeaBIOS,BiosVersion:1.15.0-1,BiosReleaseDate:04/01/2014,BiosMajorRelease:0x0,BiosMinorRelease:0x0,SystemManufacturer:QEMU,SystemProduct:Standard PC (Q35 + ICH9, 2009),SystemFamily:,SystemSK",
+          "acpi/qemu0002/3&11583659&0",
+          "QEMU Standard PC (Q35 + ICH9, 2009)",
+          "4scsi/disk&ven_qemu&prod_harddisk/4&35424867&0&000000(e"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO",
+        "refs": [
+          {
+            "ref": "#memory_dumps",
+            "value": "WerFault.exe, 00000023.00000002.4258880017.0000022634820000.00000004.00000020.00020000.00000000.sdmp"
+          },
+          {
+            "ref": "#memory_dumps",
+            "value": "WerFault.exe, 00000025.00000002.4197654402.000002C21F9B0000.00000004.00000020.00020000.00000000.sdmp"
+          }
+        ]
+      },
+      {
+        "id": "149",
+        "description": "Program does not show much activity (idle)",
+        "match_data": [
+          "no activity detected"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "1318",
+        "description": "Creates a process in suspended mode (likely to inject code)",
+        "match_data": [
+          "C:\\Windows\\System32\\rundll32.exe rundll32.exe  \"C:\\Users\\user\\Desktop\\init.dll\",#1",
+          "C:\\Windows\\System32\\WerFault.exe C:\\Windows\\system32\\WerFault.exe -u -p 3204 -s 356",
+          "C:\\Windows\\System32\\WerFault.exe C:\\Windows\\system32\\WerFault.exe -u -p 1228 -s 356",
+          "C:\\Windows\\System32\\WerFault.exe C:\\Windows\\system32\\WerFault.exe -u -p 3240 -s 356",
+          "unknown unknown"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "412",
+        "description": "PE file contains a debug data directory",
+        "match_data": [
+          "data directory type: IMAGE_DIRECTORY_ENTRY_DEBUG"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "629",
+        "description": "Sample crashes during execution, try analyze it on another analysis machine",
+        "severity": "IMPACT_SEVERITY_INFO"
+      }
+    ],
+    "memory_pattern_urls": [
+      "http://upx.sf.net",
+      "https://www.openssl.org/"
+    ],
+    "processes_terminated": [
+      "C:\\Windows\\System32\\cmd.exe",
+      "C:\\Windows\\System32\\rundll32.exe"
+    ],
+    "files_opened": [
+      "C:\\Users\\<USER>\\Desktop\\library.dll.manifest",
+      "C:\\Users\\<USER>\\Desktop\\library.dll",
+      "C:\\Users\\<USER>\\Desktop\\library.dll.123.Manifest",
+      "C:\\Users\\<USER>\\Desktop\\library.dll.124.Manifest",
+      "C:\\Users\\<USER>\\Desktop\\library.dll.2.Manifest",
+      "C:\\Program Files (x86)\\Common Files\\Oracle\\Java\\java8path\\",
+      "C:\\Program Files (x86)\\Common Files\\Oracle\\Java\\javapath\\",
+      "C:\\Users\\user\\Desktop\\init.dll",
+      "C:\\Users\\user\\Desktop\\init.dll.123.Manifest",
+      "C:\\Users\\user\\Desktop\\init.dll.124.Manifest",
+      "C:\\Users\\user\\Desktop\\init.dll.2.Manifest",
+      "C:\\Windows\\AppPatch\\sysmain.sdb",
+      "C:\\Windows\\Globalization\\Sorting\\sortdefault.nls",
+      "C:\\Windows\\SYSTEM32\\TextShaping.dll",
+      "C:\\Windows\\SYSTEM32\\WLDP.DLL",
+      "C:\\Windows\\SYSTEM32\\apphelp.dll",
+      "C:\\Windows\\SYSTEM32\\dwmapi.dll",
+      "C:\\Windows\\SYSTEM32\\kernel.appcore.dll",
+      "C:\\Windows\\SYSTEM32\\ntdll.dll",
+      "C:\\Windows\\System32\\KERNEL32.DLL",
+      "C:\\Windows\\System32\\KERNELBASE.dll",
+      "C:\\Windows\\System32\\conhost.exe",
+      "C:\\Windows\\System32\\en-US\\user32.dll.mui",
+      "C:\\Windows\\SystemResources\\loaddll64.exe.mun",
+      "C:\\Windows\\SystemResources\\user32.dll.mun",
+      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.22621.2361_none_2712ced57382f843",
+      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.22621.2361_none_2712ced57382f843\\comctl32.DLL",
+      "C:\\Windows\\apppatch\\MergeSdbFilesSource\\sysMerge.sdb",
+      "C:\\Windows\\system32\\",
+      "C:\\Windows\\system32\\IMM32.DLL",
+      "C:\\Windows\\system32\\conhost.exe",
+      "C:\\Windows\\system32\\en-US\\conhost.exe.mui",
+      "C:\\Windows\\system32\\en-US\\rundll32.exe.mui",
+      "C:\\Windows\\system32\\loaddll64.exe",
+      "C:\\Windows\\system32\\rundll32.exe",
+      "C:\\Windows\\system32\\uxtheme.dll",
+      "C:\\Windows\\system32\\uxtheme.dll.Config"
+    ],
+    "verdicts": [
+      "UNKNOWN_VERDICT"
+    ],
+    "mitre_attack_techniques": [
+      {
+        "id": "T1129",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "link function at runtime on Windows",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "1"
+          }
+        ]
+      },
+      {
+        "id": "T1129",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "parse PE header",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "2"
+          }
+        ]
+      },
+      {
+        "id": "T1056.001",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "log keystrokes via polling",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "6"
+          }
+        ]
+      },
+      {
+        "id": "T1083",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "check if file exists",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "14"
+          }
+        ]
+      },
+      {
+        "id": "T1012",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "query or enumerate registry value",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "17"
+          }
+        ]
+      },
+      {
+        "id": "T1129",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "link many functions at runtime",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "20"
+          }
+        ]
+      },
+      {
+        "id": "T1082",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "check OS version",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "21"
+          }
+        ]
+      },
+      {
+        "id": "T1082",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "get system information on Windows",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "22"
+          }
+        ]
+      },
+      {
+        "id": "T1542.003",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "May use bcdedit to modify the Windows boot settings",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "533"
+          }
+        ]
+      },
+      {
+        "id": "T1562.001",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "Launches processes in debugging mode, may be used to hinder debugging",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "177"
+          }
+        ]
+      },
+      {
+        "id": "T1497",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "Checks if the current process is being debugged",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "76"
+          }
+        ]
+      },
+      {
+        "id": "T1218.011",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "Runs a DLL by calling functions",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "219"
+          }
+        ]
+      },
+      {
+        "id": "T1070.006",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "Binary contains a suspicious time stamp",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "234"
+          }
+        ]
+      },
+      {
+        "id": "T1056",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "Creates a DirectInput object (often for capturing keystrokes)",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "311"
+          }
+        ]
+      },
+      {
+        "id": "T1518.001",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "Checks if the current process is being debugged",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "76"
+          }
+        ]
+      }
+    ],
+    "processes_created": [
+      "\"C:\\Windows\\sysnative\\rundll32.exe\" \"C:\\Users\\<USER>\\Desktop\\library.dll\",#1",
+      "C:\\Windows\\System32\\loaddll64.exe loaddll64.exe \"C:\\Users\\user\\Desktop\\init.dll\"",
+      "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1",
+      "C:\\Windows\\System32\\cmd.exe cmd.exe /C rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",#1",
+      "C:\\Windows\\System32\\rundll32.exe rundll32.exe  \"C:\\Users\\user\\Desktop\\init.dll\",#1",
+      "C:\\Windows\\System32\\rundll32.exe rundll32.exe C:\\Users\\user\\Desktop\\init.dll,AddGadgetMessageHandler",
+      "C:\\Windows\\System32\\rundll32.exe rundll32.exe C:\\Users\\user\\Desktop\\init.dll,AddLayeredRef",
+      "C:\\Windows\\System32\\rundll32.exe rundll32.exe C:\\Users\\user\\Desktop\\init.dll,AdjustClipInsideRef",
+      "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",AddGadgetMessageHandler",
+      "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",AddLayeredRef",
+      "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",AdjustClipInsideRef",
+      "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",WaitMessageEx",
+      "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",UtilSetBackground",
+      "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",UtilGetColor",
+      "C:\\Windows\\System32\\WerFault.exe C:\\Windows\\system32\\WerFault.exe -u -p 3204 -s 356",
+      "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",UtilDrawOutlineRect",
+      "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",UtilDrawBlendRect",
+      "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",UtilBuildFont",
+      "C:\\Windows\\System32\\WerFault.exe C:\\Windows\\system32\\WerFault.exe -u -p 1228 -s 356",
+      "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",UnregisterGadgetProperty",
+      "C:\\Windows\\System32\\WerFault.exe C:\\Windows\\system32\\WerFault.exe -u -p 3240 -s 356",
+      "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",UnregisterGadgetMessageString",
+      "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",UnregisterGadgetMessage",
+      "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",SetWindowResizeFlag",
+      "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",SetTransitionVisualProperties",
+      "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",SetRestoreCachedLayeredRefFlag",
+      "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",SetMinimumDCompVersion",
+      "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",SetHardwareDeviceUsage",
+      "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",SetGadgetStyle",
+      "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",SetGadgetScale"
+    ],
+    "tags": [
+      "OBFUSCATED",
+      "CHECKS_USER_INPUT",
+      "DETECT_DEBUG_ENVIRONMENT",
+      "IDLE"
+    ],
+    "memory_pattern_domains": [
+      "upx.sf.net",
+      "www.openssl.org"
+    ],
+    "files_written": [
+      "\\Device\\ConDrv\\\\Connect"
+    ],
+    "memory_dumps": [
+      {
+        "file_name": "5504.dmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "84606976",
+        "base_address": "2147352576"
+      },
+      {
+        "file_name": "00000010.00000002.4191224017.000002794B5A0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "8192",
+        "base_address": "2719978487808",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3204"
+      },
+      {
+        "file_name": "00000007.00000002.3147564533.000001889B9D4000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "45056",
+        "base_address": "1686237954048",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6464"
+      },
+      {
+        "file_name": "00000025.00000002.4211549968.000002C221F10000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "3032816353280",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "0000001D.00000002.4214993222.000001AF29DC0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "1851833188352",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4924"
+      },
+      {
+        "file_name": "0000002A.00000002.4339549833.000001F8DBF4C000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2168353767424",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "0000002A.00000002.4239664407.000001F8D9304000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "28672",
+        "base_address": "2168307335168",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "00000019.00000002.4212220764.00007FF9B14AC000.00000004.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "20480",
+        "base_address": "140710398050304",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4048"
+      },
+      {
+        "file_name": "00000016.00000003.3978618657.000001F369960000.00000004.00000400.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "2144960118784",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "3240"
+      },
+      {
+        "file_name": "00000002.00000002.4196501024.00007FF9B14AC000.00000004.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\loaddll64.exe",
+        "size": "20480",
+        "base_address": "140710398050304",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2616"
+      },
+      {
+        "file_name": "00000029.00000002.3857671745.0000021D70D10000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "2325470052352",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6660"
+      },
+      {
+        "file_name": "00000011.00000002.3430765570.00000274A0D94000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "45056",
+        "base_address": "2699938054144",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3500"
+      },
+      {
+        "file_name": "0000001A.00000002.3576435598.0000018EB1554000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "16384",
+        "base_address": "1712372137984",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2728"
+      },
+      {
+        "file_name": "00000025.00000002.4241514723.000002C222210000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "3032819499008",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "00000014.00000002.3509792739.000002AFD6234000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "45056",
+        "base_address": "2954235166720",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1308"
+      },
+      {
+        "file_name": "0000002A.00000002.4202305332.00000048D0E7E000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "8192",
+        "base_address": "312742502400",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "00000025.00000002.4193039377.000000E01B87E000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "8192",
+        "base_address": "962534563840",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "0000001B.00000002.4186065587.0000025902394000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "16384",
+        "base_address": "2581312651264",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2096"
+      },
+      {
+        "file_name": "00000023.00000002.4216922346.00000226346C0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2363111505920",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000007.00000002.3146353308.0000006DE4DDF000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "471991185408",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6464"
+      },
+      {
+        "file_name": "0000002A.00000002.4266904408.000001F8D9370000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "12288",
+        "base_address": "2168307777536",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "00000025.00000003.4077047329.000002C21F930000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "12288",
+        "base_address": "3032776638464",
+        "stage": "MEM_STAGE_FREE",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "203"
+          }
+        ],
+        "process_id": "3700"
+      },
+      {
+        "file_name": "00000023.00000003.4094453476.0000022636FFC000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "8192",
+        "base_address": "2363154743296",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "0000002A.00000003.4122442620.000001F8DBBEC000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2168350228480",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "00000018.00000002.3522297571.0000027F50360000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "8192",
+        "base_address": "2745829818368",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2448"
+      },
+      {
+        "file_name": "00000025.00000002.4195163991.000000E01B9FE000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "8192",
+        "base_address": "962536136704",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "00000008.00000002.3234844039.000002C7BE0C0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "8192",
+        "base_address": "3056910204928",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4028"
+      },
+      {
+        "file_name": "00000008.00000002.3226810817.000000FE8207F000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "1093103251456",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4028"
+      },
+      {
+        "file_name": "00000025.00000002.4193880928.000000E01B8FE000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "8192",
+        "base_address": "962535088128",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "00000008.00000002.3216402568.000000FE81DAC000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "16384",
+        "base_address": "1093100290048",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4028"
+      },
+      {
+        "file_name": "0000001B.00000002.4185797295.000000F2C4C7F000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "1042683523072",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2096"
+      },
+      {
+        "file_name": "00000025.00000003.3986344601.000002C221F85000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "57344",
+        "base_address": "3032816832512",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "00000015.00000002.4195913870.0000026D06EB4000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "16384",
+        "base_address": "2667290771456",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1228"
+      },
+      {
+        "file_name": "00000023.00000003.4033727438.0000022636EB6000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "163840",
+        "base_address": "2363153408000",
+        "stage": "MEM_STAGE_FREE",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "203"
+          }
+        ],
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000025.00000002.4206539079.000002C21FBB4000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "32768",
+        "base_address": "3032779276288",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "0000002A.00000002.4310930703.000001F8DB9FC000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "12288",
+        "base_address": "2168348196864",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "00000010.00000002.4194169717.000002794B660000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "2719979274240",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3204"
+      },
+      {
+        "file_name": "0000001A.00000002.3576435598.0000018EB1550000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "1712372121600",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2728"
+      },
+      {
+        "file_name": "0000002A.00000002.4228464250.000001F8D924E000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2168306589696",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "00000010.00000002.4213606471.00007FF9B14AC000.00000004.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "20480",
+        "base_address": "140710398050304",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3204"
+      },
+      {
+        "file_name": "0000000F.00000002.3375887204.000001FF8B450000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "2197064843264",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3984"
+      },
+      {
+        "file_name": "0000000B.00000002.3281174810.0000026C83A30000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "2665088221184",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3140"
+      },
+      {
+        "file_name": "00000010.00000003.3899174122.000002794D470000.00000004.00000400.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "2720010797056",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "3204"
+      },
+      {
+        "file_name": "0000002A.00000003.4104997988.000001F8D91AD000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2168305930240",
+        "stage": "MEM_STAGE_FREE",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "203"
+          }
+        ],
+        "process_id": "6832"
+      },
+      {
+        "file_name": "0000002A.00000002.4238459682.000001F8D92E0000.00000004.00000800.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2168307187712",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "0000000F.00000002.3409048116.000001FF8B744000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "16384",
+        "base_address": "2197067939840",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3984"
+      },
+      {
+        "file_name": "00000011.00000002.3427527660.0000009FAFAFF000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "685847343104",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3500"
+      },
+      {
+        "file_name": "00000019.00000002.4200572269.000001BF35B14000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "126976",
+        "base_address": "1920751190016",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4048"
+      },
+      {
+        "file_name": "00000025.00000002.4241893398.000002C2226AE000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "8192",
+        "base_address": "3032824340480",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "0000001C.00000002.3598550203.0000028797470000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "73728",
+        "base_address": "2781381853184",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2044"
+      },
+      {
+        "file_name": "00000023.00000002.4196602725.000000807BF7E000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "8192",
+        "base_address": "551835656192",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "0000002A.00000003.4020246242.000001F8DB901000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2168347168768",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "00000019.00000002.4195740021.0000006D338FF000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "469016506368",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4048"
+      },
+      {
+        "file_name": "0000002A.00000002.4365972172.000001F8DC09E000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "8192",
+        "base_address": "2168355151872",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "00000025.00000002.4206752264.000002C2212C0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "3032803442688",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "00000015.00000002.4190408916.0000026D06C40000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "2667288199168",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1228"
+      },
+      {
+        "file_name": "0000000D.00000002.3366671143.000002576E140000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "2574532214784",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3680"
+      },
+      {
+        "file_name": "00000025.00000002.4192445093.000000E01B51F000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "962531028992",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "00000023.00000002.4209574536.0000022634584000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "208896",
+        "base_address": "2363110211584",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "0000001D.00000002.4200343798.000001AF28290000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "73728",
+        "base_address": "1851804680192",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4924"
+      },
+      {
+        "file_name": "00000014.00000002.3508880166.000000B06BDBF000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "757723820032",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1308"
+      },
+      {
+        "file_name": "00000023.00000002.4216765671.000002263467E000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2363111235584",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000015.00000002.4192159448.0000026D06C70000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "77824",
+        "base_address": "2667288395776",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1228"
+      },
+      {
+        "file_name": "00000029.00000002.3853521172.0000021D70980000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "73728",
+        "base_address": "2325466316800",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6660"
+      },
+      {
+        "file_name": "00000025.00000003.4077047329.000002C21F92C000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "3032776622080",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "0000000D.00000002.3356879701.0000007BD3D3F000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "531834859520",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3680"
+      },
+      {
+        "file_name": "0000001B.00000002.4201136723.00007FF9B14B1000.00000002.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "73728",
+        "base_address": "140710398070784",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2096"
+      },
+      {
+        "file_name": "0000002A.00000002.4194433272.00000048D0C73000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "45056",
+        "base_address": "312740360192",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "00000006.00000002.3148514254.000000D18233F000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "899832606720",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3752"
+      },
+      {
+        "file_name": "00000010.00000002.4210833224.00007FF9B1499000.00000002.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "77824",
+        "base_address": "140710397972480",
+        "stage": "MEM_STAGE_EXIT",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "203"
+          }
+        ],
+        "process_id": "3204"
+      },
+      {
+        "file_name": "00000014.00000002.3521924110.000002AFD6414000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "16384",
+        "base_address": "2954237132800",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1308"
+      },
+      {
+        "file_name": "00000008.00000002.3235215216.000002C7BE524000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "16384",
+        "base_address": "3056914808832",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4028"
+      },
+      {
+        "file_name": "00000019.00000002.4195029261.0000006D3387E000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "8192",
+        "base_address": "469015977984",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4048"
+      },
+      {
+        "file_name": "00000025.00000003.4077047329.000002C21F8B5000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "61440",
+        "base_address": "3032776134656",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "00000023.00000002.4194504634.000000807BB23000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "45056",
+        "base_address": "551831089152",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "0000001F.00000002.3727914694.00000136F5450000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "1335554801664",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6140"
+      },
+      {
+        "file_name": "0000001B.00000002.4185895138.000000F2C4CFF000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "1042684047360",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2096"
+      },
+      {
+        "file_name": "00000023.00000002.4209574536.0000022634580000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "12288",
+        "base_address": "2363110195200",
+        "stage": "MEM_STAGE_EXIT",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "203"
+          }
+        ],
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000023.00000002.4336582195.00000226374AE000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "45056",
+        "base_address": "2363159666688",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000025.00000002.4214932465.000002C221FFB000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "45056",
+        "base_address": "3032817315840",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "0000002A.00000002.4211701426.000001F8D917C000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "49152",
+        "base_address": "2168305729536",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "00000015.00000002.4182098553.000000B322AFF000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "769381101568",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1228"
+      },
+      {
+        "file_name": "00000029.00000002.3826629520.000000BC00CFF000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "807467479040",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6660"
+      },
+      {
+        "file_name": "0000000E.00000002.3357700180.000001C419480000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "1941749366784",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "688"
+      },
+      {
+        "file_name": "0000001C.00000002.3598550203.0000028797460000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "2781381787648",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2044"
+      },
+      {
+        "file_name": "0000000D.00000002.3360362198.000002576E010000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "8192",
+        "base_address": "2574530969600",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3680"
+      },
+      {
+        "file_name": "0000000F.00000002.3403657169.000001FF8B4D4000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "45056",
+        "base_address": "2197065383936",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3984"
+      },
+      {
+        "file_name": "0000000E.00000002.3358087212.000001C4194B0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "1941749563392",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "688"
+      },
+      {
+        "file_name": "0000000C.00000002.3347478853.000001AD44190000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "1843683459072",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6100"
+      },
+      {
+        "file_name": "00000025.00000002.4242246260.000002C2228C6000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "32768",
+        "base_address": "3032826535936",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "00000014.00000002.3508609952.000000B06BD3C000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "16384",
+        "base_address": "757723283456",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1308"
+      },
+      {
+        "file_name": "0000001A.00000002.3570483862.0000018EB11E0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "8192",
+        "base_address": "1712368517120",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2728"
+      },
+      {
+        "file_name": "00000011.00000002.3431389351.00000274A2880000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "2699966283776",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3500"
+      },
+      {
+        "file_name": "00000025.00000003.3986344601.000002C221FDE000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "3032817197056",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "0000000F.00000002.3373767499.00000083FB9EC000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "16384",
+        "base_address": "566862200832",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3984"
+      },
+      {
+        "file_name": "0000002A.00000003.4088782531.000001F8DBA55000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "40960",
+        "base_address": "2168348561408",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "00000009.00000002.3237228596.00000011F2C7F000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "77087633408",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4300"
+      },
+      {
+        "file_name": "0000002A.00000003.4122442620.000001F8DBBA3000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "16384",
+        "base_address": "2168349929472",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "00000009.00000002.3237596247.000001F17AA40000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "2136656314368",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4300"
+      },
+      {
+        "file_name": "00000022.00000002.3826091649.000002AA89204000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "45056",
+        "base_address": "2931468288000",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6332"
+      },
+      {
+        "file_name": "00000023.00000002.4204103721.0000022634490000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "8192",
+        "base_address": "2363109212160",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "0000002A.00000002.4407739989.000001F8DC317000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2168357744640",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "00000016.00000002.4220774848.00007FF9B1499000.00000002.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "77824",
+        "base_address": "140710397972480",
+        "stage": "MEM_STAGE_EXIT",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "203"
+          }
+        ],
+        "process_id": "3240"
+      },
+      {
+        "file_name": "00000009.00000002.3236480794.00000011F295C000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "16384",
+        "base_address": "77084344320",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4300"
+      },
+      {
+        "file_name": "00000016.00000002.4207245661.000001F3699F4000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "16384",
+        "base_address": "2144960724992",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3240"
+      },
+      {
+        "file_name": "0000002A.00000002.4279257331.000001F8DB000000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "20480",
+        "base_address": "2168337727488",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "0000002A.00000002.4310930703.000001F8DB9F2000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2168348155904",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "00000023.00000002.4288918994.0000022636E0C000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "12288",
+        "base_address": "2363152711680",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000023.00000003.3918555054.0000022636D11000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2363151683584",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "0000000C.00000002.3354242218.000001AD442E0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "1843684835328",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6100"
+      },
+      {
+        "file_name": "00000025.00000003.4077047329.000002C21F8E0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "16384",
+        "base_address": "3032776310784",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "00000018.00000002.3522240854.000000980491C000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "16384",
+        "base_address": "652911689728",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2448"
+      },
+      {
+        "file_name": "00000009.00000002.3237596247.000001F17AA44000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "45056",
+        "base_address": "2136656330752",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4300"
+      },
+      {
+        "file_name": "0000001D.00000002.4209688516.000001AF28480000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "1851806711808",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4924"
+      },
+      {
+        "file_name": "00000025.00000003.4128557149.000002C222065000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "40960",
+        "base_address": "3032817750016",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "00000002.00000002.4191524651.000001E0F6340000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\loaddll64.exe",
+        "size": "12288",
+        "base_address": "2065714905088",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2616"
+      },
+      {
+        "file_name": "0000001B.00000002.4194367099.00007FF9B1421000.00000020.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "487424",
+        "base_address": "140710397480960",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2096"
+      },
+      {
+        "file_name": "00000006.00000002.3154804415.0000021477970000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "2286928986112",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3752"
+      },
+      {
+        "file_name": "00000023.00000002.4195365215.000000807BBAE000.00000004.00000001.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "8192",
+        "base_address": "551831658496",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "0000001F.00000002.3728992181.00000136F5474000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "45056",
+        "base_address": "1335554949120",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6140"
+      },
+      {
+        "file_name": "0000002A.00000003.4005857834.000001F8D91B0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "77824",
+        "base_address": "2168305942528",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "00000019.00000002.4211970100.00007FF9B1421000.00000020.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "487424",
+        "base_address": "140710397480960",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4048"
+      },
+      {
+        "file_name": "0000001A.00000002.3571726463.0000018EB1310000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "1712369762304",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2728"
+      },
+      {
+        "file_name": "0000001F.00000002.3731663319.00000136F5790000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "1335558209536",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6140"
+      },
+      {
+        "file_name": "00000006.00000002.3153350620.0000021477710000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "8192",
+        "base_address": "2286926495744",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3752"
+      },
+      {
+        "file_name": "00000002.00000002.4195950918.000001E0F6460000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\loaddll64.exe",
+        "size": "4096",
+        "base_address": "2065716084736",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2616"
+      },
+      {
+        "file_name": "0000000D.00000002.3347572255.0000007BD3CBD000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "531834327040",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3680"
+      },
+      {
+        "file_name": "00000025.00000003.4077047329.000002C21F936000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "3032776663040",
+        "stage": "MEM_STAGE_FREE",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "203"
+          }
+        ],
+        "process_id": "3700"
+      },
+      {
+        "file_name": "00000014.00000002.3523608763.000002AFD7D90000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "2954263855104",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1308"
+      },
+      {
+        "file_name": "00000002.00000002.4196200497.00007FF9B1420000.00000002.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\loaddll64.exe",
+        "size": "4096",
+        "base_address": "140710397476864",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2616"
+      },
+      {
+        "file_name": "00000023.00000002.4250792018.00000226347D0000.00000004.00000800.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2363112620032",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000023.00000002.4272334916.00000226360CB000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "12288",
+        "base_address": "2363138813952",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000006.00000002.3154804415.0000021477974000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "16384",
+        "base_address": "2286929002496",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3752"
+      },
+      {
+        "file_name": "00000023.00000002.4329174714.0000022637410000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2363159019520",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "0000001D.00000002.4245867530.00007FF9B1499000.00000002.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "77824",
+        "base_address": "140710397972480",
+        "stage": "MEM_STAGE_EXIT",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "203"
+          }
+        ],
+        "process_id": "4924"
+      },
+      {
+        "file_name": "00000019.00000002.4196991380.000001BF35AF0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "1920751042560",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4048"
+      },
+      {
+        "file_name": "00000022.00000002.3824942752.000000F7638FF000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "1062527299584",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6332"
+      },
+      {
+        "file_name": "00000007.00000002.3147289755.000001889B944000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "16384",
+        "base_address": "1686237364224",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6464"
+      },
+      {
+        "file_name": "0000000C.00000002.3345713468.000001AD44100000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "1843682869248",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6100"
+      },
+      {
+        "file_name": "0000000C.00000002.3345251836.000001AD43FD0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "8192",
+        "base_address": "1843681624064",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6100"
+      },
+      {
+        "file_name": "00000025.00000002.4192445093.000000E01B513000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "45056",
+        "base_address": "962530979840",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "00000023.00000003.4094453476.0000022637001000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "12288",
+        "base_address": "2363154763776",
+        "stage": "MEM_STAGE_FREE",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "203"
+          }
+        ],
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000002.00000002.4191524651.000001E0F6353000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\loaddll64.exe",
+        "size": "32768",
+        "base_address": "2065714982912",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2616"
+      },
+      {
+        "file_name": "00000023.00000002.4220627018.0000022634750000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2363112095744",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "0000002A.00000003.4122442620.000001F8DBB08000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "45056",
+        "base_address": "2168349294592",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "00000008.00000002.3235215216.000002C7BE520000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "3056914792448",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4028"
+      },
+      {
+        "file_name": "00000018.00000002.3522415204.0000027F50430000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "2745830670336",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2448"
+      },
+      {
+        "file_name": "0000000C.00000002.3323208269.0000000F0413E000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "8192",
+        "base_address": "64492920832",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6100"
+      },
+      {
+        "file_name": "0000000B.00000002.3279611771.0000026C837F0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "8192",
+        "base_address": "2665085861888",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3140"
+      },
+      {
+        "file_name": "00000006.00000002.3148362205.000000D1822BC000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "16384",
+        "base_address": "899832070144",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3752"
+      },
+      {
+        "file_name": "00000015.00000002.4182053371.000000B322A7A000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "24576",
+        "base_address": "769380556800",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1228"
+      },
+      {
+        "file_name": "0000001D.00000002.4254517121.00007FF9B14AC000.00000004.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "20480",
+        "base_address": "140710398050304",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4924"
+      },
+      {
+        "file_name": "00000015.00000002.4204219232.00007FF9B1421000.00000020.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "487424",
+        "base_address": "140710397480960",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1228"
+      },
+      {
+        "file_name": "00000025.00000002.4226963453.000002C222010000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "3032817401856",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "00000019.00000002.4211079909.000001BF35C54000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "16384",
+        "base_address": "1920752500736",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4048"
+      },
+      {
+        "file_name": "00000022.00000002.3826091649.000002AA89200000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "2931468271616",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6332"
+      },
+      {
+        "file_name": "00000025.00000002.4195775253.000002C21F6A0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "8192",
+        "base_address": "3032773951488",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "00000014.00000002.3509792739.000002AFD6240000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "73728",
+        "base_address": "2954235215872",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1308"
+      },
+      {
+        "file_name": "00000008.00000002.3235393167.000002C7BFC60000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "3056939171840",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4028"
+      },
+      {
+        "file_name": "00000018.00000002.3522360009.0000027F503C0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "2745830211584",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2448"
+      },
+      {
+        "file_name": "00000007.00000002.3147898289.000001889D450000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "1686265724928",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6464"
+      },
+      {
+        "file_name": "00000025.00000002.4241778460.000002C222610000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "3032823693312",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "00000023.00000002.4195413083.000000807BE7E000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "8192",
+        "base_address": "551834607616",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000023.00000003.4033727438.0000022636F6B000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "110592",
+        "base_address": "2363154149376",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000006.00000002.3155106932.00000214791F0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "2286954676224",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3752"
+      },
+      {
+        "file_name": "0000000E.00000002.3356893250.000001C419460000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "1941749235712",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "688"
+      },
+      {
+        "file_name": "00000029.00000002.3850435830.0000021D70940000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "2325466054656",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6660"
+      },
+      {
+        "file_name": "00000002.00000002.4191524651.000001E0F6350000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\loaddll64.exe",
+        "size": "8192",
+        "base_address": "2065714970624",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2616"
+      },
+      {
+        "file_name": "00000023.00000003.3964431008.000002263466B000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2363111157760",
+        "stage": "MEM_STAGE_FREE",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "203"
+          }
+        ],
+        "process_id": "4672"
+      },
+      {
+        "file_name": "0000000B.00000002.3277459818.000000CB3E99C000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "16384",
+        "base_address": "872928624640",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3140"
+      },
+      {
+        "file_name": "0000001D.00000002.4222920584.00007FF9B1420000.00000002.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "140710397476864",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4924"
+      },
+      {
+        "file_name": "00000010.00000002.4191254189.000002794B614000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "16384",
+        "base_address": "2719978962944",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3204"
+      },
+      {
+        "file_name": "0000000D.00000002.3407112549.000002576E1D0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "69632",
+        "base_address": "2574532804608",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3680"
+      },
+      {
+        "file_name": "0000001A.00000002.3571859202.0000018EB1370000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "1712370155520",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2728"
+      },
+      {
+        "file_name": "0000001C.00000002.3637648059.00000287975E0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "2781383360512",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2044"
+      },
+      {
+        "file_name": "0000001D.00000002.4228762884.00007FF9B1421000.00000020.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "487424",
+        "base_address": "140710397480960",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4924"
+      },
+      {
+        "file_name": "00000023.00000003.3964431008.0000022634667000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2363111141376",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000016.00000002.4234463448.00007FF9B14B1000.00000002.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "73728",
+        "base_address": "140710398070784",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3240"
+      },
+      {
+        "file_name": "0000002A.00000002.4279257331.000001F8DB00B000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "12288",
+        "base_address": "2168337772544",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "0000002A.00000002.4310930703.000001F8DB9EC000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "20480",
+        "base_address": "2168348131328",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "0000002A.00000002.4260442683.000001F8D9330000.00000004.00000800.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2168307515392",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "0000001F.00000002.3724959655.00000136F53F0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "8192",
+        "base_address": "1335554408448",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6140"
+      },
+      {
+        "file_name": "0000001F.00000002.3730996749.00000136F5730000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "1335557816320",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6140"
+      },
+      {
+        "file_name": "0000001C.00000002.3638339097.0000028798EA0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "2781409312768",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2044"
+      },
+      {
+        "file_name": "00000023.00000002.4258880017.0000022634824000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "24576",
+        "base_address": "2363112964096",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000009.00000002.3243823467.000001F17ACF0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "2136659132416",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4300"
+      },
+      {
+        "file_name": "0000000B.00000002.3279292947.000000CB3EC7F000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "872931651584",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3140"
+      },
+      {
+        "file_name": "00000015.00000002.4182143702.000000B322B7F000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "769381625856",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1228"
+      },
+      {
+        "file_name": "00000014.00000002.3509453179.000002AFD6210000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "2954235019264",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1308"
+      },
+      {
+        "file_name": "00000025.00000002.4196788348.000002C21F990000.00000004.00000800.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "3032777031680",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "0000002A.00000003.4035554068.000001F8D91A7000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2168305905664",
+        "stage": "MEM_STAGE_FREE",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "203"
+          }
+        ],
+        "process_id": "6832"
+      },
+      {
+        "file_name": "00000007.00000002.3147168627.000001889B7E0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "8192",
+        "base_address": "1686235906048",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6464"
+      },
+      {
+        "file_name": "00000010.00000002.4194169717.000002794B664000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "45056",
+        "base_address": "2719979290624",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3204"
+      },
+      {
+        "file_name": "00000010.00000002.4204226713.00007FF9B1421000.00000020.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "487424",
+        "base_address": "140710397480960",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3204"
+      },
+      {
+        "file_name": "00000023.00000003.3964431008.0000022634621000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "16384",
+        "base_address": "2363110854656",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "0000001D.00000002.4196903502.000001AF28240000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "1851804352512",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4924"
+      },
+      {
+        "file_name": "00000009.00000002.3236951510.00000011F29DF000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "77084880896",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4300"
+      },
+      {
+        "file_name": "00000025.00000003.4128557149.000002C222011000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "131072",
+        "base_address": "3032817405952",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "0000000E.00000002.3358087212.000001C4194B4000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "45056",
+        "base_address": "1941749579776",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "688"
+      },
+      {
+        "file_name": "0000002A.00000002.4194433272.00000048D0C7F000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "312740409344",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "00000025.00000003.4077047329.000002C21F92A000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "3032776613888",
+        "stage": "MEM_STAGE_FREE",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "203"
+          }
+        ],
+        "process_id": "3700"
+      },
+      {
+        "file_name": "00000016.00000002.4194451335.000000B5078FF000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "777515954176",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3240"
+      },
+      {
+        "file_name": "00000023.00000003.4094453476.0000022636FB3000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "16384",
+        "base_address": "2363154444288",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "0000001B.00000002.4185952659.0000025902310000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "8192",
+        "base_address": "2581312110592",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2096"
+      },
+      {
+        "file_name": "00000029.00000002.3853521172.0000021D70970000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "2325466251264",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6660"
+      },
+      {
+        "file_name": "00000011.00000002.3431042635.00000274A0FA0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "2699940200448",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3500"
+      },
+      {
+        "file_name": "00000023.00000002.4348716406.0000022637614000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2363161133056",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "0000000C.00000002.3347478853.000001AD44194000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "122880",
+        "base_address": "1843683475456",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6100"
+      },
+      {
+        "file_name": "00000018.00000002.3522820472.0000027F506C0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "2745833357312",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2448"
+      },
+      {
+        "file_name": "0000000B.00000002.3280677679.0000026C83830000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "69632",
+        "base_address": "2665086124032",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3140"
+      },
+      {
+        "file_name": "0000001F.00000002.3728992181.00000136F5480000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "69632",
+        "base_address": "1335554998272",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6140"
+      },
+      {
+        "file_name": "00000010.00000002.4190969572.000000EBE407A000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "24576",
+        "base_address": "1013143019520",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3204"
+      },
+      {
+        "file_name": "0000002A.00000003.4088422352.000001F8DB9FD000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "8192",
+        "base_address": "2168348200960",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "0000001F.00000002.3728992181.00000136F5470000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "1335554932736",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6140"
+      },
+      {
+        "file_name": "00000015.00000002.4218904284.00007FF9B14B1000.00000002.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "73728",
+        "base_address": "140710398070784",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1228"
+      },
+      {
+        "file_name": "00000023.00000002.4306846327.0000022636E10000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2363152728064",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000025.00000002.4197654402.000002C21F9B0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "12288",
+        "base_address": "3032777162752",
+        "stage": "MEM_STAGE_EXIT",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "263"
+          }
+        ],
+        "process_id": "3700"
+      },
+      {
+        "file_name": "00000009.00000002.3243823467.000001F17ACF4000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "16384",
+        "base_address": "2136659148800",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4300"
+      },
+      {
+        "file_name": "00000022.00000002.3825770711.000002AA891A0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "2931467878400",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6332"
+      },
+      {
+        "file_name": "00000023.00000002.4306930564.0000022636F6B000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2363154149376",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000023.00000003.3972364701.0000022636E11000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "131072",
+        "base_address": "2363152732160",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000022.00000002.3826364295.000002AA8AAD0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "2931494289408",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6332"
+      },
+      {
+        "file_name": "00000025.00000002.4241966301.000002C2227B8000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "8192",
+        "base_address": "3032825430016",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "00000019.00000002.4200572269.000001BF35B10000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "1920751173632",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4048"
+      },
+      {
+        "file_name": "00000023.00000003.3993088980.00000226345DC000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2363110572032",
+        "stage": "MEM_STAGE_FREE",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "203"
+          }
+        ],
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000022.00000002.3822045902.000000F7635AC000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "16384",
+        "base_address": "1062523813888",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6332"
+      },
+      {
+        "file_name": "00000025.00000002.4196071255.000002C21F844000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "204800",
+        "base_address": "3032775671808",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "0000001B.00000002.4193708659.00007FF9B1420000.00000002.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "140710397476864",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2096"
+      },
+      {
+        "file_name": "00000016.00000002.4195458865.000001F369680000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "8192",
+        "base_address": "2144957104128",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3240"
+      },
+      {
+        "file_name": "0000001B.00000002.4185731548.000000F2C49EA000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "24576",
+        "base_address": "1042680815616",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2096"
+      },
+      {
+        "file_name": "00000006.00000002.3154702705.0000021477840000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "2286927740928",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3752"
+      },
+      {
+        "file_name": "00000029.00000002.3853521172.0000021D70974000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "45056",
+        "base_address": "2325466267648",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6660"
+      },
+      {
+        "file_name": "0000001D.00000002.4195746355.000001AF28110000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "8192",
+        "base_address": "1851803107328",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4924"
+      },
+      {
+        "file_name": "00000002.00000002.4196444707.00007FF9B1499000.00000002.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\loaddll64.exe",
+        "size": "77824",
+        "base_address": "140710397972480",
+        "stage": "MEM_STAGE_EXIT",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "203"
+          },
+          {
+            "ref": "#signature_matches",
+            "value": "311"
+          }
+        ],
+        "process_id": "2616"
+      },
+      {
+        "file_name": "00000018.00000002.3522787152.0000027F50670000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "2745833029632",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2448"
+      },
+      {
+        "file_name": "00000002.00000002.4196248543.00007FF9B1421000.00000020.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\loaddll64.exe",
+        "size": "487424",
+        "base_address": "140710397480960",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2616"
+      },
+      {
+        "file_name": "0000000D.00000002.3409215531.000002576E400000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "2574535098368",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3680"
+      },
+      {
+        "file_name": "00000016.00000002.4193887745.000000B50787F000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "777515429888",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3240"
+      },
+      {
+        "file_name": "00000025.00000002.4197654402.000002C21F9B4000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "24576",
+        "base_address": "3032777179136",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "00000015.00000002.4195423774.0000026D06E90000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "2667290624000",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1228"
+      },
+      {
+        "file_name": "00000016.00000002.4214304442.00007FF9B1420000.00000002.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "140710397476864",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3240"
+      },
+      {
+        "file_name": "0000000E.00000002.3356574033.000001C419400000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "8192",
+        "base_address": "1941748842496",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "688"
+      },
+      {
+        "file_name": "00000009.00000002.3242805425.000001F17AB40000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "8192",
+        "base_address": "2136657362944",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4300"
+      },
+      {
+        "file_name": "00000010.00000002.4191179083.000000EBE417F000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "1013144088576",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3204"
+      },
+      {
+        "file_name": "0000000D.00000002.3407112549.000002576E1C0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "2574532739072",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3680"
+      },
+      {
+        "file_name": "0000001F.00000002.3688796340.00000007E547C000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "16384",
+        "base_address": "33911455744",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6140"
+      },
+      {
+        "file_name": "00000018.00000002.3522415204.0000027F50434000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "45056",
+        "base_address": "2745830686720",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2448"
+      },
+      {
+        "file_name": "0000002A.00000002.4199059619.00000048D0DFE000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "8192",
+        "base_address": "312741978112",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "00000025.00000003.4077047329.000002C21F926000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "3032776597504",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "0000000F.00000002.3409461590.000001FF8D020000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "2197094006784",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3984"
+      },
+      {
+        "file_name": "00000023.00000003.3972364701.0000022636EB5000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "167936",
+        "base_address": "2363153403904",
+        "stage": "MEM_STAGE_FREE",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "203"
+          }
+        ],
+        "process_id": "4672"
+      },
+      {
+        "file_name": "0000001A.00000002.3571859202.0000018EB1380000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "69632",
+        "base_address": "1712370221056",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2728"
+      },
+      {
+        "file_name": "00000008.00000002.3235024112.000002C7BE270000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "73728",
+        "base_address": "3056911974400",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4028"
+      },
+      {
+        "file_name": "00000011.00000002.3431252987.00000274A1000000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "2699940593664",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3500"
+      },
+      {
+        "file_name": "0000002A.00000002.4332949481.000001F8DBC00000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2168350310400",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "00000014.00000002.3509792739.000002AFD6230000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "2954235150336",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1308"
+      },
+      {
+        "file_name": "00000025.00000002.4206539079.000002C21FBB0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "12288",
+        "base_address": "3032779259904",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "00000007.00000002.3146548292.0000006DE507F000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "471993937920",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6464"
+      },
+      {
+        "file_name": "00000010.00000002.4191254189.000002794B610000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "2719978946560",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3204"
+      },
+      {
+        "file_name": "00000023.00000003.4126171396.0000022637011000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "196608",
+        "base_address": "2363154829312",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000023.00000003.4076798468.00000226345DD000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2363110576128",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000025.00000003.3986344601.000002C221F11000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "196608",
+        "base_address": "3032816357376",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "00000023.00000003.3972364701.0000022636F18000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2363153809408",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000010.00000002.4218901078.00007FF9B14B1000.00000002.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "73728",
+        "base_address": "140710398070784",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3204"
+      },
+      {
+        "file_name": "00000010.00000002.4193676953.000002794B620000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "2719979012096",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3204"
+      },
+      {
+        "file_name": "0000001F.00000002.3718923297.00000007E54FF000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "33911992320",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6140"
+      },
+      {
+        "file_name": "0000002A.00000002.4292303302.000001F8DB900000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2168347164672",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "00000006.00000002.3149116113.0000021477610000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "2286925447168",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3752"
+      },
+      {
+        "file_name": "0000000B.00000002.3280677679.0000026C83824000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "45056",
+        "base_address": "2665086074880",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3140"
+      },
+      {
+        "file_name": "00000025.00000002.4206819691.000002C221610000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "20480",
+        "base_address": "3032806916096",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "0000001B.00000002.4186015864.0000025902370000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "2581312503808",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2096"
+      },
+      {
+        "file_name": "00000009.00000002.3237596247.000001F17AA50000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "73728",
+        "base_address": "2136656379904",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4300"
+      },
+      {
+        "file_name": "00000025.00000002.4196071255.000002C21F840000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "12288",
+        "base_address": "3032775655424",
+        "stage": "MEM_STAGE_EXIT",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "203"
+          }
+        ],
+        "process_id": "3700"
+      },
+      {
+        "file_name": "0000000E.00000002.3354873209.000000903D9BC000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "16384",
+        "base_address": "619508908032",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "688"
+      },
+      {
+        "file_name": "00000023.00000003.3964431008.000002263466D000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2363111165952",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000023.00000003.4094453476.0000022637007000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "12288",
+        "base_address": "2363154788352",
+        "stage": "MEM_STAGE_FREE",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "203"
+          }
+        ],
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000022.00000002.3822285545.000000F76387F000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "1062526775296",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6332"
+      },
+      {
+        "file_name": "00000023.00000003.3964431008.00000226345F6000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "61440",
+        "base_address": "2363110678528",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000007.00000002.3147289755.000001889B940000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "1686237347840",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6464"
+      },
+      {
+        "file_name": "00000023.00000002.4239473261.0000022634790000.00000004.00000800.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2363112357888",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000007.00000002.3147564533.000001889B9D0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "1686237937664",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6464"
+      },
+      {
+        "file_name": "00000019.00000002.4212147975.00007FF9B1499000.00000002.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "77824",
+        "base_address": "140710397972480",
+        "stage": "MEM_STAGE_EXIT",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "203"
+          }
+        ],
+        "process_id": "4048"
+      },
+      {
+        "file_name": "0000002A.00000002.4310930703.000001F8DB9F4000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "8192",
+        "base_address": "2168348164096",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "0000002A.00000002.4392173092.000001F8DC1A8000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "8192",
+        "base_address": "2168356241408",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "0000001D.00000002.4200343798.000001AF28280000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "1851804614656",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4924"
+      },
+      {
+        "file_name": "00000016.00000002.4227347132.00007FF9B14AC000.00000004.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "20480",
+        "base_address": "140710398050304",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3240"
+      },
+      {
+        "file_name": "00000015.00000003.3854029465.0000026D06DF0000.00000004.00000400.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "2667289968640",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "1228"
+      },
+      {
+        "file_name": "00000008.00000002.3234934262.000002C7BE1F0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "3056911450112",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "4028"
+      },
+      {
+        "file_name": "00000025.00000002.4206468241.000002C21FB70000.00000004.00000800.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "3032778997760",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "0000002A.00000002.4208418323.000001F8D8FF0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "8192",
+        "base_address": "2168304107520",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "6832"
+      },
+      {
+        "file_name": "00000010.00000002.4200422719.00007FF9B1420000.00000002.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "140710397476864",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3204"
+      },
+      {
+        "file_name": "00000015.00000002.4200557424.00007FF9B1420000.00000002.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "140710397476864",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1228"
+      },
+      {
+        "file_name": "0000001B.00000002.4186065587.0000025902390000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "12288",
+        "base_address": "2581312634880",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2096"
+      },
+      {
+        "file_name": "00000015.00000002.4213683643.00007FF9B14AC000.00000004.00000001.01000000.00000004.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "20480",
+        "base_address": "140710398050304",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1228"
+      },
+      {
+        "file_name": "0000001A.00000002.3563099724.00000045BDFCC000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "16384",
+        "base_address": "299540201472",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "2728"
+      },
+      {
+        "file_name": "00000023.00000003.4033727438.0000022636FFC000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "4096",
+        "base_address": "2363154743296",
+        "stage": "MEM_STAGE_FREE",
+        "process_id": "4672"
+      },
+      {
+        "file_name": "00000025.00000002.4214932465.000002C22200C000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "12288",
+        "base_address": "3032817385472",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3700"
+      },
+      {
+        "file_name": "00000011.00000002.3430765570.00000274A0DA0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "69632",
+        "base_address": "2699938103296",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3500"
+      },
+      {
+        "file_name": "0000000B.00000002.3281497145.0000026C85350000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "4096",
+        "base_address": "2665114566656",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3140"
+      },
+      {
+        "file_name": "0000002A.00000003.4122442620.000001F8DBAA6000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\WerFault.exe",
+        "size": "163840",
+        "base_address": "2168348893184",
+        "stage": "MEM_STAGE_FREE",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "203"
+          }
+        ],
+        "process_id": "6832"
+      },
+      {
+        "file_name": "00000016.00000002.4196910993.000001F369850000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Windows\\System32\\rundll32.exe",
+        "size": "73728",
+        "base_address": "2144959004672",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "3240"
+      }
+    ],
+    "registry_keys_opened": [
+      "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize",
+      "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize\\DisableMetaFiles",
+      "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize\\DisableUmpdBufferSizeCheck",
+      "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Ole\\FeatureDevelopmentProperties",
+      "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Segment Heap",
+      "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\rundll32.exe",
+      "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\Display",
+      "HKEY_LOCAL_MACHINE\\OSDATA\\Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags",
+      "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Ole",
+      "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\WerFault.exe",
+      "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\SdbUpdates",
+      "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers",
+      "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers",
+      "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders",
+      "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Wow64\\x86\\xtajit",
+      "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options",
+      "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\AppModel\\Lookaside\\user",
+      "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\OLE",
+      "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\LanguageOverlay\\OverlayPackages\\en-US",
+      "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\SideBySide",
+      "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\cmd.exe",
+      "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager",
+      "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+      "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\SdbUpdates\\ManifestedMergeStubSdbs",
+      "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\AppModel\\Lookaside\\machine",
+      "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\MUI\\Settings",
+      "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\OLE\\Tracing",
+      "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags",
+      "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows NT\\CurrentVersion",
+      "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\loaddll64.exe"
+    ],
+    "mbc": [
+      {
+        "id": "C0007",
+        "objective": "Memory",
+        "behavior": "Allocate Memory",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "0"
+          }
+        ]
+      },
+      {
+        "id": "C0042",
+        "objective": "Process",
+        "behavior": "Create Mutex",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "4"
+          }
+        ]
+      },
+      {
+        "id": "C0040",
+        "objective": "Process",
+        "behavior": "Allocate Thread Local Storage",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "5"
+          }
+        ]
+      },
+      {
+        "id": "F0002.002",
+        "objective": "Collection",
+        "behavior": "Keylogging",
+        "method": "Polling",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "6"
+          }
+        ]
+      },
+      {
+        "id": "C0041",
+        "objective": "Process",
+        "behavior": "Set Thread Local Storage Value",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "12"
+          }
+        ]
+      },
+      {
+        "id": "E1083",
+        "objective": "Discovery",
+        "behavior": "File and Directory Discovery",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "14"
+          }
+        ]
+      },
+      {
+        "id": "C0038",
+        "objective": "Process",
+        "behavior": "Create Thread",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "15"
+          }
+        ]
+      },
+      {
+        "id": "B0001.032",
+        "objective": "Anti-Behavioral Analysis",
+        "behavior": "Debugger Detection",
+        "method": "Timing/Delay Check GetTickCount",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "16"
+          }
+        ]
+      },
+      {
+        "id": "C0036.006",
+        "objective": "Operating System",
+        "behavior": "Registry",
+        "method": "Query Registry Value",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "17"
+          }
+        ]
+      },
+      {
+        "id": "E1082",
+        "objective": "Discovery",
+        "behavior": "System Information Discovery",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "21"
+          }
+        ]
+      },
+      {
+        "id": "OC0006"
+      },
+      {
+        "id": "C0005.001"
+      },
+      {
+        "id": "C0002"
+      },
+      {
+        "id": "OB0001"
+      },
+      {
+        "id": "OB0002"
+      },
+      {
+        "id": "OB0006"
+      },
+      {
+        "id": "F0001"
+      },
+      {
+        "id": "F0005"
+      },
+      {
+        "id": "F0005.004"
+      }
+    ],
+    "processes_tree": [
+      {
+        "process_id": "2560",
+        "name": "%SANDBOX_DLL_LOADER_AMD64% %TEMP%\\469K933O3D12LT9L.dll %WORKDIR% 483"
+      },
+      {
+        "process_id": "2756",
+        "name": "wmiadap.exe /F /T /R"
+      },
+      {
+        "process_id": "2184",
+        "name": "%windir%\\System32\\svchost.exe -k WerSvcGroup"
+      },
+      {
+        "process_id": "2800",
+        "name": "%windir%\\system32\\wbem\\wmiprvse.exe"
+      },
+      {
+        "process_id": "5504",
+        "name": "\"C:\\Windows\\sysnative\\rundll32.exe\" \"C:\\Users\\<USER>\\Desktop\\library.dll\",#1"
+      },
+      {
+        "process_id": "2616",
+        "name": "C:\\Windows\\System32\\loaddll64.exe loaddll64.exe \"C:\\Users\\user\\Desktop\\init.dll\"",
+        "children": [
+          {
+            "process_id": "2368",
+            "name": "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1",
+            "files_opened": [
+              "C:\\Windows\\Globalization\\Sorting\\sortdefault.nls",
+              "C:\\Windows\\SYSTEM32\\TextShaping.dll",
+              "C:\\Windows\\SYSTEM32\\dwmapi.dll",
+              "C:\\Windows\\System32\\conhost.exe",
+              "C:\\Windows\\System32\\en-US\\user32.dll.mui",
+              "C:\\Windows\\SystemResources\\user32.dll.mun",
+              "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.22621.2361_none_2712ced57382f843",
+              "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.22621.2361_none_2712ced57382f843\\comctl32.DLL",
+              "C:\\Windows\\system32\\conhost.exe",
+              "C:\\Windows\\system32\\en-US\\conhost.exe.mui",
+              "C:\\Windows\\system32\\uxtheme.dll",
+              "C:\\Windows\\system32\\uxtheme.dll.Config"
+            ]
+          },
+          {
+            "process_id": "5064",
+            "name": "C:\\Windows\\System32\\cmd.exe cmd.exe /C rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",#1",
+            "children": [
+              {
+                "process_id": "6464",
+                "name": "C:\\Windows\\System32\\rundll32.exe rundll32.exe  \"C:\\Users\\user\\Desktop\\init.dll\",#1"
+              }
+            ],
+            "files_opened": [
+              "C:\\Program Files (x86)\\Common Files\\Oracle\\Java\\java8path\\",
+              "C:\\Program Files (x86)\\Common Files\\Oracle\\Java\\javapath\\",
+              "C:\\Windows\\SYSTEM32\\kernel.appcore.dll",
+              "C:\\Windows\\system32\\"
+            ],
+            "files_written": [
+              "\\Device\\ConDrv\\\\Connect"
+            ]
+          },
+          {
+            "process_id": "3752",
+            "name": "C:\\Windows\\System32\\rundll32.exe rundll32.exe C:\\Users\\user\\Desktop\\init.dll,AddGadgetMessageHandler",
+            "files_opened": [
+              "C:\\Users\\user\\Desktop\\init.dll.123.Manifest",
+              "C:\\Users\\user\\Desktop\\init.dll.124.Manifest",
+              "C:\\Users\\user\\Desktop\\init.dll.2.Manifest",
+              "C:\\Windows\\SYSTEM32\\WLDP.DLL",
+              "C:\\Windows\\system32\\en-US\\rundll32.exe.mui",
+              "C:\\Windows\\system32\\rundll32.exe"
+            ]
+          },
+          {
+            "process_id": "4028",
+            "name": "C:\\Windows\\System32\\rundll32.exe rundll32.exe C:\\Users\\user\\Desktop\\init.dll,AddLayeredRef"
+          },
+          {
+            "process_id": "4300",
+            "name": "C:\\Windows\\System32\\rundll32.exe rundll32.exe C:\\Users\\user\\Desktop\\init.dll,AdjustClipInsideRef"
+          },
+          {
+            "process_id": "3140",
+            "name": "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",AddGadgetMessageHandler"
+          },
+          {
+            "process_id": "6100",
+            "name": "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",AddLayeredRef"
+          },
+          {
+            "process_id": "3680",
+            "name": "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",AdjustClipInsideRef"
+          },
+          {
+            "process_id": "688",
+            "name": "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",WaitMessageEx"
+          },
+          {
+            "process_id": "3984",
+            "name": "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",UtilSetBackground"
+          },
+          {
+            "process_id": "3204",
+            "name": "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",UtilGetColor",
+            "children": [
+              {
+                "process_id": "3700",
+                "name": "C:\\Windows\\System32\\WerFault.exe C:\\Windows\\system32\\WerFault.exe -u -p 3204 -s 356"
+              }
+            ]
+          },
+          {
+            "process_id": "3500",
+            "name": "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",UtilDrawOutlineRect"
+          },
+          {
+            "process_id": "1308",
+            "name": "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",UtilDrawBlendRect"
+          },
+          {
+            "process_id": "1228",
+            "name": "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",UtilBuildFont",
+            "children": [
+              {
+                "process_id": "4672",
+                "name": "C:\\Windows\\System32\\WerFault.exe C:\\Windows\\system32\\WerFault.exe -u -p 1228 -s 356"
+              }
+            ]
+          },
+          {
+            "process_id": "3240",
+            "name": "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",UnregisterGadgetProperty",
+            "children": [
+              {
+                "process_id": "6832",
+                "name": "C:\\Windows\\System32\\WerFault.exe C:\\Windows\\system32\\WerFault.exe -u -p 3240 -s 356"
+              }
+            ]
+          },
+          {
+            "process_id": "2448",
+            "name": "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",UnregisterGadgetMessageString"
+          },
+          {
+            "process_id": "4048",
+            "name": "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",UnregisterGadgetMessage"
+          },
+          {
+            "process_id": "2728",
+            "name": "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",SetWindowResizeFlag"
+          },
+          {
+            "process_id": "2096",
+            "name": "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",SetTransitionVisualProperties"
+          },
+          {
+            "process_id": "2044",
+            "name": "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",SetRestoreCachedLayeredRefFlag"
+          },
+          {
+            "process_id": "4924",
+            "name": "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",SetMinimumDCompVersion"
+          },
+          {
+            "process_id": "6140",
+            "name": "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",SetHardwareDeviceUsage"
+          },
+          {
+            "process_id": "6332",
+            "name": "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",SetGadgetStyle"
+          },
+          {
+            "process_id": "6660",
+            "name": "C:\\Windows\\System32\\rundll32.exe rundll32.exe \"C:\\Users\\user\\Desktop\\init.dll\",SetGadgetScale"
+          }
+        ],
+        "files_opened": [
+          "C:\\Users\\user\\Desktop\\init.dll",
+          "C:\\Windows\\AppPatch\\sysmain.sdb",
+          "C:\\Windows\\SYSTEM32\\apphelp.dll",
+          "C:\\Windows\\SYSTEM32\\ntdll.dll",
+          "C:\\Windows\\System32\\KERNEL32.DLL",
+          "C:\\Windows\\System32\\KERNELBASE.dll",
+          "C:\\Windows\\SystemResources\\loaddll64.exe.mun",
+          "C:\\Windows\\apppatch\\MergeSdbFilesSource\\sysMerge.sdb",
+          "C:\\Windows\\system32\\IMM32.DLL",
+          "C:\\Windows\\system32\\loaddll64.exe"
+        ],
+        "files_written": [
+          "\\Device\\ConDrv\\\\Connect"
+        ]
+      }
+    ],
+    "attack_techniques": {
+      "T1129": [
+        {
+          "severity": "INFO",
+          "description": "link function at runtime on Windows",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "1"
+            }
+          ]
+        },
+        {
+          "severity": "INFO",
+          "description": "parse PE header",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "2"
+            }
+          ]
+        },
+        {
+          "severity": "INFO",
+          "description": "link many functions at runtime",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "20"
+            }
+          ]
+        }
+      ],
+      "T1056.001": [
+        {
+          "severity": "INFO",
+          "description": "log keystrokes via polling",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "6"
+            }
+          ]
+        }
+      ],
+      "T1083": [
+        {
+          "severity": "INFO",
+          "description": "check if file exists",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "14"
+            }
+          ]
+        }
+      ],
+      "T1012": [
+        {
+          "severity": "INFO",
+          "description": "query or enumerate registry value",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "17"
+            }
+          ]
+        }
+      ],
+      "T1082": [
+        {
+          "severity": "INFO",
+          "description": "check OS version",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "21"
+            }
+          ]
+        },
+        {
+          "severity": "INFO",
+          "description": "get system information on Windows",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "22"
+            }
+          ]
+        }
+      ],
+      "T1542.003": [
+        {
+          "severity": "INFO",
+          "description": "May use bcdedit to modify the Windows boot settings",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "533"
+            }
+          ]
+        }
+      ],
+      "T1562.001": [
+        {
+          "severity": "INFO",
+          "description": "Launches processes in debugging mode, may be used to hinder debugging",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "177"
+            }
+          ]
+        }
+      ],
+      "T1497": [
+        {
+          "severity": "INFO",
+          "description": "Checks if the current process is being debugged",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "76"
+            }
+          ]
+        }
+      ],
+      "T1218.011": [
+        {
+          "severity": "INFO",
+          "description": "Runs a DLL by calling functions",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "219"
+            }
+          ]
+        }
+      ],
+      "T1070.006": [
+        {
+          "severity": "INFO",
+          "description": "Binary contains a suspicious time stamp",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "234"
+            }
+          ]
+        }
+      ],
+      "T1056": [
+        {
+          "severity": "INFO",
+          "description": "Creates a DirectInput object (often for capturing keystrokes)",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "311"
+            }
+          ]
+        }
+      ],
+      "T1518.001": [
+        {
+          "severity": "INFO",
+          "description": "Checks if the current process is being debugged",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "76"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

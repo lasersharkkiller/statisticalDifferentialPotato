@@ -1,0 +1,338 @@
+{
+    "data":  {
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "2736",
+                                            "name":  "wmiadap.exe /F /T /R"
+                                        },
+                                        {
+                                            "process_id":  "2776",
+                                            "name":  "%windir%\\system32\\wbem\\wmiprvse.exe"
+                                        },
+                                        {
+                                            "process_id":  "2524",
+                                            "name":  "%SANDBOX_DLL_LOADER_AMD64% %TEMP%\\EIZM9GLMVVZZ336A.dll %WORKDIR% 483",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "2600",
+                                                                 "name":  "rundll32.exe %TEMP%\\EIZM9GLMVVZZ336A.dll,DllGetActivationFactory"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2592",
+                                                                 "name":  "rundll32.exe %TEMP%\\EIZM9GLMVVZZ336A.dll,DllCanUnloadNow"
+                                                             }
+                                                         ]
+                                        }
+                                    ],
+                 "verdicts":  [
+                                  "UNKNOWN_VERDICT"
+                              ],
+                 "mbc":  [
+                             {
+                                 "id":  "E1083",
+                                 "objective":  "Discovery",
+                                 "behavior":  "File and Directory Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "2"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0030.001",
+                                 "objective":  "Command and Control",
+                                 "behavior":  "C2 Communication",
+                                 "method":  "Send Data",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "3"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0030.002",
+                                 "objective":  "Command and Control",
+                                 "behavior":  "C2 Communication",
+                                 "method":  "Receive Data",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "4"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0001.001",
+                                 "objective":  "Communication",
+                                 "behavior":  "Socket Communication",
+                                 "method":  "Set Socket Config",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "5"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0051",
+                                 "objective":  "File System",
+                                 "behavior":  "Read File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "6"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0001.007",
+                                 "objective":  "Communication",
+                                 "behavior":  "Socket Communication",
+                                 "method":  "Send Data",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "7"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0001.006",
+                                 "objective":  "Communication",
+                                 "behavior":  "Socket Communication",
+                                 "method":  "Receive Data",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "8"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0042",
+                                 "objective":  "Process",
+                                 "behavior":  "Create Mutex",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "10"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "signature_matches":  [
+                                           {
+                                               "id":  "1",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "connect socket",
+                                               "description":  "communication/socket : Detects socket connection attempts using common APIs or ConnectEx setup.",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "joakim@intezer.com",
+                                                               "mrhafizfarhad@gmail.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: connect"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: connect socket\n    namespace: communication/socket\n    authors:\n      - moritz.raabe@mandiant.com\n      - joakim@intezer.com\n      - mrhafizfarhad@gmail.com\n    description: Detects socket connection attempts using common APIs or ConnectEx setup.\n    scopes:\n      static: basic block\n      dynamic: span of calls\n    examples:\n      - Practical Malware Analysis Lab 01-01.dll_:0x10001010\n  features:\n    - or:\n      - api: connect\n      - api: ws2_32.connect\n      - api: ws2_32.#4 = connect\n      - api: ws2_32.WSAConnect\n      - api: ws2_32.#33 = WSAConnect\n      - api: ConnectEx\n      - or:\n        - and:\n          # static\n          - basic block:\n            # candidate for GUID: WSAID_CONNECTEX/25a207b9-ddf3-4660-8ee9-76e58c74063e\n            - and:\n              - number: 0x25A207B9\n              - number: 0x4660DDF3\n              - number: 0xE576E98E\n              - number: 0x3E06748C\n          - basic block:\n            - and:\n              - or:\n                - api: ws2_32.WSAIoctl\n                - api: ws2_32.#60 = WSAIoctl\n              - number: 0xC8000006 = SIO_GET_EXTENSION_FUNCTION_POINTER\n          - basic block:\n            - and:\n              - or:\n                - api: setsockopt\n                - api: ws2_32.#21 = setsockopt\n              - number: 0xFFFF = SOL_SOCKET\n              - number: 0x7010 = SO_UPDATE_CONNECT_CONTEXT\n          # socket must be bound to ConnectEx\n          # https://gist.github.com/joeyadams/4158972\n          - or:\n            - api: bind\n            - api: ws2_32.#2 = bind\n        - and:\n          # dynamic\n          - call:\n            - and:\n              - or:\n                - api: ws2_32.WSAIoctl\n                - api: ws2_32.#60 = WSAIoctl\n              - number: 0xC8000006 = SIO_GET_EXTENSION_FUNCTION_POINTER\n          - call:\n            - and:\n              - or:\n                - api: setsockopt\n                - api: ws2_32.#21 = setsockopt\n              - number: 0xFFFF = SOL_SOCKET\n              - number: 0x7010 = SO_UPDATE_CONNECT_CONTEXT\n          # socket must be bound to ConnectEx\n          # https://gist.github.com/joeyadams/4158972\n          - or:\n            - api: bind\n            - api: ws2_32.#2 = bind\n"
+                                           },
+                                           {
+                                               "id":  "2",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check if file exists",
+                                               "description":  "host-interaction/file-system/exists",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetLastError",
+                                                                  "ERROR_FILE_NOT_FOUND",
+                                                                  "mnemonic: cmp"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check if file exists\n    namespace: host-interaction/file-system/exists\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    examples:\n      - 31600AD0D1A7EA615690DF111AE36C73:0x401284\n  features:\n    - or:\n      - basic block:\n        - and:\n          - api: kernel32.GetFileAttributes\n          - instruction:\n            - mnemonic: cmp\n            - number: 0xFFFFFFFF = INVALID_FILE_ATTRIBUTES\n      - basic block:\n        - and:\n          - api: kernel32.GetLastError\n          - instruction:\n            - mnemonic: cmp\n            - number: 2 = ERROR_FILE_NOT_FOUND\n      - api: shlwapi.PathFileExists\n      - api: System.IO.File::Exists\n      - property/read: System.IO.FileSystemInfo::Exists\n"
+                                           },
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "send data",
+                                               "description":  "communication : all known techniques for sending data to a potential C2 server",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com",
+                                                               "joakim@intezer.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "send data on socket",
+                                                                  "api: WSASend"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: send data\n    namespace: communication\n    authors:\n      - william.ballenthin@mandiant.com\n      - joakim@intezer.com\n    description: all known techniques for sending data to a potential C2 server\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Command and Control::C2 Communication::Send Data [B0030.001]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13145D60\n  features:\n    - or:\n      - and:\n        - os: windows\n        - or:\n          - match: send HTTP request\n          - match: send data on socket\n          - match: send file via HTTP\n          - match: send data to Internet\n      - and:\n        - os: linux\n        - or: # Require network bound socket.\n          - match: create TCP socket\n          - match: create UDP socket\n        - or:\n          - match: send HTTP request\n          - match: send data on socket\n          - match: send file via HTTP\n"
+                                           },
+                                           {
+                                               "id":  "4",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "receive data",
+                                               "description":  "communication : all known techniques for receiving data from a potential C2 server",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "receive data on socket",
+                                                                  "api: WSARecv"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: receive data\n    namespace: communication\n    authors:\n      - william.ballenthin@mandiant.com\n    description: all known techniques for receiving data from a potential C2 server\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Command and Control::C2 Communication::Receive Data [B0030.002]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13145D60\n  features:\n    - or:\n      - match: receive data on socket\n      - match: read data from Internet\n      - match: download URL\n"
+                                           },
+                                           {
+                                               "id":  "5",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "set socket configuration",
+                                               "description":  "communication/socket",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: ioctlsocket",
+                                                                  "api: setsockopt"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: set socket configuration\n    namespace: communication/socket\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Communication::Socket Communication::Set Socket Config [C0001.001]\n    examples:\n      - 6A352C3E55E8AE5ED39DC1BE7FB964B1:0x1000C1F0\n  features:\n    - or:\n      - api: ws2_32.setsockopt\n      - api: ws2_32.#21 = setsockopt\n      - api: ws2_32.ioctlsocket\n      - api: ws2_32.#10 = ioctlsocket\n"
+                                           },
+                                           {
+                                               "id":  "6",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "read file on Windows",
+                                               "description":  "host-interaction/file-system/read",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: ReadFile"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: read file on Windows\n    namespace: host-interaction/file-system/read\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - File System::Read File [C0051]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x1314567B\n  features:\n    - or:\n      - and:\n        - os: windows\n        - optional:\n          - and:\n            - number: 0x80000000 = GENERIC_READ\n            - match: create or open file\n        - or:\n          - api: kernel32.ReadFile\n          - api: ReadFileEx\n          - api: NtReadFile\n          - api: ZwReadFile\n          - api: LZRead\n          - api: _read\n          - api: fread\n      - api: System.IO.File::ReadAllBytes\n      - api: System.IO.File::ReadAllBytesAsync\n      - api: System.IO.File::ReadAllLines\n      - api: System.IO.File::ReadAllLinesAsync\n      - api: System.IO.File::ReadAllText\n      - api: System.IO.File::ReadAllTextAsync\n      - api: System.IO.File::ReadLines\n"
+                                           },
+                                           {
+                                               "id":  "7",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "send data on socket",
+                                               "description":  "communication/socket/send",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "joakim@intezer.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: WSASend"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: send data on socket\n    namespace: communication/socket/send\n    authors:\n      - moritz.raabe@mandiant.com\n      - joakim@intezer.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Communication::Socket Communication::Send Data [C0001.007]\n    examples:\n      - Practical Malware Analysis Lab 01-01.dll_:0x10001010\n  features:\n    - or:\n      - api: send\n      - api: ws2_32.send\n      - api: ws2_32.#19 = send\n      - api: ws2_32.sendto\n      - api: ws2_32.#20 = sendto\n      - api: ws2_32.WSASend\n      - api: ws2_32.#76 = WSASend\n      - api: ws2_32.WSASendMsg\n      - api: ws2_32.WSASendTo\n      - api: ws2_32.#78 = WSASendTo\n      - api: System.Net.Sockets.Socket::Send\n      - api: System.Net.Sockets.Socket::SendAsync\n      - api: System.Net.Sockets.Socket::SendTo\n      - api: System.Net.Sockets.Socket::SendToAsync\n      - api: System.Net.Sockets.UdpClient::Send\n"
+                                           },
+                                           {
+                                               "id":  "8",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "receive data on socket",
+                                               "description":  "communication/socket/receive",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "joakim@intezer.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: WSARecv"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: receive data on socket\n    namespace: communication/socket/receive\n    authors:\n      - moritz.raabe@mandiant.com\n      - joakim@intezer.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Communication::Socket Communication::Receive Data [C0001.006]\n    examples:\n      - Practical Malware Analysis Lab 01-01.dll_:0x10001010\n  features:\n    - or:\n      - api: recv\n      - api: ws2_32.recv\n      - api: ws2_32.#16 = recv\n      - api: ws2_32.recvfrom\n      - api: ws2_32.#17 = recvfrom\n      - api: ws2_32.WSARecv\n      - api: ws2_32.#71 = WSARecv\n      - api: ws2_32.WSARecvDisconnect\n      - api: ws2_32.#72 = WSARecvDisconnect\n      - api: ws2_32.WSARecvEx\n      - api: ws2_32.WSARecvFrom\n      - api: ws2_32.#73 = WSARecvFrom\n      - api: ws2_32.WSARecvMsg\n      - api: recvmsg\n      - api: System.Net.Sockets.Socket::Receive\n      - api: System.Net.Sockets.Socket::ReceiveAsync\n      - api: System.Net.Sockets.Socket::ReceiveFrom\n      - api: System.Net.Sockets.Socket::ReceiveFromAsync\n      - api: System.Net.Sockets.Socket::ReceiveMessageFrom\n      - api: System.Net.Sockets.Socket::ReceiveMessageFromAsync\n      - api: System.Net.Sockets.Socket::BeginReceive\n      - api: System.Net.Sockets.Socket::BeginReceiveFrom\n      - api: System.Net.Sockets.Socket::BeginReceiveMessageFrom\n      - api: System.Net.Sockets.Socket::EndReceive\n      - api: System.Net.Sockets.Socket::EndReceiveFrom\n      - api: System.Net.Sockets.Socket::EndReceiveMessageFrom\n"
+                                           },
+                                           {
+                                               "id":  "9",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "print debug messages",
+                                               "description":  "host-interaction/log/debug/write-event",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: OutputDebugString"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: print debug messages\n    namespace: host-interaction/log/debug/write-event\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    examples:\n      - 493167E85E45363D09495D0841C30648:0x401000\n  features:\n    - or:\n      - api: DbgPrint\n      - api: kernel32.OutputDebugString\n      - and:\n        - os: android\n        - api: __android_log_print\n"
+                                           },
+                                           {
+                                               "id":  "10",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create or open mutex on Windows",
+                                               "description":  "host-interaction/mutex",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com",
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: CreateMutexEx"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create or open mutex on Windows\n    namespace: host-interaction/mutex\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n      - mehunhoff@google.com\n    scopes:\n      static: instruction\n      dynamic: call\n    mbc:\n      - Process::Create Mutex [C0042]\n    examples:\n      - Practical Malware Analysis Lab 01-01.dll_:0x10001010\n  features:\n    - or:\n      - api: kernel32.OpenMutex\n      - api: kernel32.CreateMutex\n      - api: kernel32.CreateMutexEx\n      - api: ntdll.NtCreateMutant\n      - api: ntdll.NtOpenMutant\n      - and:\n        - format: dotnet\n        - or:\n          - api: System.Threading.Mutex::ctor\n          - api: System.Threading.Mutex::OpenExisting\n          - api: System.Threading.Mutex::TryOpenExisting\n"
+                                           },
+                                           {
+                                               "id":  "11",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "link function at runtime on Windows",
+                                               "description":  "linking/runtime-linking",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetProcAddress"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: link function at runtime on Windows\n    namespace: linking/runtime-linking\n    authors:\n      - moritz.raabe@mandiant.com\n      - mehunhoff@google.com\n    scopes:\n      static: instruction\n      dynamic: call\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x404130\n      - Practical Malware Analysis Lab 01-04.exe_:0x401350\n  features:\n    - and:\n      - os: windows\n      - or:\n        - api: kernel32.GetProcAddress\n        - api: ntdll.LdrGetProcedureAddress\n        - api: ntdll.LdrGetProcedureAddressEx\n        - api: ntdll.LdrGetProcedureAddressForCaller\n        - api: MmGetSystemRoutineAddress\n"
+                                           }
+                                       ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1083",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "check if file exists",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "2"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "link function at runtime on Windows",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "11"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "attack_techniques":  {
+                                           "T1083":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "check if file exists",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "2"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "link function at runtime on Windows",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "11"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

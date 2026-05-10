@@ -1,0 +1,62 @@
+{
+    "data":  {
+                 "mbc":  [
+                             {
+                                 "id":  "C0032.001",
+                                 "objective":  "Data",
+                                 "behavior":  "Checksum",
+                                 "method":  "CRC32",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "0"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "signature_matches":  [
+                                           {
+                                               "id":  "0",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "hash data with CRC32",
+                                               "description":  "data-manipulation/checksum/crc32",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "bits in a byte",
+                                                                  "mnemonic: test",
+                                                                  "nzxor"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: hash data with CRC32\n    namespace: data-manipulation/checksum/crc32\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires operand[1].number, characteristic, bytes, mnemonic features\n    mbc:\n      - Data::Checksum::CRC32 [C0032.001]\n    examples:\n      - 2D3EDC218A90F03089CC01715A9F047F:0x403CBD\n      - 7D28CB106CB54876B2A5C111724A07CD:0x402350  # RtlComputeCrc32\n      - 7EFF498DE13CC734262F87E6B3EF38AB:0x100084A6\n  features:\n    - or:\n      - and:\n        - number: 1 = bits in a byte\n        - instruction:\n          - description: is bit set?\n          - or:\n            - mnemonic: and\n            - mnemonic: test\n          - operand[1].number: 1\n        - instruction:\n          - mnemonic: shr\n          - number: 1\n        - characteristic: nzxor\n        - operand[1].number: 0xEDB88320\n      - and:\n        - number: 0x8320\n        - number: 0xEDB8\n        - characteristic: nzxor\n      - api: RtlComputeCrc32\n      - bytes: 00 00 00 00 96 30 07 77 2C 61 0E EE BA 51 09 99 19 C4 6D 07 8F F4 6A 70 35 A5 63 E9 A3 95 64 9E = crc32_tab\n"
+                                           },
+                                           {
+                                               "id":  "2",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "complete processing asynchronous IO request",
+                                               "description":  "host-interaction/driver : signals that driver has finished all processing for a given IRP (part of major function)",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: IofCompleteRequest"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: complete processing asynchronous IO request\n    namespace: host-interaction/driver\n    authors:\n      - moritz.raabe@mandiant.com\n    description: signals that driver has finished all processing for a given IRP (part of major function)\n    scopes:\n      static: basic block\n      dynamic: span of calls\n    examples:\n      - Practical Malware Analysis Lab 10-03.sys_:0x10666\n  features:\n    - or:\n      - api: IoCompleteRequest\n      - api: IofCompleteRequest\n"
+                                           },
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "resolve function by parsing PE exports",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "sara-rn"
+                                                           ],
+                                               "match_data":  [
+                                                                  "loop",
+                                                                  "mnemonic: movzx"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: resolve function by parsing PE exports\n    namespace: load-code/pe\n    authors:\n      - sara-rn\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic, offset, mnemonic features\n    examples:\n      - 73CE04892E5F39EC82B00C02FC04C70F:0x406BA1\n  features:\n    - and:\n      - os: windows\n      - or:\n        - characteristic: loop\n        - mnemonic: movzx\n      - and:\n        - offset: 0x3C = IMAGE_DOS_HEADER.PE.e_lfanew\n        - or:\n          - and:\n            - arch: i386\n            - offset: 0x78 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n          - and:\n            - arch: amd64\n            - offset: 0x88 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n        - 3 or more:\n          - offset: 0x14 = IMAGE_EXPORT_DIRECTORY.NumberOfFunctions\n          - offset: 0x24 = IMAGE_EXPORT_DIRECTORY.AddressOfNameOrdinals\n          - offset: 0x20 = IMAGE_EXPORT_DIRECTORY.AddressOfNames\n          - offset: 0x18 = IMAGE_EXPORT_DIRECTORY.NumberOfNames\n          - offset: 0x1C = IMAGE_EXPORT_DIRECTORY.AddressOfFunctions\n      - optional:\n        - or:\n          - api: LoadLibrary\n          - api: strcmp\n"
+                                           }
+                                       ]
+             }
+}

@@ -1,0 +1,127 @@
+{
+    "data":  {
+                 "mbc":  [
+                             {
+                                 "id":  "C0027.009",
+                                 "objective":  "Cryptography",
+                                 "behavior":  "Encrypt Data",
+                                 "method":  "RC4",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "5"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0021.004",
+                                 "objective":  "Cryptography",
+                                 "behavior":  "Generate Pseudo-random Sequence",
+                                 "method":  "RC4 PRGA",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "5"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0002.014",
+                                 "objective":  "Communication",
+                                 "behavior":  "HTTP Communication",
+                                 "method":  "Read Header",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "6"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "signature_matches":  [
+                                           {
+                                               "id":  "1",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "resolve function by parsing PE exports",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "sara-rn"
+                                                           ],
+                                               "match_data":  [
+                                                                  "loop"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: resolve function by parsing PE exports\n    namespace: load-code/pe\n    authors:\n      - sara-rn\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic, offset, mnemonic features\n    examples:\n      - 73CE04892E5F39EC82B00C02FC04C70F:0x406BA1\n  features:\n    - and:\n      - os: windows\n      - or:\n        - characteristic: loop\n        - mnemonic: movzx\n      - and:\n        - offset: 0x3C = IMAGE_DOS_HEADER.PE.e_lfanew\n        - or:\n          - and:\n            - arch: i386\n            - offset: 0x78 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n          - and:\n            - arch: amd64\n            - offset: 0x88 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n        - 3 or more:\n          - offset: 0x14 = IMAGE_EXPORT_DIRECTORY.NumberOfFunctions\n          - offset: 0x24 = IMAGE_EXPORT_DIRECTORY.AddressOfNameOrdinals\n          - offset: 0x20 = IMAGE_EXPORT_DIRECTORY.AddressOfNames\n          - offset: 0x18 = IMAGE_EXPORT_DIRECTORY.NumberOfNames\n          - offset: 0x1C = IMAGE_EXPORT_DIRECTORY.AddressOfFunctions\n      - optional:\n        - or:\n          - api: LoadLibrary\n          - api: strcmp\n"
+                                           },
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "complete processing asynchronous IO request",
+                                               "description":  "host-interaction/driver : signals that driver has finished all processing for a given IRP (part of major function)",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: IofCompleteRequest"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: complete processing asynchronous IO request\n    namespace: host-interaction/driver\n    authors:\n      - moritz.raabe@mandiant.com\n    description: signals that driver has finished all processing for a given IRP (part of major function)\n    scopes:\n      static: basic block\n      dynamic: span of calls\n    examples:\n      - Practical Malware Analysis Lab 10-03.sys_:0x10666\n  features:\n    - or:\n      - api: IoCompleteRequest\n      - api: IofCompleteRequest\n"
+                                           },
+                                           {
+                                               "id":  "5",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "encrypt data using RC4 PRGA",
+                                               "description":  "data-manipulation/encryption/rc4",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "contain loop",
+                                                                  "loop",
+                                                                  "tight loop"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: encrypt data using RC4 PRGA\n    namespace: data-manipulation/encryption/rc4\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic, mnemonic, basicblock features\n    att\u0026ck:\n      - Defense Evasion::Obfuscated Files or Information [T1027]\n    mbc:\n      - Cryptography::Encrypt Data::RC4 [C0027.009]\n      - Cryptography::Generate Pseudo-random Sequence::RC4 PRGA [C0021.004]\n    examples:\n      - 34404A3FB9804977C6AB86CB991FB130:0x403DB0\n      - 34404A3FB9804977C6AB86CB991FB130:0x403E50\n      - 9324D1A8AE37A36AE560C37448C9705A:0x4049F0\n      - 73CE04892E5F39EC82B00C02FC04C70F:0x4064C6\n  features:\n    - and:\n      # TODO: maybe add characteristic for nzxor reg size\n      - count(characteristic(nzxor)): 1\n      - or:\n        - match: calculate modulo 256 via x86 assembly\n        # compiler may do this via zero-extended mov from 8-bit register\n        - count(mnemonic(movzx)): 4 or more\n      # should not call (many) functions\n      - count(characteristic(calls from)): (0, 4)\n      # should not be too simple or too complex (50 is picked by intuition)\n      - count(basic blocks): (4, 50)\n      - match: contain loop\n      - optional:\n        - or:\n          - number: 0xFF\n          - number: 0x100\n"
+                                           },
+                                           {
+                                               "id":  "6",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check HTTP status code",
+                                               "description":  "communication/http/client",
+                                               "authors":  [
+                                                               "@mr-tz"
+                                                           ],
+                                               "match_data":  [
+                                                                  "OK",
+                                                                  "mnemonic: cmp",
+                                                                  "HTTP_QUERY_STATUS_CODE"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check HTTP status code\n    namespace: communication/http/client\n    authors:\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic features\n    mbc:\n      - Communication::HTTP Communication::Read Header [C0002.014]\n    examples:\n      - 54ac78733552a62d1d05ea4ba3fc604bb49fe000d7fc948da45335b726e64d75:0x10001a20\n      - Practical Malware Analysis Lab 03-02.dll_:0x10004452\n  features:\n    - and:\n      - os: windows\n      - or:\n        - number: 0x20000013 = HTTP_QUERY_FLAG_NUMBER | HTTP_QUERY_STATUS_CODE\n        - number: 0x13 = HTTP_QUERY_STATUS_CODE\n      - optional:\n        - api: atoi\n        - api: wininet.HttpQueryInfo\n      - instruction:\n        - and:\n          - or:\n            - mnemonic: cmp\n            - mnemonic: test\n          - or:\n            - number: 200 = OK\n            - number: 400 = Bad Request\n            - number: 401 = Unauthorized\n            - number: 403 = Forbidden\n            - number: 404 = Not Found\n"
+                                           }
+                                       ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1027",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "encrypt data using RC4 PRGA",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "5"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "attack_techniques":  {
+                                           "T1027":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "encrypt data using RC4 PRGA",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "5"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

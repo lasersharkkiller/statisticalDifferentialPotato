@@ -1,0 +1,949 @@
+{
+    "data":  {
+                 "files_written":  [
+                                       "\\Device\\ConDrv",
+                                       "\\Device\\ConDrv\\\\Connect"
+                                   ],
+                 "signature_matches":  [
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get file attributes",
+                                               "description":  "host-interaction/file-system/meta",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetFileAttributes"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get file attributes\n    namespace: host-interaction/file-system/meta\n    authors:\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - File System::Get File Attributes [C0049]\n    examples:\n      - 03B236B23B1EC37C663527C1F53AF3FE:0x180019824\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x4028B6\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x4029E0\n  features:\n    - or:\n      - api: kernel32.GetFileAttributes\n      - api: ZwQueryDirectoryFile\n      - api: ZwQueryInformationFile\n      - api: NtQueryDirectoryFile\n      - api: NtQueryInformationFile\n      - api: System.IO.File::GetAttributes\n      - api: System.IO.File::GetCreationTime\n      - api: System.IO.File::GetCreationTimeUtc\n      - api: System.IO.File::GetLastAccessTime\n      - api: System.IO.File::GetLastAccessTimeUtc\n      - api: System.IO.File::GetLastWriteTime\n      - api: System.IO.File::GetLastWriteTimeUtc\n      - property/read: System.IO.FileSystemInfo::Attributes\n      - api: stat\n      - api: fstat\n      - api: lstat\n      - api: fstatat\n"
+                                           },
+                                           {
+                                               "id":  "4",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "enumerate files on Windows",
+                                               "description":  "host-interaction/file-system/files/list",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "contain loop",
+                                                                  "loop",
+                                                                  "api: FindNextFile"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: enumerate files on Windows\n    namespace: host-interaction/file-system/files/list\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    references:\n      - https://github.com/hfiref0x/TDL/blob/cc4b46ae1c939b14a22a734a727b163f873a41b5/Source/Furutaka/sup.c#L315\n    examples:\n      - Practical Malware Analysis Lab 01-01.exe_:0x4011E0\n      - Practical Malware Analysis Lab 20-02.exe_:0x401000\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x14000203C\n  features:\n    - or:\n      - and:\n        - or:\n          - api: kernel32.FindFirstFile\n          - api: kernel32.FindFirstFileEx\n          - api: kernel32.FindFirstFileTransacted\n          - api: kernel32.FindFirstFileName\n          - api: kernel32.FindFirstFileNameTransacted\n        - or:\n          - api: kernel32.FindNextFile\n          - api: kernel32.FindNextFileName\n        - optional:\n          - api: kernel32.FindClose\n          - match: contain loop\n      - and:\n        - or:\n          - basic block:\n            - and:\n              - number: 1 = DIRECTORY_QUERY\n              - api: ntdll.NtOpenDirectoryObject\n          - call:\n            - and:\n              - number: 1 = DIRECTORY_QUERY\n              - api: ntdll.NtOpenDirectoryObject\n        - api: ntdll.NtQueryDirectoryObject\n        - optional:\n          - api: RtlAllocateHeap\n          - match: contain loop\n          - characteristic: indirect call\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://github.com/hfiref0x/TDL/blob/cc4b46ae1c939b14a22a734a727b163f873a41b5/Source/Furutaka/sup.c#L315"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "5",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "parse PE header",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "IMAGE_DOS_SIGNATURE (MZ)",
+                                                                  "IMAGE_NT_SIGNATURE (PE)",
+                                                                  "mnemonic: cmp"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: parse PE header\n    namespace: load-code/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic, operand[1].offset features\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x403DD0\n  features:\n    - and:\n      - os: windows\n      - and:\n        - mnemonic: cmp\n        - or:\n          - number: 0x4550 = IMAGE_NT_SIGNATURE (PE)\n          - and:\n            - number: 0x50\n            - number: 0x45\n        - or:\n          - number: 0x5A4D = IMAGE_DOS_SIGNATURE (MZ)\n          - and:\n            - number: 0x4D\n            - number: 0x5A\n        - optional:\n          - and:\n            - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x30 = IMAGE_NT_HEADERS64.OptionalHeader.ImageBase\n          - basic block:\n            - and:\n              - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n              - 3 or more:\n                - operand[1].offset: 0x4 = IMAGE_NT_HEADERS.FileHeader.Machine\n                - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n                - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n                - operand[1].offset: 0x16 = IMAGE_NT_HEADERS.FileHeader.Characteristics\n                - operand[1].offset: 0x28 = IMAGE_NT_HEADERS.OptionalHeader.AddressOfEntryPoint  # for 32 and 64 bit\n                - or:\n                  - and:\n                    - arch: i386\n                    - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                  - and:\n                    - arch: amd64\n                    - operand[1].offset: 0x30 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n"
+                                           },
+                                           {
+                                               "id":  "7",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "accept command line arguments",
+                                               "description":  "host-interaction/cli",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetCommandLine"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: accept command line arguments\n    namespace: host-interaction/cli\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Execution::Command and Scripting Interpreter [T1059]\n    mbc:\n      - Execution::Command and Scripting Interpreter [E1059]\n    examples:\n      - e5369ac309f1be6d77afeeb3edab0ed8:0x402760\n  features:\n    - or:\n      - api: GetCommandLine\n      - api: CommandLineToArgv\n      - api: System.Environment::GetCommandLineArgs\n"
+                                           },
+                                           {
+                                               "id":  "8",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "terminate process",
+                                               "description":  "host-interaction/process/terminate",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: exit"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: terminate process\n    namespace: host-interaction/process/terminate\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Process::Terminate Process [C0018]\n    examples:\n      - C91887D861D9BD4A5872249B641BC9F9:0x401A77\n      - 9B7CCAA2AE6A5B96E3110EBCBC4311F6:0x10010307\n  features:\n    - or:\n      - api: System.Diagnostics.Process::Kill\n      - api: System.Diagnostics.Process::WaitForExit\n      - api: System.Diagnostics.Process::WaitForExitAsync\n      - api: System.Environment::Exit\n      - api: System.Windows.Forms.Application::Exit\n      - api: exit\n      - api: Exit\n      - and:\n        - os: linux\n        - api: exit_group\n      - and:\n        - optional:\n          - match: open process\n        - or:\n          - api: kernel32.TerminateProcess\n          - api: ntdll.NtTerminateProcess\n          - api: kernel32.ExitProcess\n"
+                                           },
+                                           {
+                                               "id":  "9",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "enumerate PE sections",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "@Ana06",
+                                                               "@mr-tz"
+                                                           ],
+                                               "match_data":  [
+                                                                  "mnemonic: movzx"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: enumerate PE sections\n    namespace: load-code/pe\n    authors:\n      - \"@Ana06\"\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: unsupported  # requires offset, operand[1].offset, characteristic, mnemonic, basicblock features\n    mbc:\n      - Discovery::Code Discovery::Enumerate PE Sections [B0046.001]\n    references:\n      - https://0x00sec.org/t/reflective-dll-injection/3080\n      - https://www.ired.team/offensive-security/code-injection-process-injection/reflective-dll-injection\n    examples:\n      - E4C33AC3638EEF68311F8AC0D72483C7:0x401510\n  features:\n    - and:\n      - os: windows\n      # there should be some complexity to functions like this\n      - count(basic blocks): 3 or more\n      - optional:\n        - offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n      - instruction:\n        - or:\n          - mnemonic: mov\n          - mnemonic: movzx\n        - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n      - basic block:\n        - or:\n          - and:\n            - description: IMAGE_FIRST_SECTION(nt_header)\n            - instruction:\n              - or:\n                - mnemonic: add\n                - mnemonic: mov\n                - mnemonic: movzx\n              - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n            - operand[1].offset: 0x18 = FileHeader.SizeOfOptionalHeader\n          - and:\n            - description: (DWORD)dll_raw + dos_header-\u003ee_lfanew + sizeof(IMAGE_NT_HEADERS) + sizeof(IMAGE_SECTION_HEADER) * i\n            - number: 0x28 = sizeof(IMAGE_SECTION_HEADER)\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0xF8 = sizeof(IMAGE_NT_HEADERS32)\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x108 = sizeof(IMAGE_NT_HEADERS64)\n      - 2 or more:\n        - operand[1].offset: 0xC = IMAGE_SECTION_HEADER.VirtualAddress\n        - operand[1].offset: 0x14 = IMAGE_SECTION_HEADER.PointerToRawData\n        - operand[1].offset: 0x10 = IMAGE_SECTION_HEADER.SizeOfRawData\n        # there\u0027s also offset 0x8 = IMAGE_SECTION_HEADER.Misc.PhysicalAddress, but it\u0027s likely too common\n      - not:\n        # non-zeroing XOR was observed in FPs\n        - characteristic: nzxor\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://0x00sec.org/t/reflective-dll-injection/3080"
+                                                            },
+                                                            {
+                                                                "ref":  "https://www.ired.team/offensive-security/code-injection-process-injection/reflective-dll-injection"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "10",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check if file exists",
+                                               "description":  "host-interaction/file-system/exists",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "mnemonic: cmp",
+                                                                  "INVALID_FILE_ATTRIBUTES",
+                                                                  "api: GetFileAttributes"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check if file exists\n    namespace: host-interaction/file-system/exists\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    examples:\n      - 31600AD0D1A7EA615690DF111AE36C73:0x401284\n  features:\n    - or:\n      - basic block:\n        - and:\n          - api: kernel32.GetFileAttributes\n          - instruction:\n            - mnemonic: cmp\n            - number: 0xFFFFFFFF = INVALID_FILE_ATTRIBUTES\n      - basic block:\n        - and:\n          - api: kernel32.GetLastError\n          - instruction:\n            - mnemonic: cmp\n            - number: 2 = ERROR_FILE_NOT_FOUND\n      - api: shlwapi.PathFileExists\n      - api: System.IO.File::Exists\n      - property/read: System.IO.FileSystemInfo::Exists\n"
+                                           },
+                                           {
+                                               "id":  "11",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get number of processors",
+                                               "description":  "host-interaction/hardware/cpu",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "peb access",
+                                                                  "PEB access",
+                                                                  "PEB-\u003eNumberOfProcessors"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get number of processors\n    namespace: host-interaction/hardware/cpu\n    authors:\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires property features\n    att\u0026ck:\n      - Discovery::System Information Discovery [T1082]\n    references:\n      - https://github.com/LordNoteworthy/al-khaser/blob/bed03d2f849d9060c68f8d5905bd204d0cb3f593/al-khaser/AntiVM/Generic.cpp#L361\n    examples:\n      - al-khaser_x86.exe_:0x432CB0\n  features:\n    - or:\n      - and:\n        - match: PEB access\n        - or:\n          - and:\n            - arch: i386\n            - number: 0x64 = PEB-\u003eNumberOfProcessors\n          - and:\n            - arch: amd64\n            - number: 0xB8 = PEB-\u003eNumberOfProcessors\n      - property/read: System.Environment::ProcessorCount\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://github.com/LordNoteworthy/al-khaser/blob/bed03d2f849d9060c68f8d5905bd204d0cb3f593/al-khaser/AntiVM/Generic.cpp#L361"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "871",
+                                               "description":  "Sample execution stops while process was sleeping (likely an evasion)",
+                                               "match_data":  [
+                                                                  "Thread delayed"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "9028",
+                                               "description":  "Uses 32bit PE files",
+                                               "match_data":  [
+                                                                  "EXECUTABLE_IMAGE, 32BIT_MACHINE"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "415",
+                                               "description":  "PE file has an executable .text section and no other executable section",
+                                               "match_data":  [
+                                                                  "Section: .text IMAGE_SCN_CNT_CODE, IMAGE_SCN_MEM_EXECUTE, IMAGE_SCN_MEM_READ"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "509",
+                                               "description":  "Reads software policies",
+                                               "match_data":  [
+                                                                  "HKEY_CURRENT_USER\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "#registry_keys_opened",
+                                                                "value":  "HKEY_CURRENT_USER\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "411",
+                                               "description":  "PE file contains a mix of data directories often seen in goodware",
+                                               "match_data":  [
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_IMPORT",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_RESOURCE",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_BASERELOC",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_DEBUG",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_IAT"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "715",
+                                               "description":  "Classification label",
+                                               "match_data":  [
+                                                                  "clean2.winEXE@2/1@0/0"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "229",
+                                               "description":  "Spawns processes",
+                                               "match_data":  [
+                                                                  "C:\\Users\\user\\Desktop\\tscon.exe C:\\Users\\user\\Desktop\\tscon.exe",
+                                                                  "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "406",
+                                               "description":  "Contains modern PE file flags such as dynamic base (ASLR) or NX",
+                                               "match_data":  [
+                                                                  "DYNAMIC_BASE, NX_COMPAT, GUARD_CF, TERMINAL_SERVER_AWARE"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "95",
+                                               "description":  "Creates mutexes",
+                                               "match_data":  [
+                                                                  "\\Sessions\\1\\BaseNamedObjects\\Local\\SM0:7452:120:WilError_01"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "149",
+                                               "description":  "Program does not show much activity (idle)",
+                                               "match_data":  [
+                                                                  "no activity detected"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "203",
+                                               "description":  "Binary contains paths to debug symbols",
+                                               "match_data":  [
+                                                                  "tscon.pdb source: tscon.exe",
+                                                                  "tscon.pdbGCTL source: tscon.exe"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "412",
+                                               "description":  "PE file contains a debug data directory",
+                                               "match_data":  [
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_DEBUG"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "234",
+                                               "description":  "Binary contains a suspicious time stamp",
+                                               "match_data":  [
+                                                                  "0xAE631B8B [Sun Sep 17 14:58:19 2062 UTC]"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           }
+                                       ],
+                 "dns_lookups":  [
+                                     {
+                                         "hostname":  "www.microsoft.com",
+                                         "resolved_ips":  [
+                                                              "23.55.140.42"
+                                                          ]
+                                     },
+                                     {
+                                         "hostname":  "res.public.onecdn.static.microsoft",
+                                         "resolved_ips":  [
+                                                              "23.67.33.147",
+                                                              "23.67.33.144",
+                                                              "23.67.33.152",
+                                                              "23.67.33.138",
+                                                              "23.67.33.154",
+                                                              "23.67.33.137",
+                                                              "23.67.33.135",
+                                                              "23.67.33.150",
+                                                              "23.67.33.136"
+                                                          ]
+                                     }
+                                 ],
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "3040",
+                                            "name":  "\"C:\\Users\\\u003cUSER\u003e\\AppData\\Local\\Temp\\tscon.exe\""
+                                        },
+                                        {
+                                            "process_id":  "2920",
+                                            "name":  "%WINDIR%\\explorer.exe",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "3184",
+                                                                 "name":  "%SAMPLEPATH%\\tscon.exe"
+                                                             }
+                                                         ]
+                                        },
+                                        {
+                                            "process_id":  "616",
+                                            "name":  "C:\\Windows\\System32\\svchost.exe",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "2416",
+                                                                 "name":  "C:\\Windows\\System32\\wuapihost.exe"
+                                                             }
+                                                         ]
+                                        },
+                                        {
+                                            "process_id":  "7444",
+                                            "name":  "C:\\Users\\user\\Desktop\\tscon.exe",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "7452",
+                                                                 "name":  "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1"
+                                                             }
+                                                         ]
+                                        }
+                                    ],
+                 "processes_created":  [
+                                           "\"C:\\Users\\\u003cUSER\u003e\\AppData\\Local\\Temp\\tscon.exe\"",
+                                           "%SAMPLEPATH%\\tscon.exe",
+                                           "C:\\Windows\\System32\\wuapihost.exe",
+                                           "C:\\Windows\\System32\\UI0Detect.exe",
+                                           "C:\\Program Files\\Google752_432279770\\bin\\updater.exe",
+                                           "C:\\Users\\user\\Desktop\\tscon.exe",
+                                           "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1"
+                                       ],
+                 "verdicts":  [
+                                  "CLEAN"
+                              ],
+                 "files_opened":  [
+                                      "C:\\Users\\\u003cUSER\u003e\\AppData\\Local\\Temp\\tscon.exe",
+                                      "\\crashpad_3664_MQDCAAJVLLSOVNBS",
+                                      "C:\\Users\\user\\Desktop\\en-US\\tscon.exe.mui",
+                                      "C:\\Users\\user\\Desktop\\en\\tscon.exe.mui",
+                                      "C:\\Users\\user\\Desktop\\tscon.exe",
+                                      "C:\\Windows\\Globalization\\Sorting\\sortdefault.nls",
+                                      "C:\\Windows\\SYSTEM32\\ntmarta.dll",
+                                      "C:\\Windows\\SYSTEM32\\ole32.dll",
+                                      "C:\\Windows\\SYSTEM32\\wintypes.dll",
+                                      "C:\\Windows\\SysWOW64\\IMM32.DLL",
+                                      "C:\\Windows\\SysWOW64\\WINSTA.dll",
+                                      "C:\\Windows\\SysWOW64\\browcli.dll",
+                                      "C:\\Windows\\SysWOW64\\en-US\\KERNELBASE.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\utildll.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\logoncli.dll",
+                                      "C:\\Windows\\SysWOW64\\netutils.dll",
+                                      "C:\\Windows\\SysWOW64\\samcli.dll",
+                                      "C:\\Windows\\SysWOW64\\srvcli.dll",
+                                      "C:\\Windows\\SysWOW64\\utildll.dll",
+                                      "C:\\Windows\\System32\\CoreMessaging.dll",
+                                      "C:\\Windows\\System32\\CoreUIComponents.dll",
+                                      "C:\\Windows\\System32\\TextInputFramework.dll",
+                                      "C:\\Windows\\System32\\en-US\\user32.dll.mui",
+                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_d3fbe61b7c93d9f0",
+                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_d3fbe61b7c93d9f0\\comctl32.DLL",
+                                      "C:\\Windows\\system32\\IMM32.DLL",
+                                      "C:\\Windows\\system32\\conhost.exe",
+                                      "C:\\Windows\\system32\\dwmapi.dll",
+                                      "C:\\Windows\\system32\\en-US\\conhost.exe.mui",
+                                      "C:\\Windows\\system32\\rpcss.dll",
+                                      "C:\\Windows\\system32\\uxtheme.dll",
+                                      "C:\\Windows\\system32\\uxtheme.dll.Config",
+                                      "\\Device\\ConDrv\\Server",
+                                      "\\Device\\ConDrv\\\\Input",
+                                      "\\Device\\ConDrv\\\\Output",
+                                      "\\Device\\ConDrv\\\\Reference"
+                                  ],
+                 "ip_traffic":  [
+                                    {
+                                        "destination_ip":  "20.99.185.48",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "192.229.211.108",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.216.147.76",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "20.99.184.37",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "131.253.33.203",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "20.99.133.109",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "20.99.186.246",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "192.168.0.203",
+                                        "destination_port":  137,
+                                        "transport_layer_protocol":  "UDP"
+                                    },
+                                    {
+                                        "destination_ip":  "20.69.140.28",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.196.193.245",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.55.140.42",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.67.33.147",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    }
+                                ],
+                 "mbc":  [
+                             {
+                                 "id":  "C0049",
+                                 "objective":  "File System",
+                                 "behavior":  "Get File Attributes",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "3"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1083",
+                                 "objective":  "Discovery",
+                                 "behavior":  "File and Directory Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "4"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1059",
+                                 "objective":  "Execution",
+                                 "behavior":  "Command and Scripting Interpreter",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "7"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0018",
+                                 "objective":  "Process",
+                                 "behavior":  "Terminate Process",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "8"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0046.001",
+                                 "objective":  "Discovery",
+                                 "behavior":  "Code Discovery",
+                                 "method":  "Enumerate PE Sections",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "9"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1083",
+                                 "objective":  "Discovery",
+                                 "behavior":  "File and Directory Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "10"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "OC0006"
+                             },
+                             {
+                                 "id":  "C0002"
+                             }
+                         ],
+                 "processes_terminated":  [
+                                              "%SAMPLEPATH%\\tscon.exe",
+                                              "C:\\Windows\\System32\\conhost.exe",
+                                              "C:\\Windows\\System32\\wuapihost.exe",
+                                              "C:\\Windows\\System32\\UI0Detect.exe",
+                                              "C:\\Program Files\\Google752_432279770\\bin\\updater.exe",
+                                              "C:\\Users\\user\\Desktop\\tscon.exe"
+                                          ],
+                 "verdict_confidence":  98,
+                 "files_dropped":  [
+                                       {
+                                           "path":  "C:\\Windows\\System32\\spp\\store\\2.0\\data.dat.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\Windows\\System32\\spp\\store\\2.0\\cache\\cache.dat"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\141.0.7340.0"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\141.0.7340.0\\Crashpad"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\141.0.7340.0\\Crashpad\\reports"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\141.0.7340.0\\Crashpad\\attachments"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\141.0.7340.0\\Crashpad\\metadata"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files\\Google3664_625312373"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\141.0.7340.0\\uninstall.cmd"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\141.0.7340.0\\updater.exe"
+                                       },
+                                       {
+                                           "path":  "\\Device\\ConDrv",
+                                           "sha256":  "61482f0cfa57431288f02886cb36d3c8d00e51684b23411cd1de3c21db96ae6a",
+                                           "type":  "TEXT"
+                                       }
+                                   ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1083",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "enumerate files on Windows",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "4"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "parse PE header",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "5"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1059",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "accept command line arguments",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "7"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1083",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "check if file exists",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "10"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get number of processors",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "11"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1071",
+                                                     "signature_description":  "Adversaries may communicate using application layer protocols to avoid detection/network filtering by blending in with existing traffic."
+                                                 },
+                                                 {
+                                                     "id":  "T1070.006",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Binary contains a suspicious time stamp",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "234"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Reads software policies",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "509"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "processes_injected":  [
+                                            "C:\\Program Files\\Google752_432279770\\bin\\updater.exe"
+                                        ],
+                 "registry_keys_opened":  [
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\LanguageOverlay\\OverlayPackages\\en-US",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Session Manager\\ResourcePolicies",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize\\DisableMetaFiles",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize\\DisableUmpdBufferSizeCheck",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Lsa",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Policies\\Microsoft\\Windows\\Display",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Policies\\Microsoft\\WindowsStore",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\Setup",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Policies\\Microsoft\\MUI\\Settings",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Nls\\CustomLocale",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\LanmanWorkstation\\Parameters",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Nls\\ExtendedLocale",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\MUI\\UILanguages\\PendingDelete",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\MUI\\UILanguages",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Srp\\GP\\DLL",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\LanguageOverlay\\OverlayPackages\\en-US",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Lsa\\FipsAlgorithmPolicy",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\MUI\\Settings\\LanguageConfiguration",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\FileSystem\\",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Windows",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\SafeBoot\\Option",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Policies\\Microsoft\\Cryptography\\Configuration",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Segment Heap",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\NLS\\Language",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Session Manager",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Wow64\\x86",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\tscon.exe",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\MUI\\UILanguages\\en-US",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Nls\\CustomLocale",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Nls\\Sorting\\Versions",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+                                          ],
+                 "tags":  [
+                              "IDLE",
+                              "DETECT_DEBUG_ENVIRONMENT"
+                          ],
+                 "memory_dumps":  [
+                                      {
+                                          "file_name":  "3040.dmp",
+                                          "process":  "C:\\Users\\Bruno\\AppData\\Local\\Temp\\tscon.exe",
+                                          "size":  "37494784",
+                                          "base_address":  "2228224"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1012290964.00000000008D0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\tscon.exe",
+                                          "size":  "4096",
+                                          "base_address":  "9240576",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1012386793.0000000000B90000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\tscon.exe",
+                                          "size":  "12288",
+                                          "base_address":  "12124160",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1012266236.000000000057E000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\tscon.exe",
+                                          "size":  "8192",
+                                          "base_address":  "5758976",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1012297374.00000000008E0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\tscon.exe",
+                                          "size":  "24576",
+                                          "base_address":  "9306112",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000000.1011109570.00000000012C7000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\tscon.exe",
+                                          "size":  "12288",
+                                          "base_address":  "19689472",
+                                          "stage":  "MEM_STAGE_NEW"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1012353421.00000000009F8000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\tscon.exe",
+                                          "size":  "69632",
+                                          "base_address":  "10452992",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1012386793.0000000000B95000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\tscon.exe",
+                                          "size":  "8192",
+                                          "base_address":  "12144640",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1012434778.00000000012C5000.00000004.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\tscon.exe",
+                                          "size":  "4096",
+                                          "base_address":  "19681280",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1012273986.00000000005BE000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\tscon.exe",
+                                          "size":  "8192",
+                                          "base_address":  "6021120",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1012406485.00000000012C0000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\tscon.exe",
+                                          "size":  "4096",
+                                          "base_address":  "19660800",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1012314928.000000000092F000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\tscon.exe",
+                                          "size":  "4096",
+                                          "base_address":  "9629696",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1012250416.000000000050B000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\tscon.exe",
+                                          "size":  "20480",
+                                          "base_address":  "5287936",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1012225518.0000000000450000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\tscon.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4521984",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1012281561.00000000005FE000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\tscon.exe",
+                                          "size":  "8192",
+                                          "base_address":  "6283264",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1012198206.0000000000440000.00000004.00000020.00040000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\tscon.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4456448",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1012235499.00000000004CD000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\tscon.exe",
+                                          "size":  "12288",
+                                          "base_address":  "5033984",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1012323933.000000000096E000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\tscon.exe",
+                                          "size":  "8192",
+                                          "base_address":  "9887744",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000000.1011103010.00000000012C1000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\tscon.exe",
+                                          "size":  "16384",
+                                          "base_address":  "19664896",
+                                          "stage":  "MEM_STAGE_NEW"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1012340291.00000000009AF000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\tscon.exe",
+                                          "size":  "4096",
+                                          "base_address":  "10153984",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1012443603.00000000012C7000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\tscon.exe",
+                                          "size":  "12288",
+                                          "base_address":  "19689472",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1012353421.00000000009F0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\tscon.exe",
+                                          "size":  "24576",
+                                          "base_address":  "10420224",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1012423080.00000000012C1000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\tscon.exe",
+                                          "size":  "16384",
+                                          "base_address":  "19664896",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000000.1011096198.00000000012C0000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\tscon.exe",
+                                          "size":  "4096",
+                                          "base_address":  "19660800",
+                                          "stage":  "MEM_STAGE_NEW"
+                                      }
+                                  ],
+                 "files_deleted":  [
+                                       "C:\\Windows\\System32\\spp\\store\\2.0\\cache\\cache.dat"
+                                   ],
+                 "command_executions":  [
+                                            "\"%SAMPLEPATH%\\tscon.exe\" ",
+                                            "C:\\Windows\\System32\\wuapihost.exe -Embedding",
+                                            "C:\\Windows\\system32\\UI0Detect.exe",
+                                            "\"C:\\Program Files\\Google752_432279770\\bin\\updater.exe\" --update --system --enable-logging --vmodule=*/chrome/updater/*=2 /sessionid {AD2B6183-94E9-4009-81DD-BC3217D100C4}"
+                                        ],
+                 "attack_techniques":  {
+                                           "T1083":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "enumerate files on Windows",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "4"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "check if file exists",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "10"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "parse PE header",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "5"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1059":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "accept command line arguments",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "7"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1082":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get number of processors",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "11"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Reads software policies",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "509"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1071":  [
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "Adversaries may communicate using application layer protocols to avoid detection/network filtering by blending in with existing traffic."
+                                                         }
+                                                     ],
+                                           "T1070.006":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "Binary contains a suspicious time stamp",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "234"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ]
+                                       }
+             }
+}

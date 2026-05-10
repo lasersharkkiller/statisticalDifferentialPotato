@@ -1,0 +1,149 @@
+{
+    "data":  {
+                 "mbc":  [
+                             {
+                                 "id":  "C0036.001",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Set Registry Key",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "set registry value"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.007",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Delete Registry Value",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "delete registry value"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0029",
+                                 "objective":  "Cryptography",
+                                 "behavior":  "Cryptographic Hash",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "hash data via BCrypt"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1112",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "delete registry value",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "delete registry value"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1027",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "hash data via BCrypt",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "hash data via BCrypt"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "signature_matches":  [
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "resolve function by parsing PE exports",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "sara-rn"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: resolve function by parsing PE exports\n    namespace: load-code/pe\n    authors:\n      - sara-rn\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic, offset, mnemonic features\n    examples:\n      - 73CE04892E5F39EC82B00C02FC04C70F:0x406BA1\n  features:\n    - and:\n      - os: windows\n      - or:\n        - characteristic: loop\n        - mnemonic: movzx\n      - and:\n        - offset: 0x3C = IMAGE_DOS_HEADER.PE.e_lfanew\n        - or:\n          - and:\n            - arch: i386\n            - offset: 0x78 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n          - and:\n            - arch: amd64\n            - offset: 0x88 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n        - 3 or more:\n          - offset: 0x14 = IMAGE_EXPORT_DIRECTORY.NumberOfFunctions\n          - offset: 0x24 = IMAGE_EXPORT_DIRECTORY.AddressOfNameOrdinals\n          - offset: 0x20 = IMAGE_EXPORT_DIRECTORY.AddressOfNames\n          - offset: 0x18 = IMAGE_EXPORT_DIRECTORY.NumberOfNames\n          - offset: 0x1C = IMAGE_EXPORT_DIRECTORY.AddressOfFunctions\n      - optional:\n        - or:\n          - api: LoadLibrary\n          - api: strcmp\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "set registry value",
+                                               "description":  "host-interaction/registry/create",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: set registry value\n    namespace: host-interaction/registry/create\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Operating System::Registry::Set Registry Key [C0036.001]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13147AF0\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x40433E\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x40415E\n      - 98c37c3c23bbfb362dac7754c6ba48e75cf24d73bc963a4cdfca557b9e016909:0x40294D\n  features:\n    - or:\n      - and:\n        - optional:\n          - match: create or open registry key\n        - or:\n          - api: advapi32.RegSetValue\n          - api: advapi32.RegSetValueEx\n          - api: advapi32.RegSetKeyValue\n          - api: ZwSetValueKey\n          - api: NtSetValueKey\n          - api: RtlWriteRegistryValue\n          - api: SHSetValue\n          - api: SHRegSetPath\n          - api: SHRegSetValue\n          - api: SHRegSetUSValue\n          - api: SHRegWriteUSValue\n          - api: Microsoft.Win32.RegistryKey::SetValue\n          - api: Microsoft.Win32.Registry::SetValue\n      - and:\n        - match: host-interaction/process/create\n        - string: \"/add/i\"\n        - or:\n          - string: \"/reg(|.exe)/i\"\n          - string: \"/hklm/i\"\n          - string: \"/HKEY_LOCAL_MACHINE/i\"\n          - string: \"/hkcu/i\"\n          - string: \"/HKEY_CURRENT_USER/i\"\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create device object",
+                                               "description":  "host-interaction/driver",
+                                               "authors":  [
+                                                               "@mr-tz"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create device object\n    namespace: host-interaction/driver\n    authors:\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: span of calls\n    examples:\n      - Practical Malware Analysis Lab 10-03.sys_:0x00010706\n  features:\n    - and:\n      - api: IoCreateDevice\n      - optional:\n        - description: sets up a symbolic link between a device object name and a user-visible name for the device\n        - api: IoCreateSymbolicLink\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "complete processing asynchronous IO request",
+                                               "description":  "host-interaction/driver : signals that driver has finished all processing for a given IRP (part of major function)",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: complete processing asynchronous IO request\n    namespace: host-interaction/driver\n    authors:\n      - moritz.raabe@mandiant.com\n    description: signals that driver has finished all processing for a given IRP (part of major function)\n    scopes:\n      static: basic block\n      dynamic: span of calls\n    examples:\n      - Practical Malware Analysis Lab 10-03.sys_:0x10666\n  features:\n    - or:\n      - api: IoCompleteRequest\n      - api: IofCompleteRequest\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "delete registry value",
+                                               "description":  "host-interaction/registry/delete",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: delete registry value\n    namespace: host-interaction/registry/delete\n    authors:\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Defense Evasion::Modify Registry [T1112]\n    mbc:\n      - Operating System::Registry::Delete Registry Value [C0036.007]\n    examples:\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x4041A0\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegDeleteValue\n        - api: advapi32.RegDeleteKeyValue\n        - api: ZwDeleteValueKey\n        - api: NtDeleteValueKey\n        - api: RtlDeleteRegistryValue\n        - api: SHDeleteValue\n        - api: SHRegDeleteUSValue\n        - api: Microsoft.Win32.RegistryKey::DeleteValue\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "hash data via BCrypt",
+                                               "description":  "data-manipulation/hashing",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: hash data via BCrypt\n    namespace: data-manipulation/hashing\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Defense Evasion::Obfuscated Files or Information [T1027]\n    mbc:\n      - Cryptography::Cryptographic Hash [C0029]\n  features:\n    - and:\n      - or:\n        - api: BCryptHash\n        - and:\n          - api: BCryptHashData\n          - optional:\n            - api: BCryptFinishHash\n            - api: BCryptDestroyHash\n            - api: BCryptCreateHash\n      - optional:\n        - api: BCryptOpenAlgorithmProvider\n        - api: BCryptCloseAlgorithmProvider\n"
+                                           }
+                                       ],
+                 "attack_techniques":  {
+                                           "T1112":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "delete registry value",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "delete registry value"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1027":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "hash data via BCrypt",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "hash data via BCrypt"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

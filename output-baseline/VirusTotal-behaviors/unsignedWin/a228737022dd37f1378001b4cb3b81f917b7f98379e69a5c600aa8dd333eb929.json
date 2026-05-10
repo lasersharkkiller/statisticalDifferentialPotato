@@ -1,0 +1,149 @@
+{
+    "data":  {
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "2512",
+                                            "name":  "%TEMP%\\M2WM99BPFPO58DCQ.exe"
+                                        }
+                                    ],
+                 "mbc":  [
+                             {
+                                 "id":  "C0041",
+                                 "objective":  "Process",
+                                 "behavior":  "Set Thread Local Storage Value",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "2"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0040",
+                                 "objective":  "Process",
+                                 "behavior":  "Allocate Thread Local Storage",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "4"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0018",
+                                 "objective":  "Process",
+                                 "behavior":  "Terminate Process",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "5"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "signature_matches":  [
+                                           {
+                                               "id":  "1",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get thread local storage value",
+                                               "description":  "host-interaction/process",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: TlsGetValue"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get thread local storage value\n    namespace: host-interaction/process\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n  features:\n    - and:\n      - api: kernel32.TlsGetValue\n"
+                                           },
+                                           {
+                                               "id":  "2",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "set thread local storage value",
+                                               "description":  "host-interaction/thread/tls",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "allocate thread local storage",
+                                                                  "api: TlsAlloc",
+                                                                  "api: TlsSetValue"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: set thread local storage value\n    namespace: host-interaction/thread/tls\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Process::Set Thread Local Storage Value [C0041]\n    examples:\n      - 03B236B23B1EC37C663527C1F53AF3FE:0x18000AE21\n  features:\n    - and:\n      - api: kernel32.TlsSetValue\n      - optional:\n        - match: allocate thread local storage\n"
+                                           },
+                                           {
+                                               "id":  "4",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "allocate thread local storage",
+                                               "description":  "host-interaction/thread/tls",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: TlsAlloc"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: allocate thread local storage\n    namespace: host-interaction/thread/tls\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Process::Allocate Thread Local Storage [C0040]\n    examples:\n      - 03B236B23B1EC37C663527C1F53AF3FE:0x18000ADF6\n  features:\n    - or:\n      - api: kernel32.TlsAlloc\n"
+                                           },
+                                           {
+                                               "id":  "5",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "terminate process",
+                                               "description":  "host-interaction/process/terminate",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "mehunhoff@google.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: ExitProcess",
+                                                                  "api: exit"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: terminate process\n    namespace: host-interaction/process/terminate\n    authors:\n      - moritz.raabe@mandiant.com\n      - mehunhoff@google.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Process::Terminate Process [C0018]\n    examples:\n      - C91887D861D9BD4A5872249B641BC9F9:0x401A77\n      - 9B7CCAA2AE6A5B96E3110EBCBC4311F6:0x10010307\n  features:\n    - or:\n      - api: System.Diagnostics.Process::Kill\n      - api: System.Diagnostics.Process::WaitForExit\n      - api: System.Diagnostics.Process::WaitForExitAsync\n      - api: System.Environment::Exit\n      - api: System.Windows.Forms.Application::Exit\n      - api: exit\n      - api: Exit\n      - api: RstrtMgr.RmShutdown\n      - and:\n        - os: linux\n        - api: exit_group\n      - and:\n        - optional:\n          - match: open process\n        - or:\n          - api: kernel32.TerminateProcess\n          - api: ntdll.NtTerminateProcess\n          - api: kernel32.ExitProcess\n          - api: ZwTerminateProcess\n"
+                                           },
+                                           {
+                                               "id":  "6",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "parse PE header",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "mnemonic: cmp",
+                                                                  "IMAGE_NT_SIGNATURE (PE)",
+                                                                  "IMAGE_DOS_SIGNATURE (MZ)"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: parse PE header\n    namespace: load-code/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic, operand[1].offset features\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x403DD0\n  features:\n    - and:\n      - os: windows\n      - and:\n        - mnemonic: cmp\n        - or:\n          - number: 0x4550 = IMAGE_NT_SIGNATURE (PE)\n          - and:\n            - number: 0x50\n            - number: 0x45\n        - or:\n          - number: 0x5A4D = IMAGE_DOS_SIGNATURE (MZ)\n          - and:\n            - number: 0x4D\n            - number: 0x5A\n        - optional:\n          - and:\n            - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x30 = IMAGE_NT_HEADERS64.OptionalHeader.ImageBase\n          - basic block:\n            - and:\n              - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n              - 3 or more:\n                - operand[1].offset: 0x4 = IMAGE_NT_HEADERS.FileHeader.Machine\n                - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n                - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n                - operand[1].offset: 0x16 = IMAGE_NT_HEADERS.FileHeader.Characteristics\n                - operand[1].offset: 0x28 = IMAGE_NT_HEADERS.OptionalHeader.AddressOfEntryPoint  # for 32 and 64 bit\n                - or:\n                  - and:\n                    - arch: i386\n                    - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                  - and:\n                    - arch: amd64\n                    - operand[1].offset: 0x30 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n"
+                                           }
+                                       ],
+                 "verdicts":  [
+                                  "UNKNOWN_VERDICT"
+                              ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "parse PE header",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "6"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "attack_techniques":  {
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "parse PE header",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "6"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

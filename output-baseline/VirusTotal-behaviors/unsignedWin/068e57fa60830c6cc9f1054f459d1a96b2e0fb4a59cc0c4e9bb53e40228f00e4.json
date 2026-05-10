@@ -1,0 +1,96 @@
+{
+    "data":  {
+                 "processes_terminated":  [
+                                              "%windir%\\System32\\svchost.exe -k WerSvcGroup",
+                                              "wmiadap.exe /F /T /R"
+                                          ],
+                 "verdicts":  [
+                                  "UNKNOWN_VERDICT"
+                              ],
+                 "mbc":  [
+                             {
+                                 "id":  "B0001.032",
+                                 "objective":  "Anti-Behavioral Analysis",
+                                 "behavior":  "Debugger Detection",
+                                 "method":  "Timing/Delay Check GetTickCount",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "check for time delay via GetTickCount"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0052",
+                                 "objective":  "File System",
+                                 "behavior":  "Writes File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "write file on Windows"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0051",
+                                 "objective":  "File System",
+                                 "behavior":  "Read File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "read file on Windows"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "2252",
+                                            "name":  "%windir%\\System32\\svchost.exe -k WerSvcGroup"
+                                        },
+                                        {
+                                            "process_id":  "2616",
+                                            "name":  "%SANDBOX_DLL_LOADER_AMD64% %SAMPLEPATH% %WORKDIR% 483"
+                                        },
+                                        {
+                                            "process_id":  "2836",
+                                            "name":  "wmiadap.exe /F /T /R"
+                                        },
+                                        {
+                                            "process_id":  "2876",
+                                            "name":  "%windir%\\system32\\wbem\\wmiprvse.exe"
+                                        }
+                                    ],
+                 "signature_matches":  [
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check for time delay via GetTickCount",
+                                               "description":  "anti-analysis/anti-debugging/debugger-detection",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check for time delay via GetTickCount\n    namespace: anti-analysis/anti-debugging/debugger-detection\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic features\n    mbc:\n      - Anti-Behavioral Analysis::Debugger Detection::Timing/Delay Check GetTickCount [B0001.032]\n    examples:\n      - Practical Malware Analysis Lab 16-03.exe_:0x4013d0\n  features:\n    - and:\n      - count(api(kernel32.GetTickCount)): 2 or more\n      - basic block:\n        - and:\n          - mnemonic: sub\n          - mnemonic: cmp\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "write file on Windows",
+                                               "description":  "host-interaction/file-system/write",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: write file on Windows\n    namespace: host-interaction/file-system/write\n    authors:\n      - william.ballenthin@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - File System::Writes File [C0052]\n    examples:\n      - Practical Malware Analysis Lab 01-04.exe_:0x4011FC\n      # ntdll\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x1400025C4\n  features:\n    - or:\n      - and:\n        - os: windows\n        - optional:\n          - basic block:\n            - or:\n              - number: 0x40000000 = GENERIC_WRITE\n              - number: 0x2 = FILE_WRITE_DATA\n              - match: create or open file\n          - call:\n            - or:\n              - number: 0x40000000 = GENERIC_WRITE\n              - number: 0x2 = FILE_WRITE_DATA\n              - match: create or open file\n        - or:\n          - api: kernel32.WriteFile\n          - api: kernel32.WriteFileEx\n          - api: NtWriteFile\n          - api: ZwWriteFile\n          - api: _fwrite\n          - api: fwrite\n      - api: System.IO.File::WriteAllBytes\n      - api: System.IO.File::WriteAllBytesAsync\n      - api: System.IO.File::WriteAllLines\n      - api: System.IO.File::WriteAllLinesAsync\n      - api: System.IO.File::WriteAllText\n      - api: System.IO.File::WriteAllTextAsync\n      - api: System.IO.File::AppendAllLines\n      - api: System.IO.File::AppendAllLinesAsync\n      - api: System.IO.File::AppendAllText\n      - api: System.IO.File::AppendAllTextAsync\n      - api: System.IO.File::AppendText\n      - api: System.IO.FileInfo::AppendText\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "read file on Windows",
+                                               "description":  "host-interaction/file-system/read",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: read file on Windows\n    namespace: host-interaction/file-system/read\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - File System::Read File [C0051]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x1314567B\n  features:\n    - or:\n      - and:\n        - os: windows\n        - optional:\n          - and:\n            - number: 0x80000000 = GENERIC_READ\n            - match: create or open file\n        - or:\n          - api: kernel32.ReadFile\n          - api: ReadFileEx\n          - api: NtReadFile\n          - api: ZwReadFile\n          - api: LZRead\n          - api: _read\n          - api: fread\n      - api: System.IO.File::ReadAllBytes\n      - api: System.IO.File::ReadAllBytesAsync\n      - api: System.IO.File::ReadAllLines\n      - api: System.IO.File::ReadAllLinesAsync\n      - api: System.IO.File::ReadAllText\n      - api: System.IO.File::ReadAllTextAsync\n      - api: System.IO.File::ReadLines\n"
+                                           }
+                                       ]
+             }
+}

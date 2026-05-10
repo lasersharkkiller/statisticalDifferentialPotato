@@ -1,0 +1,391 @@
+{
+    "data":  {
+                 "signature_matches":  [
+                                           {
+                                               "id":  "0",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "print debug messages",
+                                               "description":  "host-interaction/log/debug/write-event",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: OutputDebugString"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: print debug messages\n    namespace: host-interaction/log/debug/write-event\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    examples:\n      - 493167E85E45363D09495D0841C30648:0x401000\n  features:\n    - or:\n      - api: DbgPrint\n      - api: kernel32.OutputDebugString\n      - and:\n        - os: android\n        - api: __android_log_print\n"
+                                           },
+                                           {
+                                               "id":  "2",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check if file exists",
+                                               "description":  "host-interaction/file-system/exists",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "ERROR_FILE_NOT_FOUND",
+                                                                  "mnemonic: cmp",
+                                                                  "api: GetLastError"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check if file exists\n    namespace: host-interaction/file-system/exists\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    examples:\n      - 31600AD0D1A7EA615690DF111AE36C73:0x401284\n  features:\n    - or:\n      - basic block:\n        - and:\n          - api: kernel32.GetFileAttributes\n          - instruction:\n            - mnemonic: cmp\n            - number: 0xFFFFFFFF = INVALID_FILE_ATTRIBUTES\n      - basic block:\n        - and:\n          - api: kernel32.GetLastError\n          - instruction:\n            - mnemonic: cmp\n            - number: 2 = ERROR_FILE_NOT_FOUND\n      - api: shlwapi.PathFileExists\n      - api: System.IO.File::Exists\n      - property/read: System.IO.FileSystemInfo::Exists\n"
+                                           },
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get system information on Windows",
+                                               "description":  "host-interaction/os/info",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "joakim@intezer.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetSystemInfo"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get system information on Windows\n    namespace: host-interaction/os/info\n    authors:\n      - moritz.raabe@mandiant.com\n      - joakim@intezer.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::System Information Discovery [T1082]\n    examples:\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x140002280\n  features:\n    - and:\n      - os: windows\n      - or:\n        - api: kernel32.GetSystemInfo\n        - api: kernel32.GetNativeSystemInfo\n        - api: NtQuerySystemInformation\n        - api: NtQuerySystemInformationEx\n        - api: ntdll.RtlGetNativeSystemInformation\n        - api: ZwQuerySystemInformation\n        - api: ZwQuerySystemInformationEx\n"
+                                           },
+                                           {
+                                               "id":  "8",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "extract resource via kernel32 functions",
+                                               "description":  "executable/resource",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: LoadResource",
+                                                                  "api: SizeofResource",
+                                                                  "api: LockResource"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: extract resource via kernel32 functions\n    namespace: executable/resource\n    authors:\n      - william.ballenthin@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    examples:\n      - BF88E1BD4A3BDE10B419A622278F1FF7:0x401000\n      - Practical Malware Analysis Lab 01-04.exe_:0x4011FC\n      # ntdll\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x140001ABA\n  features:\n    - or:\n      - and:\n        - or:\n          - api: kernel32.LoadResource\n          - api: kernel32.LockResource\n          - api: LdrAccessResource\n        - optional:\n          - api: kernel32.GetModuleHandle\n          # may occur in parent function, see 0664B09A86EC2DF7DFE01A93E184A1FA23DF66EA82CAB39000944E418EC1F7B2\n          - or:\n            - api: kernel32.FindResource\n            - api: kernel32.FindResourceEx\n            - api: LdrFindResource_U\n            - api: LdrFindResourceEx_U\n          - api: kernel32.SizeofResource\n          - api: kernel32.FreeResource\n"
+                                           },
+                                           {
+                                               "id":  "9",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "access PE header",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: RtlImageNtHeader"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: access PE header\n    namespace: load-code/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x1400018E0\n  features:\n    - and:\n      - os: windows\n      - or:\n        - api: RtlImageNtHeader\n        - api: RtlImageNtHeaderEx\n"
+                                           },
+                                           {
+                                               "id":  "10",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "link function at runtime on Windows",
+                                               "description":  "linking/runtime-linking",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetProcAddress"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: link function at runtime on Windows\n    namespace: linking/runtime-linking\n    authors:\n      - moritz.raabe@mandiant.com\n      - mehunhoff@google.com\n    scopes:\n      static: instruction\n      dynamic: call\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x404130\n      - Practical Malware Analysis Lab 01-04.exe_:0x401350\n  features:\n    - and:\n      - os: windows\n      - or:\n        - api: kernel32.GetProcAddress\n        - api: ntdll.LdrGetProcedureAddress\n        - api: ntdll.LdrGetProcedureAddressEx\n        - api: ntdll.LdrGetProcedureAddressForCaller\n        - api: MmGetSystemRoutineAddress\n"
+                                           },
+                                           {
+                                               "id":  "12",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "implement COM DLL",
+                                               "description":  "executable/pe",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: implement COM DLL\n    namespace: executable/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    references:\n      - https://learn.microsoft.com/en-us/windows/win32/api/combaseapi/nf-combaseapi-dllgetclassobject\n  features:\n    - and:\n      - export: DllGetClassObject\n      - optional:\n        - export: DllRegisterServer\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://learn.microsoft.com/en-us/windows/win32/api/combaseapi/nf-combaseapi-dllgetclassobject"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "13",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check for PEB BeingDebugged flag",
+                                               "description":  "anti-analysis/anti-debugging/debugger-detection",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "PEB access",
+                                                                  "peb access"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check for PEB BeingDebugged flag\n    namespace: anti-analysis/anti-debugging/debugger-detection\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: unsupported  # requires offset features\n    mbc:\n      - Anti-Behavioral Analysis::Debugger Detection::Process Environment Block BeingDebugged [B0001.035]\n    references:\n      - Practical Malware Analysis, Chapter 16, p. 353\n    examples:\n      - Practical Malware Analysis Lab 16-01.exe_:0x403530\n  features:\n    - and:\n      - match: PEB access\n      - offset: 2 = PEB.BeingDebugged\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "Practical Malware Analysis, Chapter 16, p. 353"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "15",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "enumerate PE sections",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "@Ana06",
+                                                               "@mr-tz"
+                                                           ],
+                                               "match_data":  [
+                                                                  "mnemonic: movzx"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: enumerate PE sections\n    namespace: load-code/pe\n    authors:\n      - \"@Ana06\"\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: unsupported  # requires offset, operand[1].offset, characteristic, mnemonic, basicblock features\n    mbc:\n      - Discovery::Code Discovery::Enumerate PE Sections [B0046.001]\n    references:\n      - https://0x00sec.org/t/reflective-dll-injection/3080\n      - https://www.ired.team/offensive-security/code-injection-process-injection/reflective-dll-injection\n    examples:\n      - E4C33AC3638EEF68311F8AC0D72483C7:0x401510\n  features:\n    - and:\n      - os: windows\n      # there should be some complexity to functions like this\n      - count(basic blocks): 3 or more\n      - optional:\n        - offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n      - instruction:\n        - or:\n          - mnemonic: mov\n          - mnemonic: movzx\n        - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n      - basic block:\n        - or:\n          - and:\n            - description: IMAGE_FIRST_SECTION(nt_header)\n            - instruction:\n              - or:\n                - mnemonic: add\n                - mnemonic: mov\n                - mnemonic: movzx\n              - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n            - operand[1].offset: 0x18 = FileHeader.SizeOfOptionalHeader\n          - and:\n            - description: (DWORD)dll_raw + dos_header-\u003ee_lfanew + sizeof(IMAGE_NT_HEADERS) + sizeof(IMAGE_SECTION_HEADER) * i\n            - number: 0x28 = sizeof(IMAGE_SECTION_HEADER)\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0xF8 = sizeof(IMAGE_NT_HEADERS32)\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x108 = sizeof(IMAGE_NT_HEADERS64)\n      - 2 or more:\n        - operand[1].offset: 0xC = IMAGE_SECTION_HEADER.VirtualAddress\n        - operand[1].offset: 0x14 = IMAGE_SECTION_HEADER.PointerToRawData\n        - operand[1].offset: 0x10 = IMAGE_SECTION_HEADER.SizeOfRawData\n        # there\u0027s also offset 0x8 = IMAGE_SECTION_HEADER.Misc.PhysicalAddress, but it\u0027s likely too common\n      - not:\n        # non-zeroing XOR was observed in FPs\n        - characteristic: nzxor\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://0x00sec.org/t/reflective-dll-injection/3080"
+                                                            },
+                                                            {
+                                                                "ref":  "https://www.ired.team/offensive-security/code-injection-process-injection/reflective-dll-injection"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "16",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "query or enumerate registry value",
+                                               "description":  "host-interaction/registry",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: RegGetValue"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: query or enumerate registry value\n    namespace: host-interaction/registry\n    authors:\n      - william.ballenthin@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::Query Registry [T1012]\n    mbc:\n      - Operating System::Registry::Query Registry Value [C0036.006]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13145B5A\n      - Practical Malware Analysis Lab 03-02.dll_:0x100047AD\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegGetValue\n        - api: advapi32.RegEnumValue\n        - api: advapi32.RegQueryValue\n        - api: advapi32.RegQueryValueEx\n        - api: advapi32.RegQueryMultipleValues\n        - api: ZwQueryValueKey\n        - api: ZwEnumerateValueKey\n        - api: NtQueryValueKey\n        - api: NtEnumerateValueKey\n        - api: RtlQueryRegistryValues\n        - api: SHGetValue\n        - api: SHEnumValue\n        - api: SHRegGetInt\n        - api: SHRegGetPath\n        - api: SHRegGetValue\n        - api: SHQueryValueEx\n        - api: SHRegGetUSValue\n        - api: SHOpenRegStream\n        - api: SHRegEnumUSValue\n        - api: SHOpenRegStream2\n        - api: SHRegQueryUSValue\n        - api: SHRegGetBoolUSValue\n        - api: SHRegGetValueFromHKCUHKLM\n        - api: SHRegGetBoolValueFromHKCUHKLM\n        - api: Microsoft.Win32.RegistryKey::GetValue\n        - api: Microsoft.Win32.RegistryKey::GetValueKind\n        - api: Microsoft.Win32.RegistryKey::GetValueNames\n        - api: Microsoft.Win32.Registry::GetValue\n"
+                                           },
+                                           {
+                                               "id":  "17",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "decode data using Base64 via WinAPI",
+                                               "description":  "data-manipulation/encoding/base64",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "dwFlags=CRYPT_STRING_BASE64",
+                                                                  "api: CryptStringToBinary"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: decode data using Base64 via WinAPI\n    namespace: data-manipulation/encoding/base64\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    att\u0026ck:\n      - Defense Evasion::Deobfuscate/Decode Files or Information [T1140]\n    examples:\n      - mimikatz.exe_:0x40D742\n  features:\n    - and:\n      - or:\n        # number: 0x0 = CRYPT_STRING_BASE64HEADER (with certificate beginning and ending headers), FPs too likely for 0\n        - number: 0x1 = dwFlags=CRYPT_STRING_BASE64  # without headers\n        - number: 0x6 = dwFlags=CRYPT_STRING_BASE64_ANY  # tries: CRYPT_STRING_BASE64HEADER, CRYPT_STRING_BASE64\n        - number: 0x7 = dwFlags=CRYPT_STRING_ANY  # tries: CRYPT_STRING_BASE64HEADER, CRYPT_STRING_BASE64, CRYPT_STRING_BINARY\n      - api: CryptStringToBinary\n"
+                                           },
+                                           {
+                                               "id":  "18",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create or open mutex on Windows",
+                                               "description":  "host-interaction/mutex",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com",
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: CreateMutexEx"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create or open mutex on Windows\n    namespace: host-interaction/mutex\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n      - mehunhoff@google.com\n    scopes:\n      static: instruction\n      dynamic: call\n    mbc:\n      - Process::Create Mutex [C0042]\n    examples:\n      - Practical Malware Analysis Lab 01-01.dll_:0x10001010\n  features:\n    - or:\n      - api: kernel32.OpenMutex\n      - api: kernel32.CreateMutex\n      - api: kernel32.CreateMutexEx\n      - api: ntdll.NtCreateMutant\n      - api: ntdll.NtOpenMutant\n      - and:\n        - format: dotnet\n        - or:\n          - api: System.Threading.Mutex::ctor\n          - api: System.Threading.Mutex::OpenExisting\n          - api: System.Threading.Mutex::TryOpenExisting\n"
+                                           }
+                                       ],
+                 "mbc":  [
+                             {
+                                 "id":  "E1083",
+                                 "objective":  "Discovery",
+                                 "behavior":  "File and Directory Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "2"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0001.035",
+                                 "objective":  "Anti-Behavioral Analysis",
+                                 "behavior":  "Debugger Detection",
+                                 "method":  "Process Environment Block BeingDebugged",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "13"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0046.001",
+                                 "objective":  "Discovery",
+                                 "behavior":  "Code Discovery",
+                                 "method":  "Enumerate PE Sections",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "15"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.006",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Query Registry Value",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "16"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0042",
+                                 "objective":  "Process",
+                                 "behavior":  "Create Mutex",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "18"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1083",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "check if file exists",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "2"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get system information on Windows",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "3"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "access PE header",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "9"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "link function at runtime on Windows",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "10"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1012",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "query or enumerate registry value",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "16"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1140",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "decode data using Base64 via WinAPI",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "17"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "attack_techniques":  {
+                                           "T1083":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "check if file exists",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "2"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1082":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get system information on Windows",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "3"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "access PE header",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "9"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "link function at runtime on Windows",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "10"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1012":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "query or enumerate registry value",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "16"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1140":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "decode data using Base64 via WinAPI",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "17"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

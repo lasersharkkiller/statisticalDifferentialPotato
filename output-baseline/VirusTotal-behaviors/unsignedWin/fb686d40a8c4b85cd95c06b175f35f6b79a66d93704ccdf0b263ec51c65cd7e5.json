@@ -1,0 +1,1642 @@
+{
+    "data":  {
+                 "verdict_confidence":  98,
+                 "files_written":  [
+                                       "\\Device\\ConDrv\\\\Connect"
+                                   ],
+                 "signature_matches":  [
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "link function at runtime on Windows",
+                                               "description":  "linking/runtime-linking",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: link function at runtime on Windows\n    namespace: linking/runtime-linking\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: instruction\n      dynamic: call\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x404130\n      - Practical Malware Analysis Lab 01-04.exe_:0x401350\n  features:\n    - and:\n      - os: windows\n      - or:\n        - api: kernel32.GetProcAddress\n        - api: ntdll.LdrGetProcedureAddress\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "allocate or change RWX memory",
+                                               "description":  "host-interaction/process/inject",
+                                               "authors":  [
+                                                               "@mr-tz"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: allocate or change RWX memory\n    namespace: host-interaction/process/inject\n    authors:\n      - \"@mr-tz\"\n    scopes:\n      static: basic block\n      dynamic: span of calls\n    mbc:\n      - Memory::Allocate Memory [C0007]\n    examples:\n      - Practical Malware Analysis Lab 03-03.exe_:0x4010EA\n      # ntdll\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x140001ABA\n  features:\n    - and:\n      - or:\n        - match: allocate memory\n        - match: change memory protection\n      - or:\n        - number: 0x40 = PAGE_EXECUTE_READWRITE\n        # lea     r9d, [rcx+40h]  ; flProtect\n        # call    cs:VirtualAlloc\n        - instruction:\n          - mnemonic: lea\n          - offset: 0x40 = PAGE_EXECUTE_READWRITE\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "delete service",
+                                               "description":  "host-interaction/service/delete",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: delete service\n    namespace: host-interaction/service/delete\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Persistence::Create or Modify System Process::Windows Service [T1543.003]\n    examples:\n      - E544A4D616B60147D9774B48C2B65EF2:0x402140\n      - Practical Malware Analysis Lab 03-02.dll_:0x10004B18\n  features:\n    - and:\n      - optional:\n        - match: get service handle\n      - api: advapi32.DeleteService\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "delete registry key",
+                                               "description":  "host-interaction/registry/delete",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "johnk3r"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: delete registry key\n    namespace: host-interaction/registry/delete\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - johnk3r\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Defense Evasion::Modify Registry [T1112]\n    mbc:\n      - Operating System::Registry::Delete Registry Key [C0036.002]\n    examples:\n      - 4f11bdb380dafa2518053c6d20147a05:0x402A36\n      - 493167E85E45363D09495D0841C30648:0x404D60\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegDeleteKey\n        - api: advapi32.RegDeleteTree\n        - api: advapi32.RegDeleteKeyEx\n        - api: advapi32.RegDeleteKeyTransacted\n        - api: ZwDeleteKey\n        - api: NtDeleteKey\n        - api: SHDeleteKey\n        - api: SHDeleteEmptyKey\n        - api: SHRegDeleteEmptyUSKey\n        - api: Microsoft.Win32.RegistryKey::DeleteSubKey\n        - api: Microsoft.Win32.RegistryKey::DeleteSubKeyTree\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "persist via Windows service",
+                                               "description":  "persistence/service",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: persist via Windows service\n    namespace: persistence/service\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Persistence::Create or Modify System Process::Windows Service [T1543.003]\n      - Execution::System Services::Service Execution [T1569.002]\n    examples:\n      - Practical Malware Analysis Lab 03-02.dll_:0x10004706\n      - 9f012d7e3ae8f62370278e372691eb73b878fe2280b6083e1be637b278021855:0x40113A\n  features:\n    - or:\n      - and:\n        - or:\n          - basic block:\n            - and:\n              - number: 2 = SERVICE_AUTO_START\n              - api: advapi32.CreateService\n          - call:\n            - and:\n              - number: 2 = SERVICE_AUTO_START\n              - api: advapi32.CreateService\n        - optional:\n          - or:\n            - api: advapi32.OpenService\n            - api: advapi32.StartService\n      - and:\n        - match: host-interaction/process/create\n        - or:\n          - and:\n            - string: /^sc(|\\.exe)$/i\n            - string: /create /i\n          - string: /^sc(|\\.exe) create/i\n          - string: /New-Service /i\n      - and:\n        - match: \"set registry value\"\n        - string: /System\\\\(CurrentControlSet|ControlSet001)\\\\Services/i\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "query or enumerate registry value",
+                                               "description":  "host-interaction/registry",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: query or enumerate registry value\n    namespace: host-interaction/registry\n    authors:\n      - william.ballenthin@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::Query Registry [T1012]\n    mbc:\n      - Operating System::Registry::Query Registry Value [C0036.006]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13145B5A\n      - Practical Malware Analysis Lab 03-02.dll_:0x100047AD\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegGetValue\n        - api: advapi32.RegEnumValue\n        - api: advapi32.RegQueryValue\n        - api: advapi32.RegQueryValueEx\n        - api: advapi32.RegQueryMultipleValues\n        - api: ZwQueryValueKey\n        - api: ZwEnumerateValueKey\n        - api: NtQueryValueKey\n        - api: NtEnumerateValueKey\n        - api: RtlQueryRegistryValues\n        - api: SHGetValue\n        - api: SHEnumValue\n        - api: SHRegGetInt\n        - api: SHRegGetPath\n        - api: SHRegGetValue\n        - api: SHQueryValueEx\n        - api: SHRegGetUSValue\n        - api: SHOpenRegStream\n        - api: SHRegEnumUSValue\n        - api: SHOpenRegStream2\n        - api: SHRegQueryUSValue\n        - api: SHRegGetBoolUSValue\n        - api: SHRegGetValueFromHKCUHKLM\n        - api: SHRegGetBoolValueFromHKCUHKLM\n        - api: Microsoft.Win32.RegistryKey::GetValue\n        - api: Microsoft.Win32.RegistryKey::GetValueKind\n        - api: Microsoft.Win32.RegistryKey::GetValueNames\n        - api: Microsoft.Win32.Registry::GetValue\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "execute shellcode via indirect call",
+                                               "description":  "load-code/shellcode",
+                                               "authors":  [
+                                                               "ronnie.salomonsen@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: execute shellcode via indirect call\n    namespace: load-code/shellcode\n    authors:\n      - ronnie.salomonsen@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic features\n    mbc:\n      - Memory::Allocate Memory [C0007]\n  features:\n    - and:\n      - match: allocate or change RWX memory\n      - or:\n        - characteristic: indirect call\n        - characteristic: cross section flow\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "modify service",
+                                               "description":  "host-interaction/service/modify",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: modify service\n    namespace: host-interaction/service/modify\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Persistence::Create or Modify System Process::Windows Service [T1543.003]\n      - Execution::System Services::Service Execution [T1569.002]\n    examples:\n      - 7D16EFD0078F22C17A4BD78B0F0CC468:0x401000\n  features:\n    - and:\n      - optional:\n        - match: get service handle\n      - or:\n        - api: advapi32.ChangeServiceConfig\n        - api: advapi32.ChangeServiceConfig2\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "contain a thread local storage (.tls) section",
+                                               "description":  "executable/pe/section/tls",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: contain a thread local storage (.tls) section\n    namespace: executable/pe/section/tls\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    examples:\n      - Practical Malware Analysis Lab 16-02.exe_\n  features:\n    - section: .tls\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "set current directory",
+                                               "description":  "host-interaction/file-system",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: set current directory\n    namespace: host-interaction/file-system\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n  features:\n    - or:\n      - api: System.IO.Directory::SetCurrentDirectory\n      - api: kernel32.SetCurrentDirectory\n      - api: chdir\n      - api: fchdir\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "enumerate PE sections",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "@Ana06",
+                                                               "@mr-tz"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: enumerate PE sections\n    namespace: load-code/pe\n    authors:\n      - \"@Ana06\"\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: unsupported  # requires offset, operand[1].offset, characteristic, mnemonic, basicblock features\n    mbc:\n      - Discovery::Code Discovery::Enumerate PE Sections [B0046.001]\n    references:\n      - https://0x00sec.org/t/reflective-dll-injection/3080\n      - https://www.ired.team/offensive-security/code-injection-process-injection/reflective-dll-injection\n    examples:\n      - E4C33AC3638EEF68311F8AC0D72483C7:0x401510\n  features:\n    - and:\n      - os: windows\n      # there should be some complexity to functions like this\n      - count(basic blocks): 3 or more\n      - optional:\n        - offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n      - instruction:\n        - or:\n          - mnemonic: mov\n          - mnemonic: movzx\n        - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n      - basic block:\n        - or:\n          - and:\n            - description: IMAGE_FIRST_SECTION(nt_header)\n            - instruction:\n              - or:\n                - mnemonic: add\n                - mnemonic: mov\n                - mnemonic: movzx\n              - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n            - operand[1].offset: 0x18 = FileHeader.SizeOfOptionalHeader\n          - and:\n            - description: (DWORD)dll_raw + dos_header-\u003ee_lfanew + sizeof(IMAGE_NT_HEADERS) + sizeof(IMAGE_SECTION_HEADER) * i\n            - number: 0x28 = sizeof(IMAGE_SECTION_HEADER)\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0xF8 = sizeof(IMAGE_NT_HEADERS32)\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x108 = sizeof(IMAGE_NT_HEADERS64)\n      - 2 or more:\n        - operand[1].offset: 0xC = IMAGE_SECTION_HEADER.VirtualAddress\n        - operand[1].offset: 0x14 = IMAGE_SECTION_HEADER.PointerToRawData\n        - operand[1].offset: 0x10 = IMAGE_SECTION_HEADER.SizeOfRawData\n        # there\u0027s also offset 0x8 = IMAGE_SECTION_HEADER.Misc.PhysicalAddress, but it\u0027s likely too common\n      - not:\n        # non-zeroing XOR was observed in FPs\n        - characteristic: nzxor\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://0x00sec.org/t/reflective-dll-injection/3080"
+                                                            },
+                                                            {
+                                                                "ref":  "https://www.ired.team/offensive-security/code-injection-process-injection/reflective-dll-injection"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "run as service",
+                                               "description":  "host-interaction/service",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: run as service\n    namespace: host-interaction/service\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    mbc:\n      - Anti-Behavioral Analysis::Conditional Execution::Runs as Service [B0025.007]\n    examples:\n      - Practical Malware Analysis Lab 03-02.dll_\n  features:\n    - or:\n      - export: ServiceMain\n      - function:\n        - or:\n          - api: RegisterServiceCtrlHandler\n          - api: RegisterServiceCtrlHandlerEx\n          - api: StartServiceCtrlDispatcher\n          - api: System.ServiceProcess.ServiceBase::Run\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "set registry value",
+                                               "description":  "host-interaction/registry/create",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: set registry value\n    namespace: host-interaction/registry/create\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Operating System::Registry::Set Registry Key [C0036.001]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13147AF0\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x40433E\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x40415E\n      - 98c37c3c23bbfb362dac7754c6ba48e75cf24d73bc963a4cdfca557b9e016909:0x40294D\n  features:\n    - or:\n      - and:\n        - optional:\n          - match: create or open registry key\n        - or:\n          - api: advapi32.RegSetValue\n          - api: advapi32.RegSetValueEx\n          - api: advapi32.RegSetKeyValue\n          - api: ZwSetValueKey\n          - api: NtSetValueKey\n          - api: RtlWriteRegistryValue\n          - api: SHSetValue\n          - api: SHRegSetPath\n          - api: SHRegSetValue\n          - api: SHRegSetUSValue\n          - api: SHRegWriteUSValue\n          - api: Microsoft.Win32.RegistryKey::SetValue\n          - api: Microsoft.Win32.Registry::SetValue\n      - and:\n        - match: host-interaction/process/create\n        - string: \"/add/i\"\n        - or:\n          - string: \"/reg(|.exe)/i\"\n          - string: \"/hklm/i\"\n          - string: \"/HKEY_LOCAL_MACHINE/i\"\n          - string: \"/hkcu/i\"\n          - string: \"/HKEY_CURRENT_USER/i\"\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "query environment variable",
+                                               "description":  "host-interaction/environment-variable",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "@_re_fox"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: query environment variable\n    namespace: host-interaction/environment-variable\n    authors:\n      - michael.hunhoff@mandiant.com\n      - \"@_re_fox\"\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Information Discovery [T1082]\n    mbc:\n      - Discovery::System Information Discovery [E1082]\n    examples:\n      - Practical Malware Analysis Lab 14-02.exe_:0x401880\n      - 0761142efbda6c4b1e801223de723578:0x65483490\n  features:\n    - or:\n      - api: kernel32.GetEnvironmentVariable\n      - api: kernel32.GetEnvironmentStrings\n      - api: kernel32.ExpandEnvironmentStrings\n      - api: msvcr90.getenv\n      - api: msvcrt.getenv\n      - api: System.Environment::GetEnvironmentVariable\n      - api: System.Environment::GetEnvironmentVariables\n      - api: System.Environment::ExpandEnvironmentVariables\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get thread local storage value",
+                                               "description":  "host-interaction/process",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get thread local storage value\n    namespace: host-interaction/process\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n  features:\n    - and:\n      - api: kernel32.TlsGetValue\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create service",
+                                               "description":  "host-interaction/service/create",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create service\n    namespace: host-interaction/service/create\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Persistence::Create or Modify System Process::Windows Service [T1543.003]\n      - Execution::System Services::Service Execution [T1569.002]\n    examples:\n      - Practical Malware Analysis Lab 03-02.dll_:0x10004706\n  features:\n    - and:\n      - api: advapi32.CreateService\n      - optional:\n        - api: advapi32.OpenSCManager\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "read .ini file",
+                                               "description":  "host-interaction/file-system/read",
+                                               "authors":  [
+                                                               "@_re_fox",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: read .ini file\n    namespace: host-interaction/file-system/read\n    authors:\n      - \"@_re_fox\"\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - File System::Read File [C0051]\n    examples:\n      - 1d8fd13c890060464019c0f07b928b1a:0x401070\n      - E6234FB98F17201C232F4502015B47B3:0x701312FA\n  features:\n    - and:\n      - or:\n        - api: GetPrivateProfileInt\n        - api: GetPrivateProfileString\n        - api: GetPrivateProfileStruct\n        - api: GetPrivateProfileSection\n        - api: GetPrivateProfileSectionNames\n      - optional:\n        - string: /\\.ini/i\n        - api: GetFullPathName\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "parse PE header",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: parse PE header\n    namespace: load-code/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic, operand[1].offset features\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x403DD0\n  features:\n    - and:\n      - os: windows\n      - and:\n        - mnemonic: cmp\n        - or:\n          - number: 0x4550 = IMAGE_NT_SIGNATURE (PE)\n          - and:\n            - number: 0x50\n            - number: 0x45\n        - or:\n          - number: 0x5A4D = IMAGE_DOS_SIGNATURE (MZ)\n          - and:\n            - number: 0x4D\n            - number: 0x5A\n        - optional:\n          - and:\n            - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x30 = IMAGE_NT_HEADERS64.OptionalHeader.ImageBase\n          - basic block:\n            - and:\n              - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n              - 3 or more:\n                - operand[1].offset: 0x4 = IMAGE_NT_HEADERS.FileHeader.Machine\n                - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n                - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n                - operand[1].offset: 0x16 = IMAGE_NT_HEADERS.FileHeader.Characteristics\n                - operand[1].offset: 0x28 = IMAGE_NT_HEADERS.OptionalHeader.AddressOfEntryPoint  # for 32 and 64 bit\n                - or:\n                  - and:\n                    - arch: i386\n                    - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                  - and:\n                    - arch: amd64\n                    - operand[1].offset: 0x30 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "terminate process",
+                                               "description":  "host-interaction/process/terminate",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: terminate process\n    namespace: host-interaction/process/terminate\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Process::Terminate Process [C0018]\n    examples:\n      - C91887D861D9BD4A5872249B641BC9F9:0x401A77\n      - 9B7CCAA2AE6A5B96E3110EBCBC4311F6:0x10010307\n  features:\n    - or:\n      - api: System.Diagnostics.Process::Kill\n      - api: System.Diagnostics.Process::WaitForExit\n      - api: System.Diagnostics.Process::WaitForExitAsync\n      - api: System.Environment::Exit\n      - api: System.Windows.Forms.Application::Exit\n      - api: exit\n      - api: Exit\n      - and:\n        - optional:\n          - match: open process\n        - or:\n          - api: kernel32.TerminateProcess\n          - api: ntdll.NtTerminateProcess\n          - api: kernel32.ExitProcess\n"
+                                           },
+                                           {
+                                               "id":  "antianalysis_tls_section",
+                                               "name":  "antianalysis_tls_section",
+                                               "description":  "Contains .tls (Thread Local Storage) section",
+                                               "match_data":  [
+                                                                  "{\"section\": {\"name\": \".tls\", \"raw_address\": \"0x0000c800\", \"virtual_address\": \"0x00013000\", \"virtual_size\": \"0x00000064\", \"size_of_data\": \"0x00000200\", \"characteristics\": \"IMAGE_SCN_CNT_INITIALIZED_DAT"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_LOW"
+                                           },
+                                           {
+                                               "id":  "network_http",
+                                               "name":  "network_http",
+                                               "description":  "Performs some HTTP requests",
+                                               "match_data":  [
+                                                                  "{\"url\": \"http://ocsp.digicert.com/MFEwTzBNMEswSTAJBgUrDgMCGgUABBQ50otx%2Fh0Ztl%2Bz8SiPI7wEWVxDlQQUTiJUIBiV5uNu5g%2F6%2BrkS7QYXjzkCEApDqVCbATUviZV57HIIulA%3D\"}",
+                                                                  "{\"url\": \"http://ocsp.digicert.com/MFEwTzBNMEswSTAJBgUrDgMCGgUABBSAUQYBMq2awn1Rh6Doh%2FsBYgFV7gQUA95QNVbRTLtm8KPiGxvDl7I90VUCEAJ0LqoXyo4hxxe7H%2Fz9DKA%3D\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_LOW"
+                                           },
+                                           {
+                                               "id":  "packer_unknown_pe_section_name",
+                                               "name":  "packer_unknown_pe_section_name",
+                                               "description":  "The binary contains an unknown PE section name indicative of packing",
+                                               "match_data":  [
+                                                                  "{\"unknown section\": {\"name\": \"/4\", \"raw_address\": \"0x0000da00\", \"virtual_address\": \"0x00015000\", \"virtual_size\": \"0x00000700\", \"size_of_data\": \"0x00000800\", \"characteristics\": \"IMAGE_SCN_CNT_INITIALIZ",
+                                                                  "{\"unknown section\": {\"name\": \"/19\", \"raw_address\": \"0x0000e200\", \"virtual_address\": \"0x00016000\", \"virtual_size\": \"0x0001abf4\", \"size_of_data\": \"0x0001ac00\", \"characteristics\": \"IMAGE_SCN_CNT_INITIALI",
+                                                                  "{\"unknown section\": {\"name\": \"/31\", \"raw_address\": \"0x00028e00\", \"virtual_address\": \"0x00031000\", \"virtual_size\": \"0x00003a2e\", \"size_of_data\": \"0x00003c00\", \"characteristics\": \"IMAGE_SCN_CNT_INITIALI",
+                                                                  "{\"unknown section\": {\"name\": \"/45\", \"raw_address\": \"0x0002ca00\", \"virtual_address\": \"0x00035000\", \"virtual_size\": \"0x000040ee\", \"size_of_data\": \"0x00004200\", \"characteristics\": \"IMAGE_SCN_CNT_INITIALI",
+                                                                  "{\"unknown section\": {\"name\": \"/57\", \"raw_address\": \"0x00030c00\", \"virtual_address\": \"0x0003a000\", \"virtual_size\": \"0x000020a0\", \"size_of_data\": \"0x00002200\", \"characteristics\": \"IMAGE_SCN_CNT_INITIALI",
+                                                                  "{\"unknown section\": {\"name\": \"/70\", \"raw_address\": \"0x00032e00\", \"virtual_address\": \"0x0003d000\", \"virtual_size\": \"0x000004b7\", \"size_of_data\": \"0x00000600\", \"characteristics\": \"IMAGE_SCN_CNT_INITIALI",
+                                                                  "{\"unknown section\": {\"name\": \"/81\", \"raw_address\": \"0x00033400\", \"virtual_address\": \"0x0003e000\", \"virtual_size\": \"0x00010d36\", \"size_of_data\": \"0x00010e00\", \"characteristics\": \"IMAGE_SCN_CNT_INITIALI",
+                                                                  "{\"unknown section\": {\"name\": \"/92\", \"raw_address\": \"0x00044200\", \"virtual_address\": \"0x0004f000\", \"virtual_size\": \"0x000011f0\", \"size_of_data\": \"0x00001200\", \"characteristics\": \"IMAGE_SCN_CNT_INITIALI"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_LOW"
+                                           },
+                                           {
+                                               "id":  "static_pe_anomaly",
+                                               "name":  "static_pe_anomaly",
+                                               "description":  "Anomalous binary characteristics",
+                                               "match_data":  [
+                                                                  "{\"anomaly\": \"Entrypoint of binary is located outside of any mapped sections\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_MEDIUM"
+                                           },
+                                           {
+                                               "id":  "871",
+                                               "description":  "Sample execution stops while process was sleeping (likely an evasion)",
+                                               "match_data":  [
+                                                                  "Thread delayed"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "415",
+                                               "description":  "PE file has an executable .text section and no other executable section",
+                                               "match_data":  [
+                                                                  "Section: .text IMAGE_SCN_CNT_CODE, IMAGE_SCN_ALIGN_1BYTES, IMAGE_SCN_ALIGN_4BYTES, IMAGE_SCN_ALIGN_8BYTES, IMAGE_SCN_ALIGN_16BYTES, IMAGE_SCN_ALIGN_32BYTES, IMAGE_SCN_ALIGN_64BYTES, IMAGE_SCN_ALIGN_25"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "509",
+                                               "description":  "Reads software policies",
+                                               "match_data":  [
+                                                                  "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "#registry_keys_opened",
+                                                                "value":  "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "1654",
+                                               "description":  "Sample might require command line arguments",
+                                               "match_data":  [
+                                                                  "${prefix}/etc/install.dat",
+                                                                  "rINSTALLER_VERSION5.0.10bInvalid arguments${prefix}/etc/install.datdebugDebug options:serviceService options:--%sError parsing command line arguments: %s"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "547",
+                                               "description":  "PE file contains more sections than normal",
+                                               "match_data":  [
+                                                                  "Number of sections : 18 \u003e 10"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "715",
+                                               "description":  "Classification label",
+                                               "match_data":  [
+                                                                  "clean2.winEXE@6/0@0/0"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "626",
+                                               "description":  "Sample tries to load a library which is not present or installed on the analysis machine, adding the library might reveal more behavior",
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "229",
+                                               "description":  "Spawns processes",
+                                               "match_data":  [
+                                                                  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe \"C:\\Users\\user\\Desktop\\syslog-ng-agent.exe\" -install",
+                                                                  "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1",
+                                                                  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe \"C:\\Users\\user\\Desktop\\syslog-ng-agent.exe\" /install",
+                                                                  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe \"C:\\Users\\user\\Desktop\\syslog-ng-agent.exe\" /load"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "908",
+                                               "description":  "Sample may offer command line options, please run it with the \u0027Execute binary with arguments\u0027 cookbook (it\u0027s possible that the command line switches require additional characters like: \"-\", \"/\", \"--\")",
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "187",
+                                               "description":  "Tries to load missing DLLs",
+                                               "match_data":  [
+                                                                  "apphelp.dll",
+                                                                  "libglib-2.0-0.dll",
+                                                                  "libsyslog-ng-5-0-10.dll"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "95",
+                                               "description":  "Creates mutexes",
+                                               "match_data":  [
+                                                                  "\\Sessions\\1\\BaseNamedObjects\\Local\\SM0:4344:120:WilError_01",
+                                                                  "\\Sessions\\1\\BaseNamedObjects\\Local\\SM0:6420:120:WilError_01",
+                                                                  "\\Sessions\\1\\BaseNamedObjects\\Local\\SM0:6068:120:WilError_01"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "149",
+                                               "description":  "Program does not show much activity (idle)",
+                                               "match_data":  [
+                                                                  "no activity detected"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "199",
+                                               "description":  "PE file contains sections with non-standard names",
+                                               "match_data":  [
+                                                                  "section name: .xdata",
+                                                                  "section name: /4",
+                                                                  "section name: /19",
+                                                                  "section name: /31",
+                                                                  "section name: /45",
+                                                                  "section name: /57",
+                                                                  "section name: /70",
+                                                                  "section name: /81",
+                                                                  "section name: /92"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           }
+                                       ],
+                 "registry_keys_opened":  [
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Segment Heap",
+                                              "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager"
+                                          ],
+                 "processes_created":  [
+                                           "%SAMPLEPATH%\\syslog-ng-agent.exe",
+                                           "\"C:\\Users\\user\\Desktop\\syslog-ng-agent.exe\" -install",
+                                           "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1",
+                                           "\"C:\\Users\\user\\Desktop\\syslog-ng-agent.exe\" /install",
+                                           "\"C:\\Users\\user\\Desktop\\syslog-ng-agent.exe\" /load"
+                                       ],
+                 "dns_lookups":  [
+                                     {
+                                         "hostname":  "www.microsoft.com",
+                                         "resolved_ips":  [
+                                                              "23.213.37.172"
+                                                          ]
+                                     },
+                                     {
+                                         "hostname":  "res.public.onecdn.static.microsoft",
+                                         "resolved_ips":  [
+                                                              "23.53.127.112",
+                                                              "23.53.127.105"
+                                                          ]
+                                     }
+                                 ],
+                 "mbc":  [
+                             {
+                                 "id":  "C0007",
+                                 "objective":  "Memory",
+                                 "behavior":  "Allocate Memory",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "allocate or change RWX memory"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.002",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Delete Registry Key",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "delete registry key"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.006",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Query Registry Value",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "query or enumerate registry value"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0007",
+                                 "objective":  "Memory",
+                                 "behavior":  "Allocate Memory",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "execute shellcode via indirect call"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0046.001",
+                                 "objective":  "Discovery",
+                                 "behavior":  "Code Discovery",
+                                 "method":  "Enumerate PE Sections",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "enumerate PE sections"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0025.007",
+                                 "objective":  "Anti-Behavioral Analysis",
+                                 "behavior":  "Conditional Execution",
+                                 "method":  "Runs as Service",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "run as service"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.001",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Set Registry Key",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "set registry value"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1082",
+                                 "objective":  "Discovery",
+                                 "behavior":  "System Information Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "query environment variable"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0051",
+                                 "objective":  "File System",
+                                 "behavior":  "Read File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "read .ini file"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0018",
+                                 "objective":  "Process",
+                                 "behavior":  "Terminate Process",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "terminate process"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0002"
+                             },
+                             {
+                                 "id":  "B0003"
+                             },
+                             {
+                                 "id":  "E1055"
+                             },
+                             {
+                                 "id":  "OC0006"
+                             },
+                             {
+                                 "id":  "C0002"
+                             },
+                             {
+                                 "id":  "OB0001"
+                             },
+                             {
+                                 "id":  "OB0002"
+                             },
+                             {
+                                 "id":  "OB0006"
+                             },
+                             {
+                                 "id":  "F0001"
+                             },
+                             {
+                                 "id":  "C0005.001"
+                             }
+                         ],
+                 "files_deleted":  [
+                                       "C:\\Windows\\System32\\wbem\\Performance\\WmiApRpl.h",
+                                       "C:\\Windows\\System32\\wbem\\Performance\\WmiApRpl.ini"
+                                   ],
+                 "files_opened":  [
+                                      "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                      "C:\\Windows\\AppPatch\\sysmain.sdb",
+                                      "C:\\Windows\\Globalization\\Sorting\\sortdefault.nls",
+                                      "C:\\Windows\\SYSTEM32\\apphelp.dll",
+                                      "C:\\Windows\\SYSTEM32\\ntdll.dll",
+                                      "C:\\Windows\\SYSTEM32\\ntmarta.dll",
+                                      "C:\\Windows\\SYSTEM32\\ole32.dll",
+                                      "C:\\Windows\\SYSTEM32\\wintypes.dll",
+                                      "C:\\Windows\\System32\\CoreMessaging.dll",
+                                      "C:\\Windows\\System32\\CoreUIComponents.dll",
+                                      "C:\\Windows\\System32\\KERNEL32.DLL",
+                                      "C:\\Windows\\System32\\KERNELBASE.dll",
+                                      "C:\\Windows\\System32\\TextInputFramework.dll",
+                                      "C:\\Windows\\System32\\en-US\\user32.dll.mui",
+                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_d3fbe61b7c93d9f0",
+                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_d3fbe61b7c93d9f0\\comctl32.DLL",
+                                      "C:\\Windows\\system32\\IMM32.DLL",
+                                      "C:\\Windows\\system32\\conhost.exe",
+                                      "C:\\Windows\\system32\\dwmapi.dll",
+                                      "C:\\Windows\\system32\\en-US\\conhost.exe.mui",
+                                      "C:\\Windows\\system32\\rpcss.dll",
+                                      "C:\\Windows\\system32\\uxtheme.dll",
+                                      "C:\\Windows\\system32\\uxtheme.dll.Config"
+                                  ],
+                 "verdicts":  [
+                                  "UNKNOWN_VERDICT",
+                                  "CLEAN"
+                              ],
+                 "tags":  [
+                              "OBFUSCATED",
+                              "IDLE"
+                          ],
+                 "command_executions":  [
+                                            "%SAMPLEPATH%",
+                                            "\"%SAMPLEPATH%\\syslog-ng-agent.exe\" "
+                                        ],
+                 "memory_dumps":  [
+                                      {
+                                          "file_name":  "00000000.00000000.1060092373.0000000000401000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "32768",
+                                          "base_address":  "4198400",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "4696"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1311396845.0000000000401000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "32768",
+                                          "base_address":  "4198400",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6008"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000000.1071289968.000000000040A000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "16384",
+                                          "base_address":  "4235264",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "3380"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1311427829.0000000000414000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4276224",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6008"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1311404126.0000000000401000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "32768",
+                                          "base_address":  "4198400",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3380"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1311386784.0000000000400000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4194304",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "4696"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000000.1060084977.0000000000400000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4194304",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "4696"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000000.1065778607.0000000000415000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "245760",
+                                          "base_address":  "4280320",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "6008"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1311486095.0000000000C2F000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "12775424",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6008"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000000.1065744312.000000000040A000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "16384",
+                                          "base_address":  "4235264",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "6008"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000000.1060143177.0000000000415000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "245760",
+                                          "base_address":  "4280320",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "4696"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1311411583.0000000000409000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4231168",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3380"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000000.1065703469.0000000000400000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4194304",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "6008"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1311419927.0000000000410000.00000004.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4259840",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6008"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000000.1071256945.0000000000401000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "32768",
+                                          "base_address":  "4198400",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "3380"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1311389188.0000000000400000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4194304",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6008"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1311411682.0000000000410000.00000004.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4259840",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "4696"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000000.1071305799.0000000000414000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4276224",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "3380"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1311453300.00000000007EC000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "24576",
+                                          "base_address":  "8306688",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "4696"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1311472035.0000000000B2F000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "11726848",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3380"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1311404782.0000000000409000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4231168",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6008"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1311393249.0000000000401000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "32768",
+                                          "base_address":  "4198400",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "4696"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1311390556.0000000000170000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "1507328",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3380"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1311426631.0000000000410000.00000004.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4259840",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3380"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1311411078.000000000040A000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "16384",
+                                          "base_address":  "4235264",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6008"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1311397314.0000000000400000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4194304",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3380"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000000.1065727497.0000000000409000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4231168",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "6008"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1311427829.0000000000411000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4263936",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6008"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000000.1065753316.0000000000410000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "8192",
+                                          "base_address":  "4259840",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "6008"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1311453300.00000000007E0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "45056",
+                                          "base_address":  "8257536",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "4696"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1311446133.0000000000415000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "245760",
+                                          "base_address":  "4280320",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3380"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1311459090.000000000065C000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "16384",
+                                          "base_address":  "6668288",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3380"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1311376605.0000000000070000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "32768",
+                                          "base_address":  "458752",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3380"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000000.1071275081.0000000000409000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4231168",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "3380"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000000.1065710802.0000000000401000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "32768",
+                                          "base_address":  "4198400",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "6008"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000000.1071239040.0000000000400000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4194304",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "3380"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1311419697.0000000000414000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4276224",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "4696"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1311473396.0000000000CDF000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "13496320",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "4696"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000000.1071305799.0000000000410000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "8192",
+                                          "base_address":  "4259840",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "3380"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000000.1060116297.0000000000414000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4276224",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "4696"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1311404739.000000000040A000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "16384",
+                                          "base_address":  "4235264",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "4696"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1311419233.000000000040A000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "16384",
+                                          "base_address":  "4235264",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3380"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1311464743.0000000000730000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "28672",
+                                          "base_address":  "7536640",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6008"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1311443459.0000000000415000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "245760",
+                                          "base_address":  "4280320",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6008"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1311464743.0000000000739000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "20480",
+                                          "base_address":  "7573504",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6008"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000000.1060108355.000000000040A000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "16384",
+                                          "base_address":  "4235264",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "4696"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1311457213.000000000065C000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "16384",
+                                          "base_address":  "6668288",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6008"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1311433413.0000000000411000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4263936",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3380"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1311434275.0000000000415000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "245760",
+                                          "base_address":  "4280320",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "4696"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1311370985.0000000000010000.00000004.00000020.00040000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "65536",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6008"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1311446681.000000000065C000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "16384",
+                                          "base_address":  "6668288",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "4696"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000000.1071321911.0000000000415000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "245760",
+                                          "base_address":  "4280320",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "3380"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1311433413.0000000000414000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4276224",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3380"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1311379649.0000000000140000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "1310720",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "4696"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1311467429.0000000000ADE000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "8192",
+                                          "base_address":  "11395072",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "4696"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000000.1060100261.0000000000409000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4231168",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "4696"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000000.1065753316.0000000000414000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4276224",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "6008"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1311399574.0000000000409000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4231168",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "4696"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1311419697.0000000000411000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "4263936",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "4696"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1311479439.0000000000A2F000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "10678272",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6008"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1311465774.000000000092F000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "9629696",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3380"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1311368106.0000000000010000.00000004.00000020.00040000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "65536",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3380"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1311371594.0000000000010000.00000004.00000020.00040000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "65536",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "4696"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000000.1060116297.0000000000410000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "8192",
+                                          "base_address":  "4259840",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "4696"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1311376605.000000000007A000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "16384",
+                                          "base_address":  "499712",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3380"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1311379933.0000000000140000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                          "size":  "4096",
+                                          "base_address":  "1310720",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6008"
+                                      }
+                                  ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "link function at runtime on Windows",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "link function at runtime on Windows"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1543.003",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "delete service",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "delete service"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1112",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "delete registry key",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "delete registry key"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1543.003",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "persist via Windows service",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "persist via Windows service"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1569.002",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "persist via Windows service",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "persist via Windows service"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1012",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "query or enumerate registry value",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "query or enumerate registry value"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1543.003",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "modify service",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "modify service"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1569.002",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "modify service",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "modify service"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "query environment variable",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "query environment variable"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1543.003",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "create service",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "create service"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1569.002",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "create service",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "create service"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "parse PE header",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "parse PE header"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1071",
+                                                     "signature_description":  "Adversaries may communicate using application layer protocols to avoid detection/network filtering by blending in with existing traffic."
+                                                 },
+                                                 {
+                                                     "id":  "T1055",
+                                                     "signature_description":  "Adversaries may inject code into processes in order to evade process-based defenses as well as possibly elevate privileges."
+                                                 },
+                                                 {
+                                                     "id":  "T1027",
+                                                     "signature_description":  "Adversaries may attempt to make an executable or file difficult to discover or analyze by encrypting, encoding, or otherwise obfuscating its contents on the system or in transit."
+                                                 },
+                                                 {
+                                                     "id":  "T1027.002",
+                                                     "signature_description":  "Adversaries may perform software packing or virtual machine software protection to conceal their code."
+                                                 },
+                                                 {
+                                                     "id":  "T1059",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Sample may offer command line options, please run it with the command line option cookbook (it\u0027s possible that the command line switches require additional characters like)",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "908"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1059",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Sample might require command line arguments, analyze it with the command line cookbook",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "1654"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1574.002",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Tries to load missing DLLs",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "187"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Reads software policies",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "509"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "processes_injected":  [
+                                            "\\\\?\\C:\\Windows\\system32\\wbem\\WMIADAP.EXE"
+                                        ],
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "2528",
+                                            "name":  "%SAMPLEPATH%"
+                                        },
+                                        {
+                                            "process_id":  "2596",
+                                            "name":  "%CONHOST% \"-817936411-1386919250924359794-1470197834-167703126810506538112072426212-1091318488"
+                                        },
+                                        {
+                                            "process_id":  "2764",
+                                            "name":  "wmiadap.exe /F /T /R"
+                                        },
+                                        {
+                                            "process_id":  "2808",
+                                            "name":  "%windir%\\system32\\wbem\\wmiprvse.exe"
+                                        },
+                                        {
+                                            "process_id":  "2924",
+                                            "name":  "%WINDIR%\\explorer.exe",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "408",
+                                                                 "name":  "%SAMPLEPATH%\\syslog-ng-agent.exe"
+                                                             }
+                                                         ]
+                                        },
+                                        {
+                                            "process_id":  "4696",
+                                            "name":  "\"C:\\Users\\user\\Desktop\\syslog-ng-agent.exe\" -install",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "4344",
+                                                                 "name":  "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1",
+                                                                 "files_opened":  [
+                                                                                      "C:\\Windows\\Globalization\\Sorting\\sortdefault.nls",
+                                                                                      "C:\\Windows\\SYSTEM32\\ntmarta.dll",
+                                                                                      "C:\\Windows\\SYSTEM32\\ole32.dll",
+                                                                                      "C:\\Windows\\SYSTEM32\\wintypes.dll",
+                                                                                      "C:\\Windows\\System32\\CoreMessaging.dll",
+                                                                                      "C:\\Windows\\System32\\CoreUIComponents.dll",
+                                                                                      "C:\\Windows\\System32\\TextInputFramework.dll",
+                                                                                      "C:\\Windows\\System32\\en-US\\user32.dll.mui",
+                                                                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_d3fbe61b7c93d9f0",
+                                                                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_d3fbe61b7c93d9f0\\comctl32.DLL",
+                                                                                      "C:\\Windows\\system32\\IMM32.DLL",
+                                                                                      "C:\\Windows\\system32\\conhost.exe",
+                                                                                      "C:\\Windows\\system32\\dwmapi.dll",
+                                                                                      "C:\\Windows\\system32\\en-US\\conhost.exe.mui",
+                                                                                      "C:\\Windows\\system32\\rpcss.dll",
+                                                                                      "C:\\Windows\\system32\\uxtheme.dll",
+                                                                                      "C:\\Windows\\system32\\uxtheme.dll.Config"
+                                                                                  ]
+                                                             }
+                                                         ],
+                                            "files_opened":  [
+                                                                 "C:\\Users\\user\\Desktop\\syslog-ng-agent.exe",
+                                                                 "C:\\Windows\\AppPatch\\sysmain.sdb",
+                                                                 "C:\\Windows\\SYSTEM32\\apphelp.dll",
+                                                                 "C:\\Windows\\SYSTEM32\\ntdll.dll",
+                                                                 "C:\\Windows\\System32\\KERNEL32.DLL",
+                                                                 "C:\\Windows\\System32\\KERNELBASE.dll"
+                                                             ],
+                                            "files_written":  [
+                                                                  "\\Device\\ConDrv\\\\Connect"
+                                                              ]
+                                        },
+                                        {
+                                            "process_id":  "6008",
+                                            "name":  "\"C:\\Users\\user\\Desktop\\syslog-ng-agent.exe\" /install",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "6068",
+                                                                 "name":  "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1"
+                                                             }
+                                                         ],
+                                            "files_written":  [
+                                                                  "\\Device\\ConDrv\\\\Connect"
+                                                              ]
+                                        },
+                                        {
+                                            "process_id":  "3380",
+                                            "name":  "\"C:\\Users\\user\\Desktop\\syslog-ng-agent.exe\" /load",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "6420",
+                                                                 "name":  "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1"
+                                                             }
+                                                         ],
+                                            "files_written":  [
+                                                                  "\\Device\\ConDrv\\\\Connect"
+                                                              ]
+                                        }
+                                    ],
+                 "ip_traffic":  [
+                                    {
+                                        "destination_ip":  "192.168.0.35",
+                                        "destination_port":  137,
+                                        "transport_layer_protocol":  "UDP"
+                                    },
+                                    {
+                                        "destination_ip":  "20.99.185.48",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.55.219.177",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "20.99.133.109",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.213.37.172",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.53.127.112",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    }
+                                ],
+                 "processes_terminated":  [
+                                              "%SAMPLEPATH%",
+                                              "%CONHOST% \"-817936411-1386919250924359794-1470197834-167703126810506538112072426212-1091318488",
+                                              "wmiadap.exe /F /T /R"
+                                          ],
+                 "attack_techniques":  {
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "link function at runtime on Windows",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "link function at runtime on Windows"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "parse PE header",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "parse PE header"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1543.003":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "delete service",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "delete service"
+                                                                              }
+                                                                          ]
+                                                             },
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "persist via Windows service",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "persist via Windows service"
+                                                                              }
+                                                                          ]
+                                                             },
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "modify service",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "modify service"
+                                                                              }
+                                                                          ]
+                                                             },
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "create service",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "create service"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1112":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "delete registry key",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "delete registry key"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1569.002":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "persist via Windows service",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "persist via Windows service"
+                                                                              }
+                                                                          ]
+                                                             },
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "modify service",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "modify service"
+                                                                              }
+                                                                          ]
+                                                             },
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "create service",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "create service"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1012":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "query or enumerate registry value",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "query or enumerate registry value"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1082":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "query environment variable",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "query environment variable"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Reads software policies",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "509"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1071":  [
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "Adversaries may communicate using application layer protocols to avoid detection/network filtering by blending in with existing traffic."
+                                                         }
+                                                     ],
+                                           "T1055":  [
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "Adversaries may inject code into processes in order to evade process-based defenses as well as possibly elevate privileges."
+                                                         }
+                                                     ],
+                                           "T1027":  [
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "Adversaries may attempt to make an executable or file difficult to discover or analyze by encrypting, encoding, or otherwise obfuscating its contents on the system or in transit."
+                                                         }
+                                                     ],
+                                           "T1027.002":  [
+                                                             {
+                                                                 "severity":  "UNKNOWN",
+                                                                 "description":  "Adversaries may perform software packing or virtual machine software protection to conceal their code."
+                                                             }
+                                                         ],
+                                           "T1059":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Sample may offer command line options, please run it with the command line option cookbook (it\u0027s possible that the command line switches require additional characters like)",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "908"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Sample might require command line arguments, analyze it with the command line cookbook",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "1654"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1574.002":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "Tries to load missing DLLs",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "187"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ]
+                                       }
+             }
+}

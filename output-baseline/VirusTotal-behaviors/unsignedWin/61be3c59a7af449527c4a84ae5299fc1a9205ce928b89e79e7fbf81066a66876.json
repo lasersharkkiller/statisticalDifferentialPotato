@@ -1,0 +1,379 @@
+{
+    "data":  {
+                 "mbc":  [
+                             {
+                                 "id":  "C0047",
+                                 "objective":  "File System",
+                                 "behavior":  "Delete File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "delete file"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1082",
+                                 "objective":  "Discovery",
+                                 "behavior":  "System Information Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "query environment variable"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1083",
+                                 "objective":  "Discovery",
+                                 "behavior":  "File and Directory Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "get common file path"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1082",
+                                 "objective":  "Discovery",
+                                 "behavior":  "System Information Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "get hostname"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0052",
+                                 "objective":  "File System",
+                                 "behavior":  "Writes File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "write file on Windows"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0046.001",
+                                 "objective":  "Discovery",
+                                 "behavior":  "Code Discovery",
+                                 "method":  "Enumerate PE Sections",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "enumerate PE sections"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "signature_matches":  [
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "link function at runtime on Windows",
+                                               "description":  "linking/runtime-linking",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: link function at runtime on Windows\n    namespace: linking/runtime-linking\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: instruction\n      dynamic: call\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x404130\n      - Practical Malware Analysis Lab 01-04.exe_:0x401350\n  features:\n    - and:\n      - os: windows\n      - or:\n        - api: kernel32.GetProcAddress\n        - api: ntdll.LdrGetProcedureAddress\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "delete file",
+                                               "description":  "host-interaction/file-system/delete",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: delete file\n    namespace: host-interaction/file-system/delete\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - File System::Delete File [C0047]\n    examples:\n      - 946A99F36A46D335DEC080D9A4371940:0x100015F0\n      # MoveFileEx\n      - 31600AD0D1A7EA615690DF111AE36C73:0x401A15\n      # NtDeleteFile\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x140001E04\n  features:\n    - or:\n      - api: kernel32.DeleteFile\n      - api: DeleteFileTransacted\n      - api: NtDeleteFile\n      - api: ZwDeleteFile\n      - api: remove\n      - api: _wremove\n      - api: System.IO.File::Delete\n      - api: System.IO.FileSystemInfo::Delete\n      # static\n      - basic block:\n        - and:\n          - number: 3 = FO_DELETE\n          - or:\n            - api: kernel32.SHFileOperation\n      - basic block:\n        - and:\n          - number: 4 = MOVEFILE_DELAY_UNTIL_REBOOT\n          - number: 0 = NULL\n          - api: MoveFileEx\n      # dynamic\n      - call:\n        - and:\n          - number: 3 = FO_DELETE\n          - or:\n            - api: kernel32.SHFileOperation\n      - call:\n        - and:\n          - number: 4 = MOVEFILE_DELAY_UNTIL_REBOOT\n          - number: 0 = NULL\n          - api: MoveFileEx\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "set current directory",
+                                               "description":  "host-interaction/file-system",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: set current directory\n    namespace: host-interaction/file-system\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n  features:\n    - or:\n      - api: System.IO.Directory::SetCurrentDirectory\n      - api: kernel32.SetCurrentDirectory\n      - api: chdir\n      - api: fchdir\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "query environment variable",
+                                               "description":  "host-interaction/environment-variable",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "@_re_fox"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: query environment variable\n    namespace: host-interaction/environment-variable\n    authors:\n      - michael.hunhoff@mandiant.com\n      - \"@_re_fox\"\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Information Discovery [T1082]\n    mbc:\n      - Discovery::System Information Discovery [E1082]\n    examples:\n      - Practical Malware Analysis Lab 14-02.exe_:0x401880\n      - 0761142efbda6c4b1e801223de723578:0x65483490\n  features:\n    - or:\n      - api: kernel32.GetEnvironmentVariable\n      - api: kernel32.GetEnvironmentStrings\n      - api: kernel32.ExpandEnvironmentStrings\n      - api: msvcr90.getenv\n      - api: msvcrt.getenv\n      - api: System.Environment::GetEnvironmentVariable\n      - api: System.Environment::GetEnvironmentVariables\n      - api: System.Environment::ExpandEnvironmentVariables\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get common file path",
+                                               "description":  "host-interaction/file-system",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get common file path\n    namespace: host-interaction/file-system\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    examples:\n      - Practical Malware Analysis Lab 03-02.dll_:0x10003415\n      - 972B219F18379907A045431303F4DA7D:0x404887\n  features:\n    - or:\n      - api: kernel32.GetTempPath\n      - api: kernel32.GetTempFileName\n      - api: kernel32.GetSystemDirectory\n      - api: kernel32.GetWindowsDirectory\n      - api: kernel32.GetSystemWow64Directory\n      - api: GetAllUsersProfileDirectory\n      - api: GetAppContainerFolderPath\n      - api: GetCurrentDirectory\n      - api: GetDefaultUserProfileDirectory\n      - api: GetProfilesDirectory\n      - api: GetUserProfileDirectory\n      - api: SHGetFolderPathAndSubDir\n      - api: shell32.SHGetFolderPath\n      - api: shell32.SHGetFolderLocation\n      - api: shell32.SHGetKnownFolderPath\n      - api: shell32.SHGetSpecialFolderPath\n      - api: shell32.SHGetSpecialFolderLocation\n      - api: System.IO.Directory::GetCurrentDirectory\n      - api: System.Environment::GetFolderPath\n      - property/read: System.Environment::SystemDirectory\n      - property/read: System.Environment::CurrentDirectory\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get hostname",
+                                               "description":  "host-interaction/os/hostname",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "joakim@intezer.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get hostname\n    namespace: host-interaction/os/hostname\n    authors:\n      - moritz.raabe@mandiant.com\n      - joakim@intezer.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Information Discovery [T1082]\n    mbc:\n      - Discovery::System Information Discovery [E1082]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x4052A0\n      - 7351f8a40c5450557b24622417fc478d:0x405438\n  features:\n    - or:\n      - api: kernel32.GetComputerName\n      - api: kernel32.GetComputerNameEx\n      - api: GetComputerObjectName\n      - api: ws2_32.gethostname\n      - api: gethostname\n      - property/read: System.Environment::MachineName\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "write file on Windows",
+                                               "description":  "host-interaction/file-system/write",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: write file on Windows\n    namespace: host-interaction/file-system/write\n    authors:\n      - william.ballenthin@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - File System::Writes File [C0052]\n    examples:\n      - Practical Malware Analysis Lab 01-04.exe_:0x4011FC\n      # ntdll\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x1400025C4\n  features:\n    - or:\n      - and:\n        - os: windows\n        - optional:\n          - basic block:\n            - or:\n              - number: 0x40000000 = GENERIC_WRITE\n              - number: 0x2 = FILE_WRITE_DATA\n              - match: create or open file\n          - call:\n            - or:\n              - number: 0x40000000 = GENERIC_WRITE\n              - number: 0x2 = FILE_WRITE_DATA\n              - match: create or open file\n        - or:\n          - api: kernel32.WriteFile\n          - api: kernel32.WriteFileEx\n          - api: NtWriteFile\n          - api: ZwWriteFile\n          - api: _fwrite\n          - api: fwrite\n      - api: System.IO.File::WriteAllBytes\n      - api: System.IO.File::WriteAllBytesAsync\n      - api: System.IO.File::WriteAllLines\n      - api: System.IO.File::WriteAllLinesAsync\n      - api: System.IO.File::WriteAllText\n      - api: System.IO.File::WriteAllTextAsync\n      - api: System.IO.File::AppendAllLines\n      - api: System.IO.File::AppendAllLinesAsync\n      - api: System.IO.File::AppendAllText\n      - api: System.IO.File::AppendAllTextAsync\n      - api: System.IO.File::AppendText\n      - api: System.IO.FileInfo::AppendText\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "parse PE header",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: parse PE header\n    namespace: load-code/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic, operand[1].offset features\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x403DD0\n  features:\n    - and:\n      - os: windows\n      - and:\n        - mnemonic: cmp\n        - or:\n          - number: 0x4550 = IMAGE_NT_SIGNATURE (PE)\n          - and:\n            - number: 0x50\n            - number: 0x45\n        - or:\n          - number: 0x5A4D = IMAGE_DOS_SIGNATURE (MZ)\n          - and:\n            - number: 0x4D\n            - number: 0x5A\n        - optional:\n          - and:\n            - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x30 = IMAGE_NT_HEADERS64.OptionalHeader.ImageBase\n          - basic block:\n            - and:\n              - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n              - 3 or more:\n                - operand[1].offset: 0x4 = IMAGE_NT_HEADERS.FileHeader.Machine\n                - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n                - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n                - operand[1].offset: 0x16 = IMAGE_NT_HEADERS.FileHeader.Characteristics\n                - operand[1].offset: 0x28 = IMAGE_NT_HEADERS.OptionalHeader.AddressOfEntryPoint  # for 32 and 64 bit\n                - or:\n                  - and:\n                    - arch: i386\n                    - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                  - and:\n                    - arch: amd64\n                    - operand[1].offset: 0x30 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "connect to WMI namespace via WbemLocator",
+                                               "description":  "host-interaction/wmi",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "# generated using capa explorer for IDA Pro\nrule:\n  meta:\n    name: connect to WMI namespace via WbemLocator\n    namespace: host-interaction/wmi\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Execution::Windows Management Instrumentation [T1047]\n    examples:\n      - al-khaser_x64.exe_:0x14001956e\n      - al-khaser_x86.exe_:0x00445270\n  features:\n    - or:\n      - call:\n        - description: dynamic detection rule\n        - or:\n          - and:\n            - api: ole32.CoCreateInstance\n            - com/class: WbemLocator  # 11 F8 90 45 3A 1D D0 11 89 1F 00 AA 00 4B 2E 24 = CLSID_WbemLocator\n          - and:\n            - match: host-interaction/process/create\n            - or:\n              - string: /wmic(|\\.exe) /i\n              - string: /Register-WMIEvent /i\n      - and:\n        - description: static detection rule\n        - basic block:\n          - and:\n            - api: ole32.CoCreateInstance\n            - com/class: WbemLocator  # 11 F8 90 45 3A 1D D0 11 89 1F 00 AA 00 4B 2E 24 = CLSID_WbemLocator\n            - com/interface: IWbemLocator  # 87 A6 12 DC 7F 73 CF 11 88 4D 00 AA 00 4B 2E 24 = IID_IWbemLocator\n        - basic block:\n          - or:\n            - and:\n              - arch: i386\n              - offset: 0xC = ppv-\u003eConnectServer\n            - and:\n              - arch: amd64\n              - offset: 0x18 = ppv-\u003eConnectServer\n        - optional:\n          - string: /ROOT\\\\CIMV2/i\n          - string: /ROOT\\\\DEFAULT/i\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "enumerate PE sections",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "@Ana06",
+                                                               "@mr-tz"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: enumerate PE sections\n    namespace: load-code/pe\n    authors:\n      - \"@Ana06\"\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: unsupported  # requires offset, operand[1].offset, characteristic, mnemonic, basicblock features\n    mbc:\n      - Discovery::Code Discovery::Enumerate PE Sections [B0046.001]\n    references:\n      - https://0x00sec.org/t/reflective-dll-injection/3080\n      - https://www.ired.team/offensive-security/code-injection-process-injection/reflective-dll-injection\n    examples:\n      - E4C33AC3638EEF68311F8AC0D72483C7:0x401510\n  features:\n    - and:\n      - os: windows\n      # there should be some complexity to functions like this\n      - count(basic blocks): 3 or more\n      - optional:\n        - offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n      - instruction:\n        - or:\n          - mnemonic: mov\n          - mnemonic: movzx\n        - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n      - basic block:\n        - or:\n          - and:\n            - description: IMAGE_FIRST_SECTION(nt_header)\n            - instruction:\n              - or:\n                - mnemonic: add\n                - mnemonic: mov\n                - mnemonic: movzx\n              - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n            - operand[1].offset: 0x18 = FileHeader.SizeOfOptionalHeader\n          - and:\n            - description: (DWORD)dll_raw + dos_header-\u003ee_lfanew + sizeof(IMAGE_NT_HEADERS) + sizeof(IMAGE_SECTION_HEADER) * i\n            - number: 0x28 = sizeof(IMAGE_SECTION_HEADER)\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0xF8 = sizeof(IMAGE_NT_HEADERS32)\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x108 = sizeof(IMAGE_NT_HEADERS64)\n      - 2 or more:\n        - operand[1].offset: 0xC = IMAGE_SECTION_HEADER.VirtualAddress\n        - operand[1].offset: 0x14 = IMAGE_SECTION_HEADER.PointerToRawData\n        - operand[1].offset: 0x10 = IMAGE_SECTION_HEADER.SizeOfRawData\n        # there\u0027s also offset 0x8 = IMAGE_SECTION_HEADER.Misc.PhysicalAddress, but it\u0027s likely too common\n      - not:\n        # non-zeroing XOR was observed in FPs\n        - characteristic: nzxor\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://0x00sec.org/t/reflective-dll-injection/3080"
+                                                            },
+                                                            {
+                                                                "ref":  "https://www.ired.team/offensive-security/code-injection-process-injection/reflective-dll-injection"
+                                                            }
+                                                        ]
+                                           }
+                                       ],
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "2220",
+                                            "name":  "%windir%\\System32\\svchost.exe -k WerSvcGroup"
+                                        },
+                                        {
+                                            "process_id":  "2596",
+                                            "name":  "%SANDBOX_DLL_LOADER_X86% %SAMPLEPATH% %WORKDIR% 483",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "2700",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,CompileSchemaToWMI"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2680",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,??4MIServer@@QAEAAV0@$$QAV0@@Z"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2664",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,??0MIFree@@QAE@PAX@Z"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2692",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,??4MIServer@@QAEAAV0@ABV0@@Z"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2672",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,??1MIFree@@QAE@XZ"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2708",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,CreateRegisterParameter"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2716",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,GetProviderSchema"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2724",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,GetProviderSchemaFile"
+                                                             }
+                                                         ]
+                                        },
+                                        {
+                                            "process_id":  "2888",
+                                            "name":  "wmiadap.exe /F /T /R"
+                                        },
+                                        {
+                                            "process_id":  "2924",
+                                            "name":  "%windir%\\system32\\wbem\\wmiprvse.exe"
+                                        }
+                                    ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "link function at runtime on Windows",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "link function at runtime on Windows"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "query environment variable",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "query environment variable"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1083",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get common file path",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "get common file path"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get hostname",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "get hostname"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "parse PE header",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "parse PE header"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1047",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "connect to WMI namespace via WbemLocator",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "connect to WMI namespace via WbemLocator"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "processes_terminated":  [
+                                              "%windir%\\System32\\svchost.exe -k WerSvcGroup",
+                                              "wmiadap.exe /F /T /R"
+                                          ],
+                 "verdicts":  [
+                                  "UNKNOWN_VERDICT"
+                              ],
+                 "attack_techniques":  {
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "link function at runtime on Windows",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "link function at runtime on Windows"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "parse PE header",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "parse PE header"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1082":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "query environment variable",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "query environment variable"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get hostname",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "get hostname"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1083":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get common file path",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "get common file path"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1047":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "connect to WMI namespace via WbemLocator",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "connect to WMI namespace via WbemLocator"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

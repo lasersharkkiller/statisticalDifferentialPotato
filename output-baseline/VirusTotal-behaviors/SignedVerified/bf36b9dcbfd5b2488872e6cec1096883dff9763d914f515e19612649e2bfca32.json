@@ -1,0 +1,339 @@
+{
+    "data":  {
+                 "processes_terminated":  [
+                                              "wmiadap.exe /F /T /R"
+                                          ],
+                 "signature_matches":  [
+                                           {
+                                               "id":  "0",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "invoke .NET assembly method",
+                                               "description":  "load-code/dotnet",
+                                               "authors":  [
+                                                               "anushka.virgaonkar@mandiant.com",
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Reflection.MethodBase::Invoke",
+                                                                  "api: System.Type::GetMethod"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: invoke .NET assembly method\n    namespace: load-code/dotnet\n    authors:\n      - anushka.virgaonkar@mandiant.com\n      - mehunhoff@google.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Defense Evasion::Reflective Code Loading [T1620]\n  features:\n    - and:\n      - format: dotnet\n      - optional:\n        - api: System.Reflection.Module::GetMethod\n        - api: System.Reflection.Module::GetMethodImpl\n        - api: System.Reflection.Module::GetMethods\n        - api: System.Reflection.Module::ResolveMethod\n        - api: System.Type::GetMethod\n        - api: System.Type::GetMethodImpl\n        - api: System.Type::GetMethods\n      - or:\n        - api: System.Delegate::DynamicInvoke\n        - api: System.Delegate::DynamicInvokeImpl\n        - api: System.Type::InvokeMember\n        - api: System.Reflection.MethodInfo::Invoke\n        - api: System.Reflection.MethodBase::Invoke\n        - api: System.Reflection.ConstructorInfo::Invoke\n"
+                                           },
+                                           {
+                                               "id":  "1",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "access .NET resource",
+                                               "description":  "executable/resource",
+                                               "authors":  [
+                                                               "@mr-tz"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Resources.ResourceManager::ctor",
+                                                                  "api: System.Reflection.Assembly::GetManifestResourceStream"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: access .NET resource\n    namespace: executable/resource\n    authors:\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: span of calls\n    examples:\n      - 387f15043f0198fd3a637b0758c2b6dde9ead795c3ed70803426fc355731b173:0x06000084\n  features:\n    - and:\n      - format: dotnet\n      - or:\n        - api: System.Resources.ResourceManager::ctor\n        - api: System.Reflection.Assembly::GetManifestResourceStream\n"
+                                           },
+                                           {
+                                               "id":  "2",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check if file exists",
+                                               "description":  "host-interaction/file-system/exists",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.IO.File::Exists"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check if file exists\n    namespace: host-interaction/file-system/exists\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    examples:\n      - 31600AD0D1A7EA615690DF111AE36C73:0x401284\n  features:\n    - or:\n      - basic block:\n        - and:\n          - api: kernel32.GetFileAttributes\n          - instruction:\n            - mnemonic: cmp\n            - number: 0xFFFFFFFF = INVALID_FILE_ATTRIBUTES\n      - basic block:\n        - and:\n          - api: kernel32.GetLastError\n          - instruction:\n            - mnemonic: cmp\n            - number: 2 = ERROR_FILE_NOT_FOUND\n      - api: shlwapi.PathFileExists\n      - api: System.IO.File::Exists\n      - property/read: System.IO.FileSystemInfo::Exists\n"
+                                           },
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "generate random filename in .NET",
+                                               "description":  "host-interaction/file-system",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.IO.Path::GetTempFileName"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: generate random filename in .NET\n    namespace: host-interaction/file-system\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n  features:\n    - or:\n      - api: System.IO.Path::GetRandomFileName\n      - api: System.IO.Path::GetTempFileName\n"
+                                           },
+                                           {
+                                               "id":  "4",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "read file on Windows",
+                                               "description":  "host-interaction/file-system/read",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.IO.File::ReadAllText"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: read file on Windows\n    namespace: host-interaction/file-system/read\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - File System::Read File [C0051]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x1314567B\n  features:\n    - or:\n      - and:\n        - os: windows\n        - optional:\n          - and:\n            - number: 0x80000000 = GENERIC_READ\n            - match: create or open file\n        - or:\n          - api: kernel32.ReadFile\n          - api: ReadFileEx\n          - api: NtReadFile\n          - api: ZwReadFile\n          - api: LZRead\n          - api: _read\n          - api: fread\n      - api: System.IO.File::ReadAllBytes\n      - api: System.IO.File::ReadAllBytesAsync\n      - api: System.IO.File::ReadAllLines\n      - api: System.IO.File::ReadAllLinesAsync\n      - api: System.IO.File::ReadAllText\n      - api: System.IO.File::ReadAllTextAsync\n      - api: System.IO.File::ReadLines\n"
+                                           },
+                                           {
+                                               "id":  "5",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "compiled to the .NET platform",
+                                               "description":  "runtime/dotnet",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: compiled to the .NET platform\n    namespace: runtime/dotnet\n    authors:\n      - william.ballenthin@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    examples:\n      - b9f5bd514485fb06da39beff051b9fdc\n  features:\n    - or:\n      - format: dotnet\n      - import: mscoree._CorExeMain\n      - import: mscoree._corexemain\n      - import: mscoree._CorDllMain\n      - import: mscoree._cordllmain\n"
+                                           },
+                                           {
+                                               "id":  "6",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "find data using regex in .NET",
+                                               "description":  "data-manipulation/regex",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Text.RegularExpressions.Regex::Match",
+                                                                  "api: System.Text.RegularExpressions.Regex::IsMatch",
+                                                                  "api: System.Text.RegularExpressions.Regex::ctor"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: find data using regex in .NET\n    namespace: data-manipulation/regex\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n  features:\n    - or:\n      - api: System.Text.RegularExpressions.Regex::Matches\n      - api: System.Text.RegularExpressions.Regex::Match\n      - api: System.Text.RegularExpressions.Regex::IsMatch\n      - api: System.Text.RegularExpressions.Regex::EnumerateMatches\n      - api: System.Text.RegularExpressions.Regex::Replace\n      - api: System.Text.RegularExpressions.Regex::Split\n      - api: System.Text.RegularExpressions.Regex::ctor\n"
+                                           },
+                                           {
+                                               "id":  "7",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "compile .NET assembly",
+                                               "description":  "load-code/dotnet",
+                                               "authors":  [
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.CodeDom.Compiler.CodeDomProvider::CompileAssemblyFromSource"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: compile .NET assembly\n    namespace: load-code/dotnet\n    authors:\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Defense Evasion::Obfuscated Files or Information::Compile After Delivery [T1027.004]\n  features:\n    - or:\n      - api: System.CodeDom.Compiler.CodeDomProvider::CompileAssemblyFromDom\n      - api: System.CodeDom.Compiler.CodeDomProvider::CompileAssemblyFromFile\n      - api: System.CodeDom.Compiler.CodeDomProvider::CompileAssemblyFromSource\n"
+                                           },
+                                           {
+                                               "id":  "8",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "reference analysis tools strings",
+                                               "description":  "anti-analysis",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "regex: /decompile(\\.exe)?/i"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: reference analysis tools strings\n    namespace: anti-analysis\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    mbc:\n      - Discovery::Analysis Tool Discovery::Process detection [B0013.001]\n    references:\n      - https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/AntiAnalysis/process.cpp\n    examples:\n      - al-khaser_x86.exe_\n  features:\n    - or:\n      - string: /ollydbg(\\.exe)?/i\n      - string: /ProcessHacker(\\.exe)?/i\n      - string: /tcpview(\\.exe)?/i\n      - string: /autoruns(\\.exe)?/i\n      - string: /autorunsc(\\.exe)?/i\n      - string: /filemon(\\.exe)?/i\n      - string: /procmon(\\.exe)?/i\n      - string: /regmon(\\.exe)?/i\n      - string: /procexp(\\.exe)?/i\n      - string: /(?\u003c!\\w)ida[gqtuw]?(\\.exe)?$/i\n      - string: /ida[gqtuw]?64(\\.exe)?$/i\n      - string: /ImmunityDebugger(\\.exe)?/i\n      - string: /Wireshark(\\.exe)?/i\n      - string: /dumpcap(\\.exe)?/i\n      - string: /HookExplorer(\\.exe)?/i\n      - string: /ImportREC(\\.exe)?/i\n      - string: /PETools(\\.exe)?/i\n      - string: /LordPE(\\.exe)?/i\n      - string: /SysInspector(\\.exe)?/i\n      - string: /proc_analyzer(\\.exe)?/i\n      - string: /sysAnalyzer(\\.exe)?/i\n      - string: /sniff_hit(\\.exe)?/i\n      - string: /windbg(\\.exe)?/i\n      - string: /joeboxcontrol(\\.exe)?/i\n      - string: /joeboxserver(\\.exe)?/i\n      - string: /ResourceHacker(\\.exe)?/i\n      - string: /x32dbg(\\.exe)?/i\n      - string: /x64dbg(\\.exe)?/i\n      - string: /Fiddler(\\.exe)?/i\n      - string: /httpdebugger(\\.exe)?/i\n      - string: /fakenet(\\.exe)?/i\n      - string: /netmon(\\.exe)?/i\n      - string: /WPE PRO(\\.exe)?/i\n      - string: /decompile(\\.exe)?/i\n      - string: /scylla/i\n      - string: /megadumper/i\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/AntiAnalysis/process.cpp"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "9",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "load XML in .NET",
+                                               "description":  "data-manipulation/xml",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Xml.XmlDocument::Load"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: load XML in .NET\n    namespace: data-manipulation/xml\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n  features:\n    - or:\n      - api: System.Xml.XmlDocument::Load\n      - api: System.Xml.XmlDocument::LoadXml\n"
+                                           },
+                                           {
+                                               "id":  "10",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "reference SQL statements",
+                                               "description":  "collection/database/sql",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "regex: /SELECT.*FROM.*WHERE/"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: reference SQL statements\n    namespace: collection/database/sql\n    authors:\n      - william.ballenthin@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Collection::Data from Information Repositories [T1213]\n    examples:\n      - 5F66B82558CA92E54E77F216EF4C066C:0x42B1DF\n  features:\n    - and:\n      - string: /SELECT.*FROM.*WHERE/\n"
+                                           },
+                                           {
+                                               "id":  "13",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "delete file",
+                                               "description":  "host-interaction/file-system/delete",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.IO.File::Delete"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: delete file\n    namespace: host-interaction/file-system/delete\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - File System::Delete File [C0047]\n    examples:\n      - 946A99F36A46D335DEC080D9A4371940:0x100015F0\n      # MoveFileEx\n      - 31600AD0D1A7EA615690DF111AE36C73:0x401A15\n      # NtDeleteFile\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x140001E04\n  features:\n    - or:\n      - api: kernel32.DeleteFile\n      - api: DeleteFileTransacted\n      - api: NtDeleteFile\n      - api: ZwDeleteFile\n      - api: remove\n      - api: _wremove\n      - api: System.IO.File::Delete\n      - api: System.IO.FileSystemInfo::Delete\n      # static\n      - basic block:\n        - and:\n          - number: 3 = FO_DELETE\n          - or:\n            - api: kernel32.SHFileOperation\n      - basic block:\n        - and:\n          - number: 4 = MOVEFILE_DELAY_UNTIL_REBOOT\n          - number: 0 = NULL\n          - api: MoveFileEx\n      # dynamic\n      - call:\n        - and:\n          - number: 3 = FO_DELETE\n          - or:\n            - api: kernel32.SHFileOperation\n      - call:\n        - and:\n          - number: 4 = MOVEFILE_DELAY_UNTIL_REBOOT\n          - number: 0 = NULL\n          - api: MoveFileEx\n"
+                                           }
+                                       ],
+                 "verdicts":  [
+                                  "UNKNOWN_VERDICT"
+                              ],
+                 "mbc":  [
+                             {
+                                 "id":  "E1083",
+                                 "objective":  "Discovery",
+                                 "behavior":  "File and Directory Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "2"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0051",
+                                 "objective":  "File System",
+                                 "behavior":  "Read File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "4"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0013.001",
+                                 "objective":  "Discovery",
+                                 "behavior":  "Analysis Tool Discovery",
+                                 "method":  "Process detection",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "8"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0047",
+                                 "objective":  "File System",
+                                 "behavior":  "Delete File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "13"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1620",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "invoke .NET assembly method",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "0"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1083",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "check if file exists",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "2"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1027.004",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "compile .NET assembly",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "7"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1213",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "reference SQL statements",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "10"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "2652",
+                                            "name":  "%CONHOST% \"-1102656500723157520568764653-1807143772-20568457091444780566603211917933633705"
+                                        },
+                                        {
+                                            "process_id":  "2864",
+                                            "name":  "wmiadap.exe /F /T /R"
+                                        },
+                                        {
+                                            "process_id":  "2904",
+                                            "name":  "%windir%\\system32\\wbem\\wmiprvse.exe"
+                                        },
+                                        {
+                                            "process_id":  "2584",
+                                            "name":  "%SANDBOX_DLL_LOADER_AMD64% %SAMPLEPATH% 483"
+                                        }
+                                    ],
+                 "attack_techniques":  {
+                                           "T1620":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "invoke .NET assembly method",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "0"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1083":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "check if file exists",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "2"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1027.004":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "compile .NET assembly",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "7"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1213":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "reference SQL statements",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "10"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

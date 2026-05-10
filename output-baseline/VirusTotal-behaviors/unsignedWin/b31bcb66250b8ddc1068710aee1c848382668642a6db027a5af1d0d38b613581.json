@@ -1,0 +1,654 @@
+{
+    "data":  {
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "check OS version",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "11"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "query environment variable",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "16"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1016",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get socket status",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "18"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "2504",
+                                            "name":  "%TEMP%\\G15VXQ10AANUK2MW.exe"
+                                        },
+                                        {
+                                            "process_id":  "2724",
+                                            "name":  "wmiadap.exe /F /T /R"
+                                        },
+                                        {
+                                            "process_id":  "2572",
+                                            "name":  "%CONHOST% \"-10673961635214566-1034697000-1330386276-1545914446-5769034841323448414800121287"
+                                        },
+                                        {
+                                            "process_id":  "2768",
+                                            "name":  "%windir%\\system32\\wbem\\wmiprvse.exe"
+                                        }
+                                    ],
+                 "signature_matches":  [
+                                           {
+                                               "id":  "1",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check mutex on Windows",
+                                               "description":  "host-interaction/mutex",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: WaitForSingleObject",
+                                                                  "api: CreateMutex",
+                                                                  "create or open mutex on Windows"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check mutex on Windows\n    namespace: host-interaction/mutex\n    authors:\n      - moritz.raabe@mandiant.com\n      - mehunhoff@google.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Process::Check Mutex [C0043]\n    examples:\n      - 1d8fd13c890060464019c0f07b928b1a:0x402eb0\n  features:\n    - or:\n      - api: ntdll.NtQueryMutant\n      - and:\n        - match: create or open mutex on Windows\n        - or:\n          - api: WaitForSingleObject\n          - basic block:\n            - and:\n              - api: GetLastError\n              - or:\n                - number: 2 = ERROR_FILE_NOT_FOUND\n                - number: 0xB7 = ERROR_ALREADY_EXISTS\n                - number: 5 = ERROR_ACCESS_DENIED\n"
+                                           },
+                                           {
+                                               "id":  "2",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "receive data",
+                                               "description":  "communication : all known techniques for receiving data from a potential C2 server",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: WSARecv",
+                                                                  "receive data on socket"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: receive data\n    namespace: communication\n    authors:\n      - william.ballenthin@mandiant.com\n    description: all known techniques for receiving data from a potential C2 server\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Command and Control::C2 Communication::Receive Data [B0030.002]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13145D60\n  features:\n    - or:\n      - match: receive data on socket\n      - match: read data from Internet\n      - match: download URL\n"
+                                           },
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "read file on Windows",
+                                               "description":  "host-interaction/file-system/read",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: fread"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: read file on Windows\n    namespace: host-interaction/file-system/read\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - File System::Read File [C0051]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x1314567B\n  features:\n    - or:\n      - and:\n        - os: windows\n        - optional:\n          - and:\n            - number: 0x80000000 = GENERIC_READ\n            - match: create or open file\n        - or:\n          - api: kernel32.ReadFile\n          - api: ReadFileEx\n          - api: NtReadFile\n          - api: ZwReadFile\n          - api: LZRead\n          - api: _read\n          - api: fread\n      - api: System.IO.File::ReadAllBytes\n      - api: System.IO.File::ReadAllBytesAsync\n      - api: System.IO.File::ReadAllLines\n      - api: System.IO.File::ReadAllLinesAsync\n      - api: System.IO.File::ReadAllText\n      - api: System.IO.File::ReadAllTextAsync\n      - api: System.IO.File::ReadLines\n"
+                                           },
+                                           {
+                                               "id":  "4",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "write file on Windows",
+                                               "description":  "host-interaction/file-system/write",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "FILE_WRITE_DATA",
+                                                                  "api: fwrite"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: write file on Windows\n    namespace: host-interaction/file-system/write\n    authors:\n      - william.ballenthin@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - File System::Writes File [C0052]\n    examples:\n      - Practical Malware Analysis Lab 01-04.exe_:0x4011FC\n      # ntdll\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x1400025C4\n  features:\n    - or:\n      - and:\n        - os: windows\n        - optional:\n          - basic block:\n            - or:\n              - number: 0x40000000 = GENERIC_WRITE\n              - number: 0x2 = FILE_WRITE_DATA\n              - match: create or open file\n          - call:\n            - or:\n              - number: 0x40000000 = GENERIC_WRITE\n              - number: 0x2 = FILE_WRITE_DATA\n              - match: create or open file\n        - or:\n          - api: kernel32.WriteFile\n          - api: kernel32.WriteFileEx\n          - api: NtWriteFile\n          - api: ZwWriteFile\n          - api: _fwrite\n          - api: fwrite\n      - api: System.IO.File::WriteAllBytes\n      - api: System.IO.File::WriteAllBytesAsync\n      - api: System.IO.File::WriteAllLines\n      - api: System.IO.File::WriteAllLinesAsync\n      - api: System.IO.File::WriteAllText\n      - api: System.IO.File::WriteAllTextAsync\n      - api: System.IO.File::AppendAllLines\n      - api: System.IO.File::AppendAllLinesAsync\n      - api: System.IO.File::AppendAllText\n      - api: System.IO.File::AppendAllTextAsync\n      - api: System.IO.File::AppendText\n      - api: System.IO.FileInfo::AppendText\n"
+                                           },
+                                           {
+                                               "id":  "5",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "terminate thread",
+                                               "description":  "host-interaction/thread/terminate",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: TerminateThread"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: terminate thread\n    namespace: host-interaction/thread/terminate\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - Process::Terminate Thread [C0039]\n    examples:\n      - Practical Malware Analysis Lab 03-02.dll_:0x10003286\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x407E90\n  features:\n    - or:\n      - api: kernel32.TerminateThread\n      - api: PsTerminateSystemThread\n      - api: System.Threading.Thread.Abort\n      - api: pthread_terminate\n"
+                                           },
+                                           {
+                                               "id":  "6",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create or open mutex on Windows",
+                                               "description":  "host-interaction/mutex",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com",
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: CreateMutex"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create or open mutex on Windows\n    namespace: host-interaction/mutex\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n      - mehunhoff@google.com\n    scopes:\n      static: instruction\n      dynamic: call\n    mbc:\n      - Process::Create Mutex [C0042]\n    examples:\n      - Practical Malware Analysis Lab 01-01.dll_:0x10001010\n  features:\n    - or:\n      - api: kernel32.OpenMutex\n      - api: kernel32.CreateMutex\n      - api: kernel32.CreateMutexEx\n      - api: ntdll.NtCreateMutant\n      - api: ntdll.NtOpenMutant\n      - and:\n        - format: dotnet\n        - or:\n          - api: System.Threading.Mutex::ctor\n          - api: System.Threading.Mutex::OpenExisting\n          - api: System.Threading.Mutex::TryOpenExisting\n"
+                                           },
+                                           {
+                                               "id":  "7",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "access the Windows event log",
+                                               "description":  "host-interaction/log/winevt/access",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: ReportEvent"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: access the Windows event log\n    namespace: host-interaction/log/winevt/access\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Discovery::File and Directory Discovery::Log File [E1083.m01]\n    examples:\n      - mimikatz.exe_:0x45228B\n  features:\n    - or:\n      - api: OpenEventLog\n      - api: ClearEventLog\n      - api: OpenBackupEventLog\n      - api: ReportEvent\n"
+                                           },
+                                           {
+                                               "id":  "8",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "initialize Winsock library",
+                                               "description":  "communication/socket",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: WSAStartup"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: initialize Winsock library\n    namespace: communication/socket\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Communication::Socket Communication::Initialize Winsock Library [C0001.009]\n    examples:\n      - 6A352C3E55E8AE5ED39DC1BE7FB964B1:0x10001D30\n  features:\n    - or:\n      - api: ws2_32.WSAStartup\n      - api: ws2_32.#115 = WSAStartup\n"
+                                           },
+                                           {
+                                               "id":  "9",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "terminate process",
+                                               "description":  "host-interaction/process/terminate",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: exit"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: terminate process\n    namespace: host-interaction/process/terminate\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Process::Terminate Process [C0018]\n    examples:\n      - C91887D861D9BD4A5872249B641BC9F9:0x401A77\n      - 9B7CCAA2AE6A5B96E3110EBCBC4311F6:0x10010307\n  features:\n    - or:\n      - api: System.Diagnostics.Process::Kill\n      - api: System.Diagnostics.Process::WaitForExit\n      - api: System.Diagnostics.Process::WaitForExitAsync\n      - api: System.Environment::Exit\n      - api: System.Windows.Forms.Application::Exit\n      - api: exit\n      - api: Exit\n      - and:\n        - os: linux\n        - api: exit_group\n      - and:\n        - optional:\n          - match: open process\n        - or:\n          - api: kernel32.TerminateProcess\n          - api: ntdll.NtTerminateProcess\n          - api: kernel32.ExitProcess\n"
+                                           },
+                                           {
+                                               "id":  "10",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "send data",
+                                               "description":  "communication : all known techniques for sending data to a potential C2 server",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com",
+                                                               "joakim@intezer.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: WSASend",
+                                                                  "send data on socket"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: send data\n    namespace: communication\n    authors:\n      - william.ballenthin@mandiant.com\n      - joakim@intezer.com\n    description: all known techniques for sending data to a potential C2 server\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Command and Control::C2 Communication::Send Data [B0030.001]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13145D60\n  features:\n    - or:\n      - and:\n        - os: windows\n        - or:\n          - match: send HTTP request\n          - match: send data on socket\n          - match: send file via HTTP\n          - match: send data to Internet\n      - and:\n        - os: linux\n        - or: # Require network bound socket.\n          - match: create TCP socket\n          - match: create UDP socket\n        - or:\n          - match: send HTTP request\n          - match: send data on socket\n          - match: send file via HTTP\n"
+                                           },
+                                           {
+                                               "id":  "11",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check OS version",
+                                               "description":  "host-interaction/os/version",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "johnk3r"
+                                                           ],
+                                               "match_data":  [
+                                                                  "gs access",
+                                                                  "mnemonic: cmp",
+                                                                  "get OS version"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check OS version\n    namespace: host-interaction/os/version\n    authors:\n      - michael.hunhoff@mandiant.com\n      - johnk3r\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic features\n    att\u0026ck:\n      - Discovery::System Information Discovery [T1082]\n    mbc:\n      - Discovery::System Information Discovery [E1082]\n    examples:\n      - 493167E85E45363D09495D0841C30648:0x401000\n  features:\n    - and:\n      - match: get OS version\n      - or:\n        - and:\n          - instruction:\n            - mnemonic: cmp\n            - number: 5 = Windows 2000\n          - optional:\n            - instruction:\n              - mnemonic: cmp\n              - or:\n                - number: 0\n                - number: 1 = Windows XP\n                - number: 2 = Windows XP 64-bit / Windows Server 2003 / Windows Server 2003 R2\n        - and:\n          - instruction:\n            - mnemonic: cmp\n            - number: 6 = Windows Vista / Windows Server 2008\n          - optional:\n            - instruction:\n              - mnemonic: cmp\n              - or:\n                - number: 0\n                - number: 1 = Windows Server 2008 R2 / Windows 7\n                - number: 2 = Windows Server 2012 / Windows 8\n                - number: 3 = Windows Server 2012 R2 / Windows 8.1\n        - and:\n          - instruction:\n            - mnemonic: cmp\n            - number: 10 = Windows Server 2016 / Windows Server 2019 / Windows 10\n          - optional:\n            - instruction:\n              - mnemonic: cmp\n              - number: 0\n"
+                                           },
+                                           {
+                                               "id":  "13",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create process on Windows",
+                                               "description":  "host-interaction/process/create",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: CreateProcess"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create process on Windows\n    namespace: host-interaction/process/create\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - Process::Create Process [C0017]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x406DB0\n      - Practical Malware Analysis Lab 01-04.exe_:0x4011FC\n      - 692f7fd6d198e804d6af98eb9e390d61:0x6000003\n  features:\n    - or:\n      - api: kernel32.WinExec\n      - api: kernel32.CreateProcess\n      - api: shell32.ShellExecute\n      - api: shell32.ShellExecuteEx\n      - api: advapi32.CreateProcessAsUser\n      - api: advapi32.CreateProcessWithLogon\n      - api: advapi32.CreateProcessWithToken\n      - api: kernel32.CreateProcessInternal\n      - api: ntdll.NtCreateUserProcess\n      - api: ntdll.NtCreateProcess\n      - api: ntdll.NtCreateProcessEx\n      - api: ntdll.ZwCreateProcess\n      - api: ZwCreateProcessEx\n      - api: ntdll.ZwCreateUserProcess\n      - api: ntdll.RtlCreateUserProcess\n      - api: System.Diagnostics.Process::Start\n"
+                                           },
+                                           {
+                                               "id":  "14",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "contains PDB path",
+                                               "description":  "executable/pe/pdb",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "regex: /:\\\\.*\\.pdb/"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: contains PDB path\n    namespace: executable/pe/pdb\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    examples:\n      - 464EF2CA59782CE697BC329713698CCC  # level32.exe\n  features:\n    - string: /:\\\\.*\\.pdb/\n"
+                                           },
+                                           {
+                                               "id":  "15",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create thread",
+                                               "description":  "host-interaction/thread/create",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "joakim@intezer.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: _beginthreadex"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create thread\n    namespace: host-interaction/thread/create\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - joakim@intezer.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: span of calls\n    mbc:\n      - Process::Create Thread [C0038]\n    examples:\n      - 946A99F36A46D335DEC080D9A4371940:0x10001DA0\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x408020\n  features:\n    - or:\n      - and:\n        - os: windows\n        - or:\n          - api: kernel32.CreateThread\n          - api: _beginthread\n          - api: _beginthreadex\n          - api: PsCreateSystemThread\n          - api: SHCreateThread\n          - api: SHCreateThreadWithHandle\n          - api: kernel32.CreateRemoteThread\n          - api: kernel32.CreateRemoteThreadEx\n          - api: RtlCreateUserThread\n          - api: ntdll.NtCreateThread\n          - api: ntdll.NtCreateThreadEx\n          - api: ntdll.ZwCreateThread\n          - api: ntdll.ZwCreateThreadEx\n      - and:\n        - or:\n          - os: linux\n          - os: android\n        - api: pthread_create\n      - and:\n        - api: System.Threading.Thread::Start\n        - optional:\n          - api: System.Threading.Thread::ctor\n"
+                                           },
+                                           {
+                                               "id":  "16",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "query environment variable",
+                                               "description":  "host-interaction/environment-variable",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "@_re_fox"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: getenv"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: query environment variable\n    namespace: host-interaction/environment-variable\n    authors:\n      - michael.hunhoff@mandiant.com\n      - \"@_re_fox\"\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Information Discovery [T1082]\n    mbc:\n      - Discovery::System Information Discovery [E1082]\n    examples:\n      - Practical Malware Analysis Lab 14-02.exe_:0x401880\n      - 0761142efbda6c4b1e801223de723578:0x65483490\n  features:\n    - or:\n      - api: kernel32.GetEnvironmentVariable\n      - api: kernel32.GetEnvironmentStrings\n      - api: kernel32.ExpandEnvironmentStrings\n      - api: msvcr90.getenv\n      - api: msvcrt.getenv\n      - api: System.Environment::GetEnvironmentVariable\n      - api: System.Environment::GetEnvironmentVariables\n      - api: System.Environment::ExpandEnvironmentVariables\n"
+                                           },
+                                           {
+                                               "id":  "17",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "set thread local storage value",
+                                               "description":  "host-interaction/thread/tls",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: TlsSetValue"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: set thread local storage value\n    namespace: host-interaction/thread/tls\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Process::Set Thread Local Storage Value [C0041]\n    examples:\n      - 03B236B23B1EC37C663527C1F53AF3FE:0x18000AE21\n  features:\n    - and:\n      - api: kernel32.TlsSetValue\n      - optional:\n        - match: allocate thread local storage\n"
+                                           },
+                                           {
+                                               "id":  "18",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get socket status",
+                                               "description":  "communication/socket",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: select"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get socket status\n    namespace: communication/socket\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Network Configuration Discovery [T1016]\n    mbc:\n      - Communication::Socket Communication::Get Socket Status [C0001.012]\n    examples:\n      - 6A352C3E55E8AE5ED39DC1BE7FB964B1:0x1000C1F0\n  features:\n    - or:\n      - api: ws2_32.select\n      - api: ws2_32.#18 = select\n"
+                                           },
+                                           {
+                                               "id":  "20",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "resolve function by parsing PE exports",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "sara-rn"
+                                                           ],
+                                               "match_data":  [
+                                                                  "mnemonic: movzx"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: resolve function by parsing PE exports\n    namespace: load-code/pe\n    authors:\n      - sara-rn\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic, offset, mnemonic features\n    examples:\n      - 73CE04892E5F39EC82B00C02FC04C70F:0x406BA1\n  features:\n    - and:\n      - os: windows\n      - or:\n        - characteristic: loop\n        - mnemonic: movzx\n      - and:\n        - offset: 0x3C = IMAGE_DOS_HEADER.PE.e_lfanew\n        - or:\n          - and:\n            - arch: i386\n            - offset: 0x78 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n          - and:\n            - arch: amd64\n            - offset: 0x88 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n        - 3 or more:\n          - offset: 0x14 = IMAGE_EXPORT_DIRECTORY.NumberOfFunctions\n          - offset: 0x24 = IMAGE_EXPORT_DIRECTORY.AddressOfNameOrdinals\n          - offset: 0x20 = IMAGE_EXPORT_DIRECTORY.AddressOfNames\n          - offset: 0x18 = IMAGE_EXPORT_DIRECTORY.NumberOfNames\n          - offset: 0x1C = IMAGE_EXPORT_DIRECTORY.AddressOfFunctions\n      - optional:\n        - or:\n          - api: LoadLibrary\n          - api: strcmp\n"
+                                           },
+                                           {
+                                               "id":  "21",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get thread local storage value",
+                                               "description":  "host-interaction/process",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: TlsGetValue"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get thread local storage value\n    namespace: host-interaction/process\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n  features:\n    - and:\n      - api: kernel32.TlsGetValue\n"
+                                           },
+                                           {
+                                               "id":  "22",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "receive data on socket",
+                                               "description":  "communication/socket/receive",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "joakim@intezer.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: WSARecv"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: receive data on socket\n    namespace: communication/socket/receive\n    authors:\n      - moritz.raabe@mandiant.com\n      - joakim@intezer.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Communication::Socket Communication::Receive Data [C0001.006]\n    examples:\n      - Practical Malware Analysis Lab 01-01.dll_:0x10001010\n  features:\n    - or:\n      - api: recv\n      - api: ws2_32.recv\n      - api: ws2_32.#16 = recv\n      - api: ws2_32.recvfrom\n      - api: ws2_32.#17 = recvfrom\n      - api: ws2_32.WSARecv\n      - api: ws2_32.#71 = WSARecv\n      - api: ws2_32.WSARecvDisconnect\n      - api: ws2_32.#72 = WSARecvDisconnect\n      - api: ws2_32.WSARecvEx\n      - api: ws2_32.WSARecvFrom\n      - api: ws2_32.#73 = WSARecvFrom\n      - api: ws2_32.WSARecvMsg\n      - api: recvmsg\n      - api: System.Net.Sockets.Socket::Receive\n      - api: System.Net.Sockets.Socket::ReceiveAsync\n      - api: System.Net.Sockets.Socket::ReceiveFrom\n      - api: System.Net.Sockets.Socket::ReceiveFromAsync\n      - api: System.Net.Sockets.Socket::ReceiveMessageFrom\n      - api: System.Net.Sockets.Socket::ReceiveMessageFromAsync\n      - api: System.Net.Sockets.Socket::BeginReceive\n      - api: System.Net.Sockets.Socket::BeginReceiveFrom\n      - api: System.Net.Sockets.Socket::BeginReceiveMessageFrom\n      - api: System.Net.Sockets.Socket::EndReceive\n      - api: System.Net.Sockets.Socket::EndReceiveFrom\n      - api: System.Net.Sockets.Socket::EndReceiveMessageFrom\n"
+                                           },
+                                           {
+                                               "id":  "26",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "send data on socket",
+                                               "description":  "communication/socket/send",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "joakim@intezer.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: WSASend"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: send data on socket\n    namespace: communication/socket/send\n    authors:\n      - moritz.raabe@mandiant.com\n      - joakim@intezer.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Communication::Socket Communication::Send Data [C0001.007]\n    examples:\n      - Practical Malware Analysis Lab 01-01.dll_:0x10001010\n  features:\n    - or:\n      - api: send\n      - api: ws2_32.send\n      - api: ws2_32.#19 = send\n      - api: ws2_32.sendto\n      - api: ws2_32.#20 = sendto\n      - api: ws2_32.WSASend\n      - api: ws2_32.#76 = WSASend\n      - api: ws2_32.WSASendMsg\n      - api: ws2_32.WSASendTo\n      - api: ws2_32.#78 = WSASendTo\n      - api: System.Net.Sockets.Socket::Send\n      - api: System.Net.Sockets.Socket::SendAsync\n      - api: System.Net.Sockets.Socket::SendTo\n      - api: System.Net.Sockets.Socket::SendToAsync\n      - api: System.Net.Sockets.UdpClient::Send\n"
+                                           },
+                                           {
+                                               "id":  "27",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "allocate thread local storage",
+                                               "description":  "host-interaction/thread/tls",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: TlsAlloc"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: allocate thread local storage\n    namespace: host-interaction/thread/tls\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Process::Allocate Thread Local Storage [C0040]\n    examples:\n      - 03B236B23B1EC37C663527C1F53AF3FE:0x18000ADF6\n  features:\n    - or:\n      - api: kernel32.TlsAlloc\n"
+                                           },
+                                           {
+                                               "id":  "28",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "set socket configuration",
+                                               "description":  "communication/socket",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: setsockopt",
+                                                                  "api: ioctlsocket"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: set socket configuration\n    namespace: communication/socket\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Communication::Socket Communication::Set Socket Config [C0001.001]\n    examples:\n      - 6A352C3E55E8AE5ED39DC1BE7FB964B1:0x1000C1F0\n  features:\n    - or:\n      - api: ws2_32.setsockopt\n      - api: ws2_32.#21 = setsockopt\n      - api: ws2_32.ioctlsocket\n      - api: ws2_32.#10 = ioctlsocket\n"
+                                           }
+                                       ],
+                 "mbc":  [
+                             {
+                                 "id":  "C0043",
+                                 "objective":  "Process",
+                                 "behavior":  "Check Mutex",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "1"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0030.002",
+                                 "objective":  "Command and Control",
+                                 "behavior":  "C2 Communication",
+                                 "method":  "Receive Data",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "2"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0051",
+                                 "objective":  "File System",
+                                 "behavior":  "Read File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "3"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0052",
+                                 "objective":  "File System",
+                                 "behavior":  "Writes File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "4"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0039",
+                                 "objective":  "Process",
+                                 "behavior":  "Terminate Thread",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "5"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0042",
+                                 "objective":  "Process",
+                                 "behavior":  "Create Mutex",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "6"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1083.m01",
+                                 "objective":  "Discovery",
+                                 "behavior":  "File and Directory Discovery",
+                                 "method":  "Log File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "7"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0001.009",
+                                 "objective":  "Communication",
+                                 "behavior":  "Socket Communication",
+                                 "method":  "Initialize Winsock Library",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "8"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0018",
+                                 "objective":  "Process",
+                                 "behavior":  "Terminate Process",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "9"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0030.001",
+                                 "objective":  "Command and Control",
+                                 "behavior":  "C2 Communication",
+                                 "method":  "Send Data",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "10"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1082",
+                                 "objective":  "Discovery",
+                                 "behavior":  "System Information Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "11"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0017",
+                                 "objective":  "Process",
+                                 "behavior":  "Create Process",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "13"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0038",
+                                 "objective":  "Process",
+                                 "behavior":  "Create Thread",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "15"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1082",
+                                 "objective":  "Discovery",
+                                 "behavior":  "System Information Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "16"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0041",
+                                 "objective":  "Process",
+                                 "behavior":  "Set Thread Local Storage Value",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "17"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0001.012",
+                                 "objective":  "Communication",
+                                 "behavior":  "Socket Communication",
+                                 "method":  "Get Socket Status",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "18"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0001.006",
+                                 "objective":  "Communication",
+                                 "behavior":  "Socket Communication",
+                                 "method":  "Receive Data",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "22"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0001.007",
+                                 "objective":  "Communication",
+                                 "behavior":  "Socket Communication",
+                                 "method":  "Send Data",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "26"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0040",
+                                 "objective":  "Process",
+                                 "behavior":  "Allocate Thread Local Storage",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "27"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0001.001",
+                                 "objective":  "Communication",
+                                 "behavior":  "Socket Communication",
+                                 "method":  "Set Socket Config",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "28"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "verdicts":  [
+                                  "UNKNOWN_VERDICT"
+                              ],
+                 "attack_techniques":  {
+                                           "T1082":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "check OS version",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "11"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "query environment variable",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "16"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1016":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get socket status",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "18"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

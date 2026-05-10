@@ -1,0 +1,133 @@
+{
+    "data":  {
+                 "verdicts":  [
+                                  "UNKNOWN_VERDICT"
+                              ],
+                 "signature_matches":  [
+                                           {
+                                               "id":  "0",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get geographical location",
+                                               "description":  "collection",
+                                               "authors":  [
+                                                               "moritz.raabe",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetLocaleInfo"
+                                                              ],
+                                               "rule_src":  "# generated using capa explorer for IDA Pro\nrule:\n  meta:\n    name: get geographical location\n    namespace: collection\n    authors:\n      - moritz.raabe\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Location Discovery [T1614]\n    examples:\n      - 9879D201DC5ACA863F357184CD1F170E:0x10001A99\n  features:\n    - or:\n      - api: GetLocaleInfo\n      - api: GetLocaleInfoEx\n      - api: kernel32.GetUserGeoID\n      - api: kernel32.GetGeoInfo\n      # strings part of requests or parsed from response\n      # \"geo\" and \"zip\" are too short\n      # \"region\" results in FPs mostly related to memory\n      - string: /geolocation/i\n      - string: /geo-location/i\n      - string: /^city/i\n      - string: /region_code/i\n      - string: /region_name/i\n      - string: /^country/i\n      - string: /country_code/i\n      - string: /countrycode/i\n      - string: /country_name/i\n      - string: /continent_code/i\n      - string: /continent_name/i\n      - string: /^latitude/i\n      - string: /^longitude/i\n"
+                                           },
+                                           {
+                                               "id":  "1",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "parse PE header",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "IMAGE_DOS_SIGNATURE (MZ)",
+                                                                  "IMAGE_NT_SIGNATURE (PE)",
+                                                                  "mnemonic: cmp"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: parse PE header\n    namespace: load-code/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic, operand[1].offset features\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x403DD0\n  features:\n    - and:\n      - os: windows\n      - and:\n        - mnemonic: cmp\n        - or:\n          - number: 0x4550 = IMAGE_NT_SIGNATURE (PE)\n          - and:\n            - number: 0x50\n            - number: 0x45\n        - or:\n          - number: 0x5A4D = IMAGE_DOS_SIGNATURE (MZ)\n          - and:\n            - number: 0x4D\n            - number: 0x5A\n        - optional:\n          - and:\n            - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x30 = IMAGE_NT_HEADERS64.OptionalHeader.ImageBase\n          - basic block:\n            - and:\n              - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n              - 3 or more:\n                - operand[1].offset: 0x4 = IMAGE_NT_HEADERS.FileHeader.Machine\n                - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n                - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n                - operand[1].offset: 0x16 = IMAGE_NT_HEADERS.FileHeader.Characteristics\n                - operand[1].offset: 0x28 = IMAGE_NT_HEADERS.OptionalHeader.AddressOfEntryPoint  # for 32 and 64 bit\n                - or:\n                  - and:\n                    - arch: i386\n                    - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                  - and:\n                    - arch: amd64\n                    - operand[1].offset: 0x30 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n"
+                                           },
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "contains PDB path",
+                                               "description":  "executable/pe/pdb",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "regex: /:\\\\.*\\.pdb/"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: contains PDB path\n    namespace: executable/pe/pdb\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    examples:\n      - 464EF2CA59782CE697BC329713698CCC  # level32.exe\n  features:\n    - string: /:\\\\.*\\.pdb/\n"
+                                           }
+                                       ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1614",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get geographical location",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "0"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "parse PE header",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "1"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "processes_terminated":  [
+                                              "%SAMPLEPATH%",
+                                              "%windir%\\System32\\svchost.exe -k WerSvcGroup",
+                                              "%CONHOST% \"64446788-410815002-1836039435-7790101071558716319-1693143502-5558335732090273710",
+                                              "wmiadap.exe /F /T /R"
+                                          ],
+                 "command_executions":  [
+                                            "%SAMPLEPATH%"
+                                        ],
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "2500",
+                                            "name":  "%SAMPLEPATH%",
+                                            "time_offset":  1
+                                        },
+                                        {
+                                            "process_id":  "2092",
+                                            "name":  "%windir%\\System32\\svchost.exe -k WerSvcGroup"
+                                        },
+                                        {
+                                            "process_id":  "2568",
+                                            "name":  "%CONHOST% \"64446788-410815002-1836039435-7790101071558716319-1693143502-5558335732090273710"
+                                        },
+                                        {
+                                            "process_id":  "2700",
+                                            "name":  "wmiadap.exe /F /T /R"
+                                        },
+                                        {
+                                            "process_id":  "2752",
+                                            "name":  "%windir%\\system32\\wbem\\wmiprvse.exe"
+                                        }
+                                    ],
+                 "attack_techniques":  {
+                                           "T1614":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get geographical location",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "0"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "parse PE header",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "1"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

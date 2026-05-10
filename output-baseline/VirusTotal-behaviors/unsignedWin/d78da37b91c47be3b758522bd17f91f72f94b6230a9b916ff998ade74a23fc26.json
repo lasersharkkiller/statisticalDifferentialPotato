@@ -1,0 +1,90 @@
+{
+  "data": {
+    "mbc": [
+      {
+        "id": "C0049",
+        "objective": "File System",
+        "behavior": "Get File Attributes",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "get file attributes"
+          }
+        ]
+      },
+      {
+        "id": "C0037.001",
+        "objective": "Hardware",
+        "behavior": "Install Driver",
+        "method": "Minifilter",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "register minifilter driver"
+          }
+        ]
+      },
+      {
+        "id": "C0023.001",
+        "objective": "Hardware",
+        "behavior": "Load Driver",
+        "method": "Minifilter",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "start minifilter driver"
+          }
+        ]
+      }
+    ],
+    "signature_matches": [
+      {
+        "format": "SIG_FORMAT_CAPA",
+        "name": "resolve function by parsing PE exports",
+        "description": "load-code/pe",
+        "authors": [
+          "sara-rn"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: resolve function by parsing PE exports\n    namespace: load-code/pe\n    authors:\n      - sara-rn\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic, offset, mnemonic features\n    examples:\n      - 73CE04892E5F39EC82B00C02FC04C70F:0x406BA1\n  features:\n    - and:\n      - os: windows\n      - or:\n        - characteristic: loop\n        - mnemonic: movzx\n      - and:\n        - offset: 0x3C = IMAGE_DOS_HEADER.PE.e_lfanew\n        - or:\n          - and:\n            - arch: i386\n            - offset: 0x78 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n          - and:\n            - arch: amd64\n            - offset: 0x88 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n        - 3 or more:\n          - offset: 0x14 = IMAGE_EXPORT_DIRECTORY.NumberOfFunctions\n          - offset: 0x24 = IMAGE_EXPORT_DIRECTORY.AddressOfNameOrdinals\n          - offset: 0x20 = IMAGE_EXPORT_DIRECTORY.AddressOfNames\n          - offset: 0x18 = IMAGE_EXPORT_DIRECTORY.NumberOfNames\n          - offset: 0x1C = IMAGE_EXPORT_DIRECTORY.AddressOfFunctions\n      - optional:\n        - or:\n          - api: LoadLibrary\n          - api: strcmp\n"
+      },
+      {
+        "format": "SIG_FORMAT_CAPA",
+        "name": "get file attributes",
+        "description": "host-interaction/file-system/meta",
+        "authors": [
+          "michael.hunhoff@mandiant.com",
+          "anushka.virgaonkar@mandiant.com"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: get file attributes\n    namespace: host-interaction/file-system/meta\n    authors:\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - File System::Get File Attributes [C0049]\n    examples:\n      - 03B236B23B1EC37C663527C1F53AF3FE:0x180019824\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x4028B6\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x4029E0\n  features:\n    - or:\n      - api: kernel32.GetFileAttributes\n      - api: ZwQueryDirectoryFile\n      - api: ZwQueryInformationFile\n      - api: NtQueryDirectoryFile\n      - api: NtQueryInformationFile\n      - api: System.IO.File::GetAttributes\n      - api: System.IO.File::GetCreationTime\n      - api: System.IO.File::GetCreationTimeUtc\n      - api: System.IO.File::GetLastAccessTime\n      - api: System.IO.File::GetLastAccessTimeUtc\n      - api: System.IO.File::GetLastWriteTime\n      - api: System.IO.File::GetLastWriteTimeUtc\n      - property/read: System.IO.FileSystemInfo::Attributes\n      - api: stat\n      - api: fstat\n      - api: lstat\n      - api: fstatat\n"
+      },
+      {
+        "format": "SIG_FORMAT_CAPA",
+        "name": "register minifilter driver",
+        "description": "host-interaction/filter",
+        "authors": [
+          "michael.hunhoff@mandiant.com"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: register minifilter driver\n    namespace: host-interaction/filter\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - Hardware::Install Driver::Minifilter [C0037.001]\n    references:\n      - https://docs.microsoft.com/en-us/windows-hardware/drivers/ifs/filter-manager-concepts\n    examples:\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x4060C8\n  features:\n    - and:\n      - api: FltRegisterFilter\n",
+        "refs": [
+          {
+            "ref": "https://docs.microsoft.com/en-us/windows-hardware/drivers/ifs/filter-manager-concepts"
+          }
+        ]
+      },
+      {
+        "format": "SIG_FORMAT_CAPA",
+        "name": "start minifilter driver",
+        "description": "host-interaction/filter",
+        "authors": [
+          "michael.hunhoff@mandiant.com"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: start minifilter driver\n    namespace: host-interaction/filter\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - Hardware::Load Driver::Minifilter [C0023.001]\n    references:\n      - https://docs.microsoft.com/en-us/windows-hardware/drivers/ifs/filter-manager-concepts\n    examples:\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x406360\n  features:\n    - and:\n      - api: FltStartFiltering\n",
+        "refs": [
+          {
+            "ref": "https://docs.microsoft.com/en-us/windows-hardware/drivers/ifs/filter-manager-concepts"
+          }
+        ]
+      }
+    ]
+  }
+}

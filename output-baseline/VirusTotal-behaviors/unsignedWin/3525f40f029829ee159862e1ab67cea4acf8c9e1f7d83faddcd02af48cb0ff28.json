@@ -1,0 +1,209 @@
+{
+    "data":  {
+                 "mbc":  [
+                             {
+                                 "id":  "C0002.017",
+                                 "objective":  "Communication",
+                                 "behavior":  "HTTP Communication",
+                                 "method":  "Get Response",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "1"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0002.008",
+                                 "objective":  "Communication",
+                                 "behavior":  "HTTP Communication",
+                                 "method":  "WinHTTP",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "3"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0002.012",
+                                 "objective":  "Communication",
+                                 "behavior":  "HTTP Communication",
+                                 "method":  "Create Request",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "4"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0002.013",
+                                 "objective":  "Communication",
+                                 "behavior":  "HTTP Communication",
+                                 "method":  "Set Header",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "6"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0001.032",
+                                 "objective":  "Anti-Behavioral Analysis",
+                                 "behavior":  "Debugger Detection",
+                                 "method":  "Timing/Delay Check GetTickCount",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "7"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0002.014",
+                                 "objective":  "Communication",
+                                 "behavior":  "HTTP Communication",
+                                 "method":  "Read Header",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "10"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "verdicts":  [
+                                  "UNKNOWN_VERDICT"
+                              ],
+                 "signature_matches":  [
+                                           {
+                                               "id":  "0",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "implement COM DLL",
+                                               "description":  "executable/pe",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: implement COM DLL\n    namespace: executable/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    references:\n      - https://learn.microsoft.com/en-us/windows/win32/api/combaseapi/nf-combaseapi-dllgetclassobject\n  features:\n    - and:\n      - export: DllGetClassObject\n      - optional:\n        - export: DllRegisterServer\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://learn.microsoft.com/en-us/windows/win32/api/combaseapi/nf-combaseapi-dllgetclassobject"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "1",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "receive HTTP response",
+                                               "description":  "communication/http/client",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: WinHttpReceiveResponse",
+                                                                  "api: WinHttpReadData",
+                                                                  "api: WinHttpQueryDataAvailable"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: receive HTTP response\n    namespace: communication/http/client\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Communication::HTTP Communication::Get Response [C0002.017]\n    examples:\n      - 6A352C3E55E8AE5ED39DC1BE7FB964B1:0x10002790\n  features:\n    - or:\n      - api: System.Net.WebRequest::GetResponse\n      - api: winhttp.WinHttpReceiveResponse\n      - and:\n        - api: winhttp.WinHttpReadData\n        - optional:\n          - api: winhttp.WinHttpQueryDataAvailable\n"
+                                           },
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "initialize WinHTTP library",
+                                               "description":  "communication/http",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: WinHttpOpen"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: initialize WinHTTP library\n    namespace: communication/http\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Communication::HTTP Communication::WinHTTP [C0002.008]\n    examples:\n      - 6A352C3E55E8AE5ED39DC1BE7FB964B1:0x1000E670\n  features:\n    - and:\n      - api: winhttp.WinHttpOpen\n"
+                                           },
+                                           {
+                                               "id":  "4",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "prepare HTTP request",
+                                               "description":  "communication/http/client",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: WinHttpOpenRequest"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: prepare HTTP request\n    namespace: communication/http/client\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Communication::HTTP Communication::Create Request [C0002.012]\n    examples:\n      - 6A352C3E55E8AE5ED39DC1BE7FB964B1:0x10002650\n  features:\n    - or:\n      - api: winhttp.WinHttpOpenRequest\n"
+                                           },
+                                           {
+                                               "id":  "6",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "set HTTP header",
+                                               "description":  "communication/http",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: WinHttpAddRequestHeaders"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: set HTTP header\n    namespace: communication/http\n    authors:\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Communication::HTTP Communication::Set Header [C0002.013]\n    examples:\n      - 6A352C3E55E8AE5ED39DC1BE7FB964B1:0x1000E230\n  features:\n    - or:\n      - api: winhttp.WinHttpAddRequestHeaders\n      - property/write: System.Net.WebClient::Headers\n      - and:\n        - api: System.Net.WebHeaderCollection::Add\n        - optional:\n          - property/read: System.Net.WebClient::Headers\n"
+                                           },
+                                           {
+                                               "id":  "7",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check for time delay via GetTickCount",
+                                               "description":  "anti-analysis/anti-debugging/debugger-detection",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "mnemonic: sub",
+                                                                  "mnemonic: cmp"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check for time delay via GetTickCount\n    namespace: anti-analysis/anti-debugging/debugger-detection\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic features\n    mbc:\n      - Anti-Behavioral Analysis::Debugger Detection::Timing/Delay Check GetTickCount [B0001.032]\n    examples:\n      - Practical Malware Analysis Lab 16-03.exe_:0x4013d0\n  features:\n    - and:\n      - count(api(kernel32.GetTickCount)): 2 or more\n      - basic block:\n        - and:\n          - mnemonic: sub\n          - mnemonic: cmp\n"
+                                           },
+                                           {
+                                               "id":  "10",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "read HTTP header",
+                                               "description":  "communication/http",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: WinHttpQueryHeaders"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: read HTTP header\n    namespace: communication/http\n    authors:\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Communication::HTTP Communication::Read Header [C0002.014]\n    examples:\n      - 6A352C3E55E8AE5ED39DC1BE7FB964B1:0x10002A30\n  features:\n    - or:\n      - api: winhttp.WinHttpQueryHeaders\n      - property/read: System.Net.WebClient::Headers\n"
+                                           }
+                                       ],
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "2604",
+                                            "name":  "%SANDBOX_DLL_LOADER_AMD64% %TEMP%\\ZV887VPOE5FCCMS3.dll %WORKDIR% 483",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "2680",
+                                                                 "name":  "rundll32.exe %TEMP%\\ZV887VPOE5FCCMS3.dll,DllGetClassObject"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2672",
+                                                                 "name":  "rundll32.exe %TEMP%\\ZV887VPOE5FCCMS3.dll,DllCanUnloadNow"
+                                                             }
+                                                         ]
+                                        },
+                                        {
+                                            "process_id":  "2876",
+                                            "name":  "%windir%\\system32\\wbem\\wmiprvse.exe"
+                                        },
+                                        {
+                                            "process_id":  "2240",
+                                            "name":  "%windir%\\System32\\svchost.exe -k WerSvcGroup"
+                                        },
+                                        {
+                                            "process_id":  "2828",
+                                            "name":  "wmiadap.exe /F /T /R"
+                                        }
+                                    ]
+             }
+}

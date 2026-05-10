@@ -1,0 +1,109 @@
+{
+    "data":  {
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "2200",
+                                            "name":  "%windir%\\System32\\svchost.exe -k WerSvcGroup"
+                                        },
+                                        {
+                                            "process_id":  "2816",
+                                            "name":  "wmiadap.exe /F /T /R"
+                                        },
+                                        {
+                                            "process_id":  "2560",
+                                            "name":  "%SANDBOX_DLL_LOADER_AMD64% %TEMP%\\E248BPXFM5X3DSFB.dll %WORKDIR% 483",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "2660",
+                                                                 "name":  "rundll32.exe %TEMP%\\E248BPXFM5X3DSFB.dll,UserServerDllInitializationWin1"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2644",
+                                                                 "name":  "rundll32.exe %TEMP%\\E248BPXFM5X3DSFB.dll,UserHardError"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2636",
+                                                                 "name":  "rundll32.exe %TEMP%\\E248BPXFM5X3DSFB.dll,UserCreateCallbackThread"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2652",
+                                                                 "name":  "rundll32.exe %TEMP%\\E248BPXFM5X3DSFB.dll,UserServerDllInitialization"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2628",
+                                                                 "name":  "rundll32.exe %TEMP%\\E248BPXFM5X3DSFB.dll,SrvEndTask"
+                                                             }
+                                                         ]
+                                        },
+                                        {
+                                            "process_id":  "2856",
+                                            "name":  "%windir%\\system32\\wbem\\wmiprvse.exe"
+                                        }
+                                    ],
+                 "signature_matches":  [
+                                           {
+                                               "id":  "2",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create thread",
+                                               "description":  "host-interaction/thread/create",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "joakim@intezer.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: RtlCreateUserThread"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create thread\n    namespace: host-interaction/thread/create\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - joakim@intezer.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: span of calls\n    mbc:\n      - Process::Create Thread [C0038]\n    examples:\n      - 946A99F36A46D335DEC080D9A4371940:0x10001DA0\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x408020\n  features:\n    - or:\n      - and:\n        - os: windows\n        - or:\n          - api: kernel32.CreateThread\n          - api: _beginthread\n          - api: _beginthreadex\n          - api: PsCreateSystemThread\n          - api: SHCreateThread\n          - api: SHCreateThreadWithHandle\n          - api: kernel32.CreateRemoteThread\n          - api: kernel32.CreateRemoteThreadEx\n          - api: RtlCreateUserThread\n          - api: ntdll.NtCreateThread\n          - api: ntdll.NtCreateThreadEx\n          - api: ntdll.ZwCreateThread\n          - api: ntdll.ZwCreateThreadEx\n      - and:\n        - or:\n          - os: linux\n          - os: android\n        - api: pthread_create\n      - and:\n        - api: System.Threading.Thread::Start\n        - optional:\n          - api: System.Threading.Thread::ctor\n"
+                                           },
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check for PEB BeingDebugged flag",
+                                               "description":  "anti-analysis/anti-debugging/debugger-detection",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "peb access",
+                                                                  "PEB access"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check for PEB BeingDebugged flag\n    namespace: anti-analysis/anti-debugging/debugger-detection\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: unsupported  # requires offset features\n    mbc:\n      - Anti-Behavioral Analysis::Debugger Detection::Process Environment Block BeingDebugged [B0001.035]\n    references:\n      - Practical Malware Analysis, Chapter 16, p. 353\n    examples:\n      - Practical Malware Analysis Lab 16-01.exe_:0x403530\n  features:\n    - and:\n      - match: PEB access\n      - offset: 2 = PEB.BeingDebugged\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "Practical Malware Analysis, Chapter 16, p. 353"
+                                                            }
+                                                        ]
+                                           }
+                                       ],
+                 "verdicts":  [
+                                  "UNKNOWN_VERDICT"
+                              ],
+                 "mbc":  [
+                             {
+                                 "id":  "C0038",
+                                 "objective":  "Process",
+                                 "behavior":  "Create Thread",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "2"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0001.035",
+                                 "objective":  "Anti-Behavioral Analysis",
+                                 "behavior":  "Debugger Detection",
+                                 "method":  "Process Environment Block BeingDebugged",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "3"
+                                              }
+                                          ]
+                             }
+                         ]
+             }
+}

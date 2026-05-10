@@ -1,0 +1,1515 @@
+{
+    "data":  {
+                 "verdicts":  [
+                                  "CLEAN"
+                              ],
+                 "signature_matches":  [
+                                           {
+                                               "id":  "1",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "parse PE header",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "mnemonic: cmp",
+                                                                  "IMAGE_DOS_SIGNATURE (MZ)",
+                                                                  "IMAGE_NT_SIGNATURE (PE)"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: parse PE header\n    namespace: load-code/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic, operand[1].offset features\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x403DD0\n  features:\n    - and:\n      - os: windows\n      - and:\n        - mnemonic: cmp\n        - or:\n          - number: 0x4550 = IMAGE_NT_SIGNATURE (PE)\n          - and:\n            - number: 0x50\n            - number: 0x45\n        - or:\n          - number: 0x5A4D = IMAGE_DOS_SIGNATURE (MZ)\n          - and:\n            - number: 0x4D\n            - number: 0x5A\n        - optional:\n          - and:\n            - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x30 = IMAGE_NT_HEADERS64.OptionalHeader.ImageBase\n          - basic block:\n            - and:\n              - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n              - 3 or more:\n                - operand[1].offset: 0x4 = IMAGE_NT_HEADERS.FileHeader.Machine\n                - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n                - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n                - operand[1].offset: 0x16 = IMAGE_NT_HEADERS.FileHeader.Characteristics\n                - operand[1].offset: 0x28 = IMAGE_NT_HEADERS.OptionalHeader.AddressOfEntryPoint  # for 32 and 64 bit\n                - or:\n                  - and:\n                    - arch: i386\n                    - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                  - and:\n                    - arch: amd64\n                    - operand[1].offset: 0x30 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n"
+                                           },
+                                           {
+                                               "id":  "2",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "terminate process",
+                                               "description":  "host-interaction/process/terminate",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "mehunhoff@google.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: exit",
+                                                                  "api: ExitProcess"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: terminate process\n    namespace: host-interaction/process/terminate\n    authors:\n      - moritz.raabe@mandiant.com\n      - mehunhoff@google.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Process::Terminate Process [C0018]\n    examples:\n      - C91887D861D9BD4A5872249B641BC9F9:0x401A77\n      - 9B7CCAA2AE6A5B96E3110EBCBC4311F6:0x10010307\n  features:\n    - or:\n      - api: System.Diagnostics.Process::Kill\n      - api: System.Diagnostics.Process::WaitForExit\n      - api: System.Diagnostics.Process::WaitForExitAsync\n      - api: System.Environment::Exit\n      - api: System.Windows.Forms.Application::Exit\n      - api: exit\n      - api: Exit\n      - api: RstrtMgr.RmShutdown\n      - and:\n        - os: linux\n        - api: exit_group\n      - and:\n        - optional:\n          - match: open process\n        - or:\n          - api: kernel32.TerminateProcess\n          - api: ntdll.NtTerminateProcess\n          - api: kernel32.ExitProcess\n          - api: ZwTerminateProcess\n"
+                                           },
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "set current directory",
+                                               "description":  "host-interaction/file-system",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: SetCurrentDirectory"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: set current directory\n    namespace: host-interaction/file-system\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n  features:\n    - or:\n      - api: System.IO.Directory::SetCurrentDirectory\n      - api: kernel32.SetCurrentDirectory\n      - api: chdir\n      - api: fchdir\n"
+                                           },
+                                           {
+                                               "id":  "5",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get geographical location",
+                                               "description":  "collection",
+                                               "authors":  [
+                                                               "moritz.raabe",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetLocaleInfo"
+                                                              ],
+                                               "rule_src":  "# generated using capa explorer for IDA Pro\nrule:\n  meta:\n    name: get geographical location\n    namespace: collection\n    authors:\n      - moritz.raabe\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Location Discovery [T1614]\n    examples:\n      - 9879D201DC5ACA863F357184CD1F170E:0x10001A99\n  features:\n    - or:\n      - api: GetLocaleInfo\n      - api: GetLocaleInfoEx\n      - api: kernel32.GetUserGeoID\n      - api: kernel32.GetGeoInfo\n      # strings part of requests or parsed from response\n      # \"geo\" and \"zip\" are too short\n      # \"region\" results in FPs mostly related to memory\n      - string: /geolocation/i\n      - string: /geo-location/i\n      - string: /^city/i\n      - string: /region_code/i\n      - string: /region_name/i\n      - string: /^country/i\n      - string: /country_code/i\n      - string: /countrycode/i\n      - string: /country_name/i\n      - string: /continent_code/i\n      - string: /continent_name/i\n      - string: /^latitude/i\n      - string: /^longitude/i\n"
+                                           },
+                                           {
+                                               "id":  "6",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get common file path",
+                                               "description":  "host-interaction/file-system",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetCurrentDirectory"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get common file path\n    namespace: host-interaction/file-system\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    examples:\n      - Practical Malware Analysis Lab 03-02.dll_:0x10003415\n      - 972B219F18379907A045431303F4DA7D:0x404887\n  features:\n    - or:\n      - api: kernel32.GetTempPath\n      - api: kernel32.GetTempFileName\n      - api: kernel32.GetSystemDirectory\n      - api: kernel32.GetWindowsDirectory\n      - api: kernel32.GetSystemWow64Directory\n      - api: GetAllUsersProfileDirectory\n      - api: GetAppContainerFolderPath\n      - api: GetCurrentDirectory\n      - api: GetDefaultUserProfileDirectory\n      - api: GetProfilesDirectory\n      - api: GetUserProfileDirectory\n      - api: SHGetFolderPathAndSubDir\n      - api: shell32.SHGetFolderPath\n      - api: shell32.SHGetFolderLocation\n      - api: shell32.SHGetKnownFolderPath\n      - api: shell32.SHGetSpecialFolderPath\n      - api: shell32.SHGetSpecialFolderLocation\n      - api: System.IO.Directory::GetCurrentDirectory\n      - api: System.Environment::GetFolderPath\n      - property/read: System.Environment::SystemDirectory\n      - property/read: System.Environment::CurrentDirectory\n"
+                                           },
+                                           {
+                                               "id":  "7",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "enumerate PE sections",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "@Ana06",
+                                                               "@mr-tz"
+                                                           ],
+                                               "match_data":  [
+                                                                  "mnemonic: movzx"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: enumerate PE sections\n    namespace: load-code/pe\n    authors:\n      - \"@Ana06\"\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: unsupported  # requires offset, operand[1].offset, characteristic, mnemonic, basicblock features\n    mbc:\n      - Discovery::Code Discovery::Enumerate PE Sections [B0046.001]\n    references:\n      - https://0x00sec.org/t/reflective-dll-injection/3080\n      - https://www.ired.team/offensive-security/code-injection-process-injection/reflective-dll-injection\n    examples:\n      - E4C33AC3638EEF68311F8AC0D72483C7:0x401510\n  features:\n    - and:\n      - os: windows\n      # there should be some complexity to functions like this\n      - count(basic blocks): 3 or more\n      - optional:\n        - offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n      - instruction:\n        - or:\n          - mnemonic: mov\n          - mnemonic: movzx\n        - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n      - basic block:\n        - or:\n          - and:\n            - description: IMAGE_FIRST_SECTION(nt_header)\n            - instruction:\n              - or:\n                - mnemonic: add\n                - mnemonic: mov\n                - mnemonic: movzx\n              - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n            - operand[1].offset: 0x18 = FileHeader.SizeOfOptionalHeader\n          - and:\n            - description: (DWORD)dll_raw + dos_header-\u003ee_lfanew + sizeof(IMAGE_NT_HEADERS) + sizeof(IMAGE_SECTION_HEADER) * i\n            - number: 0x28 = sizeof(IMAGE_SECTION_HEADER)\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0xF8 = sizeof(IMAGE_NT_HEADERS32)\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x108 = sizeof(IMAGE_NT_HEADERS64)\n      - 2 or more:\n        - operand[1].offset: 0xC = IMAGE_SECTION_HEADER.VirtualAddress\n        - operand[1].offset: 0x14 = IMAGE_SECTION_HEADER.PointerToRawData\n        - operand[1].offset: 0x10 = IMAGE_SECTION_HEADER.SizeOfRawData\n        # there\u0027s also offset 0x8 = IMAGE_SECTION_HEADER.Misc.PhysicalAddress, but it\u0027s likely too common\n      - not:\n        # non-zeroing XOR was observed in FPs\n        - characteristic: nzxor\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://0x00sec.org/t/reflective-dll-injection/3080"
+                                                            },
+                                                            {
+                                                                "ref":  "https://www.ired.team/offensive-security/code-injection-process-injection/reflective-dll-injection"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "8",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "enumerate files on Windows",
+                                               "description":  "host-interaction/file-system/files/list",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: FindFirstFile",
+                                                                  "tight loop",
+                                                                  "api: FindClose"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: enumerate files on Windows\n    namespace: host-interaction/file-system/files/list\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    references:\n      - https://github.com/hfiref0x/TDL/blob/cc4b46ae1c939b14a22a734a727b163f873a41b5/Source/Furutaka/sup.c#L315\n    examples:\n      - Practical Malware Analysis Lab 01-01.exe_:0x4011E0\n      - Practical Malware Analysis Lab 20-02.exe_:0x401000\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x14000203C\n  features:\n    - or:\n      - and:\n        - or:\n          - api: kernel32.FindFirstFile\n          - api: kernel32.FindFirstFileEx\n          - api: kernel32.FindFirstFileTransacted\n          - api: kernel32.FindFirstFileName\n          - api: kernel32.FindFirstFileNameTransacted\n        - or:\n          - api: kernel32.FindNextFile\n          - api: kernel32.FindNextFileName\n        - optional:\n          - api: kernel32.FindClose\n          - match: contain loop\n      - and:\n        - or:\n          - basic block:\n            - and:\n              - number: 1 = DIRECTORY_QUERY\n              - api: ntdll.NtOpenDirectoryObject\n          - call:\n            - and:\n              - number: 1 = DIRECTORY_QUERY\n              - api: ntdll.NtOpenDirectoryObject\n        - api: ntdll.NtQueryDirectoryObject\n        - optional:\n          - api: RtlAllocateHeap\n          - match: contain loop\n          - characteristic: indirect call\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://github.com/hfiref0x/TDL/blob/cc4b46ae1c939b14a22a734a727b163f873a41b5/Source/Furutaka/sup.c#L315"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "10",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create process on Windows",
+                                               "description":  "host-interaction/process/create",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: CreateProcess"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create process on Windows\n    namespace: host-interaction/process/create\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - Process::Create Process [C0017]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x406DB0\n      - Practical Malware Analysis Lab 01-04.exe_:0x4011FC\n      - 692f7fd6d198e804d6af98eb9e390d61:0x6000003\n  features:\n    - or:\n      - api: kernel32.WinExec\n      - api: kernel32.CreateProcess\n      - api: shell32.ShellExecute\n      - api: shell32.ShellExecuteEx\n      - api: advapi32.CreateProcessAsUser\n      - api: advapi32.CreateProcessWithLogon\n      - api: advapi32.CreateProcessWithToken\n      - api: kernel32.CreateProcessInternal\n      - api: ntdll.NtCreateUserProcess\n      - api: ntdll.NtCreateProcess\n      - api: ntdll.NtCreateProcessEx\n      - api: ntdll.ZwCreateProcess\n      - api: ZwCreateProcessEx\n      - api: ntdll.ZwCreateUserProcess\n      - api: ntdll.RtlCreateUserProcess\n      - api: System.Diagnostics.Process::Start\n"
+                                           },
+                                           {
+                                               "id":  "11",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get file version info",
+                                               "description":  "host-interaction/file-system/meta",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetFileVersionInfoSizeEx",
+                                                                  "api: VerQueryValue",
+                                                                  "api: GetFileVersionInfoEx"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get file version info\n    namespace: host-interaction/file-system/meta\n    authors:\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    examples:\n      - mimikatz.exe_:0x45E308\n  features:\n    - and:\n      - or:\n        - api: version.GetFileVersionInfo\n        - api: version.GetFileVersionInfoEx\n        - api: System.Diagnostics.FileVersionInfo::GetVersionInfo\n      - optional:\n        - description: retrieve specified version information from the version-information resource\n        - api: version.VerQueryValue\n        - or:\n          - api: version.GetFileVersionInfoSize\n          - api: version.GetFileVersionInfoSizeEx\n"
+                                           },
+                                           {
+                                               "id":  "871",
+                                               "description":  "Sample execution stops while process was sleeping (likely an evasion)",
+                                               "match_data":  [
+                                                                  "Thread delayed"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "9028",
+                                               "description":  "Uses 32bit PE files",
+                                               "match_data":  [
+                                                                  "EXECUTABLE_IMAGE, 32BIT_MACHINE"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "415",
+                                               "description":  "PE file has an executable .text section and no other executable section",
+                                               "match_data":  [
+                                                                  "Section: .text IMAGE_SCN_CNT_CODE, IMAGE_SCN_MEM_EXECUTE, IMAGE_SCN_MEM_READ"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "509",
+                                               "description":  "Reads software policies",
+                                               "match_data":  [
+                                                                  "HKEY_CURRENT_USER\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "#registry_keys_opened",
+                                                                "value":  "HKEY_CURRENT_USER\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "411",
+                                               "description":  "PE file contains a mix of data directories often seen in goodware",
+                                               "match_data":  [
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_IMPORT",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_RESOURCE",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_BASERELOC",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_DEBUG",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_IAT"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "715",
+                                               "description":  "Classification label",
+                                               "match_data":  [
+                                                                  "clean2.winEXE@38/0@0/1"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "229",
+                                               "description":  "Spawns processes",
+                                               "match_data":  [
+                                                                  "C:\\Users\\user\\Desktop\\forfiles.exe C:\\Users\\user\\Desktop\\forfiles.exe",
+                                                                  "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1",
+                                                                  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"BQJUWOYRTO.pdf\"",
+                                                                  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"BUFZSQPCOH\"",
+                                                                  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"BWDRWEEARI.mp3\"",
+                                                                  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"BWDRWEEARI.pdf\"",
+                                                                  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"desktop.ini\"",
+                                                                  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"DUKNXICOZT\"",
+                                                                  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"forfiles.exe\"",
+                                                                  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"GNLQNHOLWB.png\"",
+                                                                  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"IZMFBFKMEB.jpg\"",
+                                                                  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"IZMFBFKMEB.xlsx\"",
+                                                                  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"MIVTQDBATG\"",
+                                                                  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"NIRMEKAMZH\"",
+                                                                  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"NIRMEKAMZH.docx\"",
+                                                                  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"OVWVVIANZH.mp3\"",
+                                                                  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"PWZOQIFCAN\"",
+                                                                  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"UBVUNTSCZJ\""
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "406",
+                                               "description":  "Contains modern PE file flags such as dynamic base (ASLR) or NX",
+                                               "match_data":  [
+                                                                  "DYNAMIC_BASE, NX_COMPAT, GUARD_CF, TERMINAL_SERVER_AWARE"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "95",
+                                               "description":  "Creates mutexes",
+                                               "match_data":  [
+                                                                  "\\Sessions\\1\\BaseNamedObjects\\Local\\SM0:2824:120:WilError_01"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "149",
+                                               "description":  "Program does not show much activity (idle)",
+                                               "match_data":  [
+                                                                  "no activity detected"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "203",
+                                               "description":  "Binary contains paths to debug symbols",
+                                               "match_data":  [
+                                                                  "forfiles.pdb source: forfiles.exe",
+                                                                  "forfiles.pdbGCTL source: forfiles.exe"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "412",
+                                               "description":  "PE file contains a debug data directory",
+                                               "match_data":  [
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_DEBUG"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "234",
+                                               "description":  "Binary contains a suspicious time stamp",
+                                               "match_data":  [
+                                                                  "0xD1B29730 [Thu Jun 26 05:44:16 2081 UTC]"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           }
+                                       ],
+                 "ja3_digests":  [
+                                     "a0e9f5d64349fb13191bc781f81f42e1"
+                                 ],
+                 "verdict_confidence":  98,
+                 "sigma_analysis_results":  [
+                                                {
+                                                    "match_context":  [
+                                                                          {
+                                                                              "values":  {
+                                                                                             "Hashes":  "SHA1=502285D9914448259E73B18843B088FE972841D6,MD5=F3BDBE3BB6F734E357235F4D5898582D,SHA256=3685495D051137B1C4EFDE22C26DF0883614B6453B762FA84588DA55ED2E7744,IMPHASH=0AF8419BE362159398343D7B31721726",
+                                                                                             "CurrentDirectory":  "C:\\Users\\george\\Desktop\\",
+                                                                                             "OriginalFileName":  "Cmd.Exe",
+                                                                                             "Product":  "Microsoft\\xae Windows\\xae Operating System",
+                                                                                             "Description":  "Windows Command Processor",
+                                                                                             "EventID":  "1",
+                                                                                             "ParentCommandLine":  "\"C:\\Users\\george\\Desktop\\forfiles.exe\"",
+                                                                                             "CommandLine":  "/c echo \"BQJUWOYRTO.pdf\"",
+                                                                                             "FileVersion":  "10.0.17134.1 (WinBuild.160101.0800)",
+                                                                                             "ParentImage":  "C:\\Users\\george\\Desktop\\forfiles.exe",
+                                                                                             "IntegrityLevel":  "High",
+                                                                                             "Image":  "C:\\Windows\\SysWOW64\\cmd.exe",
+                                                                                             "Company":  "Microsoft Corporation"
+                                                                                         }
+                                                                          },
+                                                                          {
+                                                                              "values":  {
+                                                                                             "Hashes":  "SHA1=502285D9914448259E73B18843B088FE972841D6,MD5=F3BDBE3BB6F734E357235F4D5898582D,SHA256=3685495D051137B1C4EFDE22C26DF0883614B6453B762FA84588DA55ED2E7744,IMPHASH=0AF8419BE362159398343D7B31721726",
+                                                                                             "CurrentDirectory":  "C:\\Users\\george\\Desktop\\",
+                                                                                             "OriginalFileName":  "Cmd.Exe",
+                                                                                             "Product":  "Microsoft\\xae Windows\\xae Operating System",
+                                                                                             "Description":  "Windows Command Processor",
+                                                                                             "EventID":  "1",
+                                                                                             "ParentCommandLine":  "\"C:\\Users\\george\\Desktop\\forfiles.exe\"",
+                                                                                             "CommandLine":  "/c echo \"BUFZSQPCOH\"",
+                                                                                             "FileVersion":  "10.0.17134.1 (WinBuild.160101.0800)",
+                                                                                             "ParentImage":  "C:\\Users\\george\\Desktop\\forfiles.exe",
+                                                                                             "IntegrityLevel":  "High",
+                                                                                             "Image":  "C:\\Windows\\SysWOW64\\cmd.exe",
+                                                                                             "Company":  "Microsoft Corporation"
+                                                                                         }
+                                                                          },
+                                                                          {
+                                                                              "values":  {
+                                                                                             "Hashes":  "SHA1=502285D9914448259E73B18843B088FE972841D6,MD5=F3BDBE3BB6F734E357235F4D5898582D,SHA256=3685495D051137B1C4EFDE22C26DF0883614B6453B762FA84588DA55ED2E7744,IMPHASH=0AF8419BE362159398343D7B31721726",
+                                                                                             "CurrentDirectory":  "C:\\Users\\george\\Desktop\\",
+                                                                                             "OriginalFileName":  "Cmd.Exe",
+                                                                                             "Product":  "Microsoft\\xae Windows\\xae Operating System",
+                                                                                             "Description":  "Windows Command Processor",
+                                                                                             "FileVersion":  "10.0.17134.1 (WinBuild.160101.0800)",
+                                                                                             "ParentCommandLine":  "\"C:\\Users\\george\\Desktop\\forfiles.exe\"",
+                                                                                             "CommandLine":  "/c echo \"BWDRWEEARI.mp3\"",
+                                                                                             "EventID":  "1",
+                                                                                             "ParentImage":  "C:\\Users\\george\\Desktop\\forfiles.exe",
+                                                                                             "IntegrityLevel":  "High",
+                                                                                             "Image":  "C:\\Windows\\SysWOW64\\cmd.exe",
+                                                                                             "Company":  "Microsoft Corporation"
+                                                                                         }
+                                                                          },
+                                                                          {
+                                                                              "values":  {
+                                                                                             "Product":  "Microsoft\\xae Windows\\xae Operating System",
+                                                                                             "CurrentDirectory":  "C:\\Users\\george\\Desktop\\",
+                                                                                             "OriginalFileName":  "Cmd.Exe",
+                                                                                             "Hashes":  "SHA1=502285D9914448259E73B18843B088FE972841D6,MD5=F3BDBE3BB6F734E357235F4D5898582D,SHA256=3685495D051137B1C4EFDE22C26DF0883614B6453B762FA84588DA55ED2E7744,IMPHASH=0AF8419BE362159398343D7B31721726",
+                                                                                             "Description":  "Windows Command Processor",
+                                                                                             "FileVersion":  "10.0.17134.1 (WinBuild.160101.0800)",
+                                                                                             "ParentCommandLine":  "\"C:\\Users\\george\\Desktop\\forfiles.exe\"",
+                                                                                             "CommandLine":  "/c echo \"BWDRWEEARI.pdf\"",
+                                                                                             "EventID":  "1",
+                                                                                             "ParentImage":  "C:\\Users\\george\\Desktop\\forfiles.exe",
+                                                                                             "IntegrityLevel":  "High",
+                                                                                             "Image":  "C:\\Windows\\SysWOW64\\cmd.exe",
+                                                                                             "Company":  "Microsoft Corporation"
+                                                                                         }
+                                                                          },
+                                                                          {
+                                                                              "values":  {
+                                                                                             "Hashes":  "SHA1=502285D9914448259E73B18843B088FE972841D6,MD5=F3BDBE3BB6F734E357235F4D5898582D,SHA256=3685495D051137B1C4EFDE22C26DF0883614B6453B762FA84588DA55ED2E7744,IMPHASH=0AF8419BE362159398343D7B31721726",
+                                                                                             "CurrentDirectory":  "C:\\Users\\george\\Desktop\\",
+                                                                                             "OriginalFileName":  "Cmd.Exe",
+                                                                                             "Product":  "Microsoft\\xae Windows\\xae Operating System",
+                                                                                             "Description":  "Windows Command Processor",
+                                                                                             "EventID":  "1",
+                                                                                             "ParentCommandLine":  "\"C:\\Users\\george\\Desktop\\forfiles.exe\"",
+                                                                                             "CommandLine":  "/c echo \"desktop.ini\"",
+                                                                                             "FileVersion":  "10.0.17134.1 (WinBuild.160101.0800)",
+                                                                                             "ParentImage":  "C:\\Users\\george\\Desktop\\forfiles.exe",
+                                                                                             "IntegrityLevel":  "High",
+                                                                                             "Image":  "C:\\Windows\\SysWOW64\\cmd.exe",
+                                                                                             "Company":  "Microsoft Corporation"
+                                                                                         }
+                                                                          },
+                                                                          {
+                                                                              "values":  {
+                                                                                             "Hashes":  "SHA1=502285D9914448259E73B18843B088FE972841D6,MD5=F3BDBE3BB6F734E357235F4D5898582D,SHA256=3685495D051137B1C4EFDE22C26DF0883614B6453B762FA84588DA55ED2E7744,IMPHASH=0AF8419BE362159398343D7B31721726",
+                                                                                             "CurrentDirectory":  "C:\\Users\\george\\Desktop\\",
+                                                                                             "OriginalFileName":  "Cmd.Exe",
+                                                                                             "Product":  "Microsoft\\xae Windows\\xae Operating System",
+                                                                                             "Description":  "Windows Command Processor",
+                                                                                             "EventID":  "1",
+                                                                                             "ParentCommandLine":  "\"C:\\Users\\george\\Desktop\\forfiles.exe\"",
+                                                                                             "CommandLine":  "/c echo \"DUKNXICOZT\"",
+                                                                                             "FileVersion":  "10.0.17134.1 (WinBuild.160101.0800)",
+                                                                                             "ParentImage":  "C:\\Users\\george\\Desktop\\forfiles.exe",
+                                                                                             "IntegrityLevel":  "High",
+                                                                                             "Image":  "C:\\Windows\\SysWOW64\\cmd.exe",
+                                                                                             "Company":  "Microsoft Corporation"
+                                                                                         }
+                                                                          },
+                                                                          {
+                                                                              "values":  {
+                                                                                             "Hashes":  "SHA1=502285D9914448259E73B18843B088FE972841D6,MD5=F3BDBE3BB6F734E357235F4D5898582D,SHA256=3685495D051137B1C4EFDE22C26DF0883614B6453B762FA84588DA55ED2E7744,IMPHASH=0AF8419BE362159398343D7B31721726",
+                                                                                             "CurrentDirectory":  "C:\\Users\\george\\Desktop\\",
+                                                                                             "OriginalFileName":  "Cmd.Exe",
+                                                                                             "Product":  "Microsoft\\xae Windows\\xae Operating System",
+                                                                                             "Description":  "Windows Command Processor",
+                                                                                             "FileVersion":  "10.0.17134.1 (WinBuild.160101.0800)",
+                                                                                             "ParentCommandLine":  "\"C:\\Users\\george\\Desktop\\forfiles.exe\"",
+                                                                                             "CommandLine":  "/c echo \"forfiles.exe\"",
+                                                                                             "EventID":  "1",
+                                                                                             "ParentImage":  "C:\\Users\\george\\Desktop\\forfiles.exe",
+                                                                                             "IntegrityLevel":  "High",
+                                                                                             "Image":  "C:\\Windows\\SysWOW64\\cmd.exe",
+                                                                                             "Company":  "Microsoft Corporation"
+                                                                                         }
+                                                                          },
+                                                                          {
+                                                                              "values":  {
+                                                                                             "Product":  "Microsoft\\xae Windows\\xae Operating System",
+                                                                                             "CurrentDirectory":  "C:\\Users\\george\\Desktop\\",
+                                                                                             "OriginalFileName":  "Cmd.Exe",
+                                                                                             "Hashes":  "SHA1=502285D9914448259E73B18843B088FE972841D6,MD5=F3BDBE3BB6F734E357235F4D5898582D,SHA256=3685495D051137B1C4EFDE22C26DF0883614B6453B762FA84588DA55ED2E7744,IMPHASH=0AF8419BE362159398343D7B31721726",
+                                                                                             "Description":  "Windows Command Processor",
+                                                                                             "FileVersion":  "10.0.17134.1 (WinBuild.160101.0800)",
+                                                                                             "ParentCommandLine":  "\"C:\\Users\\george\\Desktop\\forfiles.exe\"",
+                                                                                             "CommandLine":  "/c echo \"GNLQNHOLWB.png\"",
+                                                                                             "EventID":  "1",
+                                                                                             "ParentImage":  "C:\\Users\\george\\Desktop\\forfiles.exe",
+                                                                                             "IntegrityLevel":  "High",
+                                                                                             "Image":  "C:\\Windows\\SysWOW64\\cmd.exe",
+                                                                                             "Company":  "Microsoft Corporation"
+                                                                                         }
+                                                                          },
+                                                                          {
+                                                                              "values":  {
+                                                                                             "Product":  "Microsoft\\xae Windows\\xae Operating System",
+                                                                                             "CurrentDirectory":  "C:\\Users\\george\\Desktop\\",
+                                                                                             "OriginalFileName":  "Cmd.Exe",
+                                                                                             "Hashes":  "SHA1=502285D9914448259E73B18843B088FE972841D6,MD5=F3BDBE3BB6F734E357235F4D5898582D,SHA256=3685495D051137B1C4EFDE22C26DF0883614B6453B762FA84588DA55ED2E7744,IMPHASH=0AF8419BE362159398343D7B31721726",
+                                                                                             "Description":  "Windows Command Processor",
+                                                                                             "FileVersion":  "10.0.17134.1 (WinBuild.160101.0800)",
+                                                                                             "ParentCommandLine":  "\"C:\\Users\\george\\Desktop\\forfiles.exe\"",
+                                                                                             "CommandLine":  "/c echo \"IZMFBFKMEB.jpg\"",
+                                                                                             "EventID":  "1",
+                                                                                             "ParentImage":  "C:\\Users\\george\\Desktop\\forfiles.exe",
+                                                                                             "IntegrityLevel":  "High",
+                                                                                             "Image":  "C:\\Windows\\SysWOW64\\cmd.exe",
+                                                                                             "Company":  "Microsoft Corporation"
+                                                                                         }
+                                                                          },
+                                                                          {
+                                                                              "values":  {
+                                                                                             "Hashes":  "SHA1=502285D9914448259E73B18843B088FE972841D6,MD5=F3BDBE3BB6F734E357235F4D5898582D,SHA256=3685495D051137B1C4EFDE22C26DF0883614B6453B762FA84588DA55ED2E7744,IMPHASH=0AF8419BE362159398343D7B31721726",
+                                                                                             "CurrentDirectory":  "C:\\Users\\george\\Desktop\\",
+                                                                                             "OriginalFileName":  "Cmd.Exe",
+                                                                                             "Product":  "Microsoft\\xae Windows\\xae Operating System",
+                                                                                             "Description":  "Windows Command Processor",
+                                                                                             "EventID":  "1",
+                                                                                             "ParentCommandLine":  "\"C:\\Users\\george\\Desktop\\forfiles.exe\"",
+                                                                                             "CommandLine":  "/c echo \"IZMFBFKMEB.xlsx\"",
+                                                                                             "FileVersion":  "10.0.17134.1 (WinBuild.160101.0800)",
+                                                                                             "ParentImage":  "C:\\Users\\george\\Desktop\\forfiles.exe",
+                                                                                             "IntegrityLevel":  "High",
+                                                                                             "Image":  "C:\\Windows\\SysWOW64\\cmd.exe",
+                                                                                             "Company":  "Microsoft Corporation"
+                                                                                         }
+                                                                          },
+                                                                          {
+                                                                              "values":  {
+                                                                                             "Product":  "Microsoft\\xae Windows\\xae Operating System",
+                                                                                             "CurrentDirectory":  "C:\\Users\\george\\Desktop\\",
+                                                                                             "OriginalFileName":  "Cmd.Exe",
+                                                                                             "Hashes":  "SHA1=502285D9914448259E73B18843B088FE972841D6,MD5=F3BDBE3BB6F734E357235F4D5898582D,SHA256=3685495D051137B1C4EFDE22C26DF0883614B6453B762FA84588DA55ED2E7744,IMPHASH=0AF8419BE362159398343D7B31721726",
+                                                                                             "Description":  "Windows Command Processor",
+                                                                                             "EventID":  "1",
+                                                                                             "ParentCommandLine":  "\"C:\\Users\\george\\Desktop\\forfiles.exe\"",
+                                                                                             "CommandLine":  "/c echo \"MIVTQDBATG\"",
+                                                                                             "FileVersion":  "10.0.17134.1 (WinBuild.160101.0800)",
+                                                                                             "ParentImage":  "C:\\Users\\george\\Desktop\\forfiles.exe",
+                                                                                             "IntegrityLevel":  "High",
+                                                                                             "Image":  "C:\\Windows\\SysWOW64\\cmd.exe",
+                                                                                             "Company":  "Microsoft Corporation"
+                                                                                         }
+                                                                          },
+                                                                          {
+                                                                              "values":  {
+                                                                                             "Hashes":  "SHA1=502285D9914448259E73B18843B088FE972841D6,MD5=F3BDBE3BB6F734E357235F4D5898582D,SHA256=3685495D051137B1C4EFDE22C26DF0883614B6453B762FA84588DA55ED2E7744,IMPHASH=0AF8419BE362159398343D7B31721726",
+                                                                                             "CurrentDirectory":  "C:\\Users\\george\\Desktop\\",
+                                                                                             "OriginalFileName":  "Cmd.Exe",
+                                                                                             "Product":  "Microsoft\\xae Windows\\xae Operating System",
+                                                                                             "Description":  "Windows Command Processor",
+                                                                                             "FileVersion":  "10.0.17134.1 (WinBuild.160101.0800)",
+                                                                                             "ParentCommandLine":  "\"C:\\Users\\george\\Desktop\\forfiles.exe\"",
+                                                                                             "CommandLine":  "/c echo \"NIRMEKAMZH\"",
+                                                                                             "EventID":  "1",
+                                                                                             "ParentImage":  "C:\\Users\\george\\Desktop\\forfiles.exe",
+                                                                                             "IntegrityLevel":  "High",
+                                                                                             "Image":  "C:\\Windows\\SysWOW64\\cmd.exe",
+                                                                                             "Company":  "Microsoft Corporation"
+                                                                                         }
+                                                                          },
+                                                                          {
+                                                                              "values":  {
+                                                                                             "Hashes":  "SHA1=502285D9914448259E73B18843B088FE972841D6,MD5=F3BDBE3BB6F734E357235F4D5898582D,SHA256=3685495D051137B1C4EFDE22C26DF0883614B6453B762FA84588DA55ED2E7744,IMPHASH=0AF8419BE362159398343D7B31721726",
+                                                                                             "CurrentDirectory":  "C:\\Users\\george\\Desktop\\",
+                                                                                             "OriginalFileName":  "Cmd.Exe",
+                                                                                             "Product":  "Microsoft\\xae Windows\\xae Operating System",
+                                                                                             "Description":  "Windows Command Processor",
+                                                                                             "FileVersion":  "10.0.17134.1 (WinBuild.160101.0800)",
+                                                                                             "ParentCommandLine":  "\"C:\\Users\\george\\Desktop\\forfiles.exe\"",
+                                                                                             "CommandLine":  "/c echo \"NIRMEKAMZH.docx\"",
+                                                                                             "EventID":  "1",
+                                                                                             "ParentImage":  "C:\\Users\\george\\Desktop\\forfiles.exe",
+                                                                                             "IntegrityLevel":  "High",
+                                                                                             "Image":  "C:\\Windows\\SysWOW64\\cmd.exe",
+                                                                                             "Company":  "Microsoft Corporation"
+                                                                                         }
+                                                                          },
+                                                                          {
+                                                                              "values":  {
+                                                                                             "Hashes":  "SHA1=502285D9914448259E73B18843B088FE972841D6,MD5=F3BDBE3BB6F734E357235F4D5898582D,SHA256=3685495D051137B1C4EFDE22C26DF0883614B6453B762FA84588DA55ED2E7744,IMPHASH=0AF8419BE362159398343D7B31721726",
+                                                                                             "CurrentDirectory":  "C:\\Users\\george\\Desktop\\",
+                                                                                             "OriginalFileName":  "Cmd.Exe",
+                                                                                             "Product":  "Microsoft\\xae Windows\\xae Operating System",
+                                                                                             "Description":  "Windows Command Processor",
+                                                                                             "EventID":  "1",
+                                                                                             "ParentCommandLine":  "\"C:\\Users\\george\\Desktop\\forfiles.exe\"",
+                                                                                             "CommandLine":  "/c echo \"OVWVVIANZH.mp3\"",
+                                                                                             "FileVersion":  "10.0.17134.1 (WinBuild.160101.0800)",
+                                                                                             "ParentImage":  "C:\\Users\\george\\Desktop\\forfiles.exe",
+                                                                                             "IntegrityLevel":  "High",
+                                                                                             "Image":  "C:\\Windows\\SysWOW64\\cmd.exe",
+                                                                                             "Company":  "Microsoft Corporation"
+                                                                                         }
+                                                                          },
+                                                                          {
+                                                                              "values":  {
+                                                                                             "Product":  "Microsoft\\xae Windows\\xae Operating System",
+                                                                                             "CurrentDirectory":  "C:\\Users\\george\\Desktop\\",
+                                                                                             "OriginalFileName":  "Cmd.Exe",
+                                                                                             "Hashes":  "SHA1=502285D9914448259E73B18843B088FE972841D6,MD5=F3BDBE3BB6F734E357235F4D5898582D,SHA256=3685495D051137B1C4EFDE22C26DF0883614B6453B762FA84588DA55ED2E7744,IMPHASH=0AF8419BE362159398343D7B31721726",
+                                                                                             "Description":  "Windows Command Processor",
+                                                                                             "FileVersion":  "10.0.17134.1 (WinBuild.160101.0800)",
+                                                                                             "ParentCommandLine":  "\"C:\\Users\\george\\Desktop\\forfiles.exe\"",
+                                                                                             "CommandLine":  "/c echo \"PWZOQIFCAN\"",
+                                                                                             "EventID":  "1",
+                                                                                             "ParentImage":  "C:\\Users\\george\\Desktop\\forfiles.exe",
+                                                                                             "IntegrityLevel":  "High",
+                                                                                             "Image":  "C:\\Windows\\SysWOW64\\cmd.exe",
+                                                                                             "Company":  "Microsoft Corporation"
+                                                                                         }
+                                                                          },
+                                                                          {
+                                                                              "values":  {
+                                                                                             "Product":  "Microsoft\\xae Windows\\xae Operating System",
+                                                                                             "CurrentDirectory":  "C:\\Users\\george\\Desktop\\",
+                                                                                             "OriginalFileName":  "Cmd.Exe",
+                                                                                             "Hashes":  "SHA1=502285D9914448259E73B18843B088FE972841D6,MD5=F3BDBE3BB6F734E357235F4D5898582D,SHA256=3685495D051137B1C4EFDE22C26DF0883614B6453B762FA84588DA55ED2E7744,IMPHASH=0AF8419BE362159398343D7B31721726",
+                                                                                             "Description":  "Windows Command Processor",
+                                                                                             "EventID":  "1",
+                                                                                             "ParentCommandLine":  "\"C:\\Users\\george\\Desktop\\forfiles.exe\"",
+                                                                                             "CommandLine":  "/c echo \"PWZOQIFCAN.docx\"",
+                                                                                             "FileVersion":  "10.0.17134.1 (WinBuild.160101.0800)",
+                                                                                             "ParentImage":  "C:\\Users\\george\\Desktop\\forfiles.exe",
+                                                                                             "IntegrityLevel":  "High",
+                                                                                             "Image":  "C:\\Windows\\SysWOW64\\cmd.exe",
+                                                                                             "Company":  "Microsoft Corporation"
+                                                                                         }
+                                                                          },
+                                                                          {
+                                                                              "values":  {
+                                                                                             "Hashes":  "SHA1=502285D9914448259E73B18843B088FE972841D6,MD5=F3BDBE3BB6F734E357235F4D5898582D,SHA256=3685495D051137B1C4EFDE22C26DF0883614B6453B762FA84588DA55ED2E7744,IMPHASH=0AF8419BE362159398343D7B31721726",
+                                                                                             "CurrentDirectory":  "C:\\Users\\george\\Desktop\\",
+                                                                                             "OriginalFileName":  "Cmd.Exe",
+                                                                                             "Product":  "Microsoft\\xae Windows\\xae Operating System",
+                                                                                             "Description":  "Windows Command Processor",
+                                                                                             "FileVersion":  "10.0.17134.1 (WinBuild.160101.0800)",
+                                                                                             "ParentCommandLine":  "\"C:\\Users\\george\\Desktop\\forfiles.exe\"",
+                                                                                             "CommandLine":  "/c echo \"PWZOQIFCAN.xlsx\"",
+                                                                                             "EventID":  "1",
+                                                                                             "ParentImage":  "C:\\Users\\george\\Desktop\\forfiles.exe",
+                                                                                             "IntegrityLevel":  "High",
+                                                                                             "Image":  "C:\\Windows\\SysWOW64\\cmd.exe",
+                                                                                             "Company":  "Microsoft Corporation"
+                                                                                         }
+                                                                          },
+                                                                          {
+                                                                              "values":  {
+                                                                                             "Product":  "Microsoft\\xae Windows\\xae Operating System",
+                                                                                             "CurrentDirectory":  "C:\\Users\\george\\Desktop\\",
+                                                                                             "OriginalFileName":  "Cmd.Exe",
+                                                                                             "Hashes":  "SHA1=502285D9914448259E73B18843B088FE972841D6,MD5=F3BDBE3BB6F734E357235F4D5898582D,SHA256=3685495D051137B1C4EFDE22C26DF0883614B6453B762FA84588DA55ED2E7744,IMPHASH=0AF8419BE362159398343D7B31721726",
+                                                                                             "Description":  "Windows Command Processor",
+                                                                                             "FileVersion":  "10.0.17134.1 (WinBuild.160101.0800)",
+                                                                                             "ParentCommandLine":  "\"C:\\Users\\george\\Desktop\\forfiles.exe\"",
+                                                                                             "CommandLine":  "/c echo \"UBVUNTSCZJ\"",
+                                                                                             "EventID":  "1",
+                                                                                             "ParentImage":  "C:\\Users\\george\\Desktop\\forfiles.exe",
+                                                                                             "IntegrityLevel":  "High",
+                                                                                             "Image":  "C:\\Windows\\SysWOW64\\cmd.exe",
+                                                                                             "Company":  "Microsoft Corporation"
+                                                                                         }
+                                                                          },
+                                                                          {
+                                                                              "values":  {
+                                                                                             "Hashes":  "SHA1=502285D9914448259E73B18843B088FE972841D6,MD5=F3BDBE3BB6F734E357235F4D5898582D,SHA256=3685495D051137B1C4EFDE22C26DF0883614B6453B762FA84588DA55ED2E7744,IMPHASH=0AF8419BE362159398343D7B31721726",
+                                                                                             "CurrentDirectory":  "C:\\Users\\george\\Desktop\\",
+                                                                                             "OriginalFileName":  "Cmd.Exe",
+                                                                                             "Product":  "Microsoft\\xae Windows\\xae Operating System",
+                                                                                             "Description":  "Windows Command Processor",
+                                                                                             "FileVersion":  "10.0.17134.1 (WinBuild.160101.0800)",
+                                                                                             "ParentCommandLine":  "\"C:\\Users\\george\\Desktop\\forfiles.exe\"",
+                                                                                             "CommandLine":  "/c echo \"UBVUNTSCZJ.jpg\"",
+                                                                                             "EventID":  "1",
+                                                                                             "ParentImage":  "C:\\Users\\george\\Desktop\\forfiles.exe",
+                                                                                             "IntegrityLevel":  "High",
+                                                                                             "Image":  "C:\\Windows\\SysWOW64\\cmd.exe",
+                                                                                             "Company":  "Microsoft Corporation"
+                                                                                         }
+                                                                          },
+                                                                          {
+                                                                              "values":  {
+                                                                                             "Product":  "Microsoft\\xae Windows\\xae Operating System",
+                                                                                             "CurrentDirectory":  "C:\\Users\\george\\Desktop\\",
+                                                                                             "OriginalFileName":  "Cmd.Exe",
+                                                                                             "Hashes":  "SHA1=502285D9914448259E73B18843B088FE972841D6,MD5=F3BDBE3BB6F734E357235F4D5898582D,SHA256=3685495D051137B1C4EFDE22C26DF0883614B6453B762FA84588DA55ED2E7744,IMPHASH=0AF8419BE362159398343D7B31721726",
+                                                                                             "Description":  "Windows Command Processor",
+                                                                                             "FileVersion":  "10.0.17134.1 (WinBuild.160101.0800)",
+                                                                                             "ParentCommandLine":  "\"C:\\Users\\george\\Desktop\\forfiles.exe\"",
+                                                                                             "CommandLine":  "/c echo \"WHZAGPPPLA.png\"",
+                                                                                             "EventID":  "1",
+                                                                                             "ParentImage":  "C:\\Users\\george\\Desktop\\forfiles.exe",
+                                                                                             "IntegrityLevel":  "High",
+                                                                                             "Image":  "C:\\Windows\\SysWOW64\\cmd.exe",
+                                                                                             "Company":  "Microsoft Corporation"
+                                                                                         }
+                                                                          }
+                                                                      ],
+                                                    "rule_level":  "high",
+                                                    "rule_id":  "32fe36abb39d468ad23cc377de33068c295dce79c9d36eb1c0b7fc94d2012270",
+                                                    "rule_source":  "Sigma Integrated Rule Set (GitHub)",
+                                                    "rule_title":  "Forfiles.EXE Child Process Masquerading",
+                                                    "rule_description":  "Detects the execution of \"forfiles\" from a non-default location, in order to potentially spawn a custom \"cmd.exe\" from the current working directory.\n",
+                                                    "rule_author":  "Nasreddine Bencherchali (Nextron Systems), Anish Bogati"
+                                                }
+                                            ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "parse PE header",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "1"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1614",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get geographical location",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "5"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1083",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get common file path",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "6"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1083",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "enumerate files on Windows",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "8"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1083",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get file version info",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "11"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1071",
+                                                     "signature_description":  "Adversaries may communicate using application layer protocols to avoid detection/network filtering by blending in with existing traffic."
+                                                 },
+                                                 {
+                                                     "id":  "T1070.006",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Binary contains a suspicious time stamp",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "234"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Reads software policies",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "509"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "processes_terminated":  [
+                                              "C:\\Windows\\SysWOW64\\cmd.exe",
+                                              "%SAMPLEPATH%\\forfiles.exe",
+                                              "C:\\Windows\\System32\\conhost.exe",
+                                              "C:\\Windows\\System32\\wuapihost.exe",
+                                              "%SAMPLEPATH%\\d81a80fe838790e3a1bc7daf3bde666c71d4a8aba8b4f8a371b2db2ff236a72e.exe",
+                                              "C:\\Windows\\System32\\UI0Detect.exe",
+                                              "C:\\Program Files\\Google3216_1122235346\\bin\\updater.exe",
+                                              "C:\\Users\\user\\Desktop\\forfiles.exe"
+                                          ],
+                 "files_written":  [
+                                       "\\Device\\ConDrv\\\\Connect"
+                                   ],
+                 "ip_traffic":  [
+                                    {
+                                        "destination_ip":  "204.79.197.203",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "20.99.133.109",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "192.229.211.108",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.197.238.105",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "151.101.22.172",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "20.69.140.28",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.196.193.245",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.46.216.134",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    }
+                                ],
+                 "files_dropped":  [
+                                       {
+                                           "path":  "C:\\Windows\\System32\\spp\\store\\2.0\\data.dat.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER2507.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER2507.tmp.WERInternalMetadata.xml"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER25D2.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER25D2.tmp.csv"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER2612.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER2612.tmp.txt"
+                                       },
+                                       {
+                                           "path":  "C:\\Windows\\System32\\spp\\store\\2.0\\cache\\cache.dat"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER396B.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER396B.tmp.WERInternalMetadata.xml"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER396C.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER396C.tmp.csv"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER397D.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER397D.tmp.txt"
+                                       },
+                                       {
+                                           "path":  "C:\\Sysmon\\438274944D21C3590AB2F6C5A34D5933B808ACB6409037FFE5B95B31EF18E8BDCFC6B5E6A0049489ADC5CECAFC7F95524157170C3CDA66F72AD85350D09F0476432071D000000000000000000000000000000000"
+                                       },
+                                       {
+                                           "path":  "C:\\Windows\\System32\\Microsoft\\Protect\\S-1-5-18\\User\\d4f05af6-c63b-4d81-9295-26018df456d9"
+                                       },
+                                       {
+                                           "path":  "C:\\Windows\\ServiceProfiles\\LocalService\\AppData\\Roaming\\Microsoft\\Crypto\\Keys\\de7cf8a7901d2ad13e5c67c29e5d1662_cbbb49d6-b7ff-44ca-aba5-8a5e250d4d42"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\141.0.7340.0"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\141.0.7340.0\\Crashpad"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\141.0.7340.0\\Crashpad\\reports"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\141.0.7340.0\\Crashpad\\attachments"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\141.0.7340.0\\Crashpad\\metadata"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files\\Google1768_117004589"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\141.0.7340.0\\uninstall.cmd"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\141.0.7340.0\\updater.exe"
+                                       }
+                                   ],
+                 "files_opened":  [
+                                      "C:\\Users\\\u003cUSER\u003e\\AppData\\Local\\Temp\\forfiles.exe",
+                                      "C:\\Users\\\u003cUSER\u003e\\AppData\\Local\\Temp",
+                                      "C:\\Users\\\u003cUSER\u003e\\AppData\\Local\\Temp\\",
+                                      "C:\\Users\\\u003cUSER\u003e\\AppData\\Local\\Temp\\cmd.exe",
+                                      "C:\\Windows\\System32\\cmd.exe",
+                                      "C:\\Users\\",
+                                      "C:\\Users\\\u003cUSER\u003e\\",
+                                      "C:\\Users\\\u003cUSER\u003e\\AppData\\",
+                                      "C:\\Users\\\u003cUSER\u003e\\AppData\\Local\\",
+                                      "\\crashpad_1768_DRNQRBHNANNMINOW",
+                                      "C:\\Users\\user\\Desktop\\en-US\\forfiles.exe.mui",
+                                      "C:\\Users\\user\\Desktop\\en\\forfiles.exe.mui",
+                                      "C:\\Users\\user\\Desktop\\forfiles.exe",
+                                      "C:\\Windows\\Globalization\\Sorting\\sortdefault.nls",
+                                      "C:\\Windows\\SYSTEM32\\ntmarta.dll",
+                                      "C:\\Windows\\SYSTEM32\\ole32.dll",
+                                      "C:\\Windows\\SYSTEM32\\wintypes.dll",
+                                      "C:\\Windows\\SysWOW64\\IMM32.DLL",
+                                      "C:\\Windows\\SysWOW64\\VERSION.dll",
+                                      "C:\\Windows\\System32\\CoreMessaging.dll",
+                                      "C:\\Windows\\System32\\CoreUIComponents.dll",
+                                      "C:\\Windows\\System32\\TextInputFramework.dll",
+                                      "C:\\Windows\\System32\\en-US\\user32.dll.mui",
+                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_d3fbe61b7c93d9f0",
+                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_d3fbe61b7c93d9f0\\comctl32.DLL",
+                                      "C:\\Windows\\system32\\IMM32.DLL",
+                                      "C:\\Windows\\system32\\conhost.exe",
+                                      "C:\\Windows\\system32\\dwmapi.dll",
+                                      "C:\\Windows\\system32\\en-US\\conhost.exe.mui",
+                                      "C:\\Windows\\system32\\rpcss.dll",
+                                      "C:\\Windows\\system32\\uxtheme.dll",
+                                      "C:\\Windows\\system32\\uxtheme.dll.Config",
+                                      "\\Device\\ConDrv\\Server",
+                                      "\\Device\\ConDrv\\\\Input",
+                                      "\\Device\\ConDrv\\\\Output",
+                                      "\\Device\\ConDrv\\\\Reference"
+                                  ],
+                 "dns_lookups":  [
+                                     {
+                                         "hostname":  "www.microsoft.com",
+                                         "resolved_ips":  [
+                                                              "23.197.238.105"
+                                                          ]
+                                     },
+                                     {
+                                         "hostname":  "res.public.onecdn.static.microsoft",
+                                         "resolved_ips":  [
+                                                              "23.46.216.134",
+                                                              "23.46.216.146"
+                                                          ]
+                                     }
+                                 ],
+                 "files_deleted":  [
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER2507.tmp.WERInternalMetadata.xml",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER25D2.tmp.csv",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER2612.tmp.txt",
+                                       "C:\\Windows\\System32\\spp\\store\\2.0\\cache\\cache.dat",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER396B.tmp.WERInternalMetadata.xml",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER396C.tmp.csv",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER397D.tmp.txt",
+                                       "C:\\Windows\\ServiceProfiles\\LocalService\\AppData\\Roaming\\Microsoft\\Crypto\\Keys\\de7cf8a7901d2ad13e5c67c29e5d1662_cbbb49d6-b7ff-44ca-aba5-8a5e250d4d42"
+                                   ],
+                 "modules_loaded":  [
+                                        "%SAMPLEPATH%\\d81a80fe838790e3a1bc7daf3bde666c71d4a8aba8b4f8a371b2db2ff236a72e.exe"
+                                    ],
+                 "registry_keys_opened":  [
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Session Manager\\SafeProcessSearchMode",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Command Processor\\DefaultColor",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize\\DisableMetaFiles",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Command Processor\\PathCompletionChar",
+                                              "HKEY_CURRENT_USER\\Software\\Policies\\Microsoft\\Windows\\System",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Command Processor\\CompletionChar",
+                                              "HKEY_CURRENT_USER\\Software\\Microsoft\\Command Processor",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Session Manager\\ResourcePolicies",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Command Processor",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize\\DisableUmpdBufferSizeCheck",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Command Processor\\AutoRun",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Command Processor\\EnableExtensions",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Command Processor\\DelayedExpansion",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Command Processor\\DisableUNCCheck",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\forfiles.exe",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Nls\\Sorting\\Versions",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Windows",
+                                              "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\AppModel\\Lookaside\\Packages",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\SideBySide",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Wow64\\x86",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Wow64\\x86\\xtajit",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Lsa\\FipsAlgorithmPolicy",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\NLS\\Language",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Policies\\Microsoft\\MUI\\Settings",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Lsa",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\OLE",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Segment Heap",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\MUI\\UILanguages",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Nls\\ExtendedLocale",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Policies\\Microsoft\\Cryptography\\Configuration",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Session Manager",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\MUI\\UILanguages\\en-US",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Ole",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Nls\\CustomLocale",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\MUI\\Settings\\LanguageConfiguration",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Nls\\CustomLocale",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\MUI\\UILanguages\\PendingDelete",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Policies\\Microsoft\\WindowsStore",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\OLE\\Tracing",
+                                              "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows NT\\CurrentVersion",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\SafeBoot\\Option",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Ole\\FeatureDevelopmentProperties",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\FileSystem\\",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Srp\\GP\\DLL",
+                                              "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Session Manager\\AppCertDlls",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\cmd.exe",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Policies\\Microsoft\\Windows\\Display",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Nls\\Sorting\\Ids"
+                                          ],
+                 "processes_created":  [
+                                           "\"C:\\Users\\\u003cUSER\u003e\\AppData\\Local\\Temp\\forfiles.exe\"",
+                                           "/c echo \"acrobat_sbx\"",
+                                           "/c echo \"acrocef_low\"",
+                                           "/c echo \"acroNGLLog.txt\"",
+                                           "%SAMPLEPATH%\\forfiles.exe",
+                                           "C:\\Windows\\SysWOW64\\cmd.exe",
+                                           "C:\\Windows\\System32\\wuapihost.exe",
+                                           "%SAMPLEPATH%\\d81a80fe838790e3a1bc7daf3bde666c71d4a8aba8b4f8a371b2db2ff236a72e.exe",
+                                           "C:\\Windows\\System32\\UI0Detect.exe",
+                                           "C:\\Program Files\\Google3216_1122235346\\bin\\updater.exe",
+                                           "C:\\Users\\user\\Desktop\\forfiles.exe",
+                                           "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1",
+                                           "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"BQJUWOYRTO.pdf\"",
+                                           "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"BUFZSQPCOH\"",
+                                           "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"PWZOQIFCAN.docx\"",
+                                           "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"PWZOQIFCAN.xlsx\"",
+                                           "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"desktop.ini\"",
+                                           "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"DUKNXICOZT\"",
+                                           "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"forfiles.exe\"",
+                                           "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"GNLQNHOLWB.png\"",
+                                           "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"UBVUNTSCZJ.jpg\"",
+                                           "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"WHZAGPPPLA.png\"",
+                                           "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"MIVTQDBATG\"",
+                                           "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"NIRMEKAMZH\"",
+                                           "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"NIRMEKAMZH.docx\"",
+                                           "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"OVWVVIANZH.mp3\"",
+                                           "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"PWZOQIFCAN\"",
+                                           "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"UBVUNTSCZJ\""
+                                       ],
+                 "tls":  [
+                             {
+                                 "subject":  {
+                                                 "ST":  "WA",
+                                                 "L":  "Redmond",
+                                                 "O":  "Microsoft Corporation",
+                                                 "C":  "US"
+                                             },
+                                 "issuer":  {
+                                                "CN":  "Microsoft Azure TLS Issuing CA 05",
+                                                "O":  "Microsoft Corporation",
+                                                "C":  "US"
+                                            },
+                                 "serial_number":  "3300ccfa6671f5fac42868f9b5000000ccfa66",
+                                 "thumbprint":  "1836a0d60e157ad82326f320fff05fee1f67737f",
+                                 "version":  "TLS 1.2",
+                                 "sni":  "api.msn.com",
+                                 "ja3":  "a0e9f5d64349fb13191bc781f81f42e1",
+                                 "ja3s":  "60a1c7426de3ff26002f692fbe0d7408"
+                             }
+                         ],
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "5932",
+                                            "name":  "\"C:\\Users\\\u003cUSER\u003e\\AppData\\Local\\Temp\\forfiles.exe\"",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "1212",
+                                                                 "name":  "/c echo \"acrobat_sbx\""
+                                                             },
+                                                             {
+                                                                 "process_id":  "2568",
+                                                                 "name":  "/c echo \"acrocef_low\""
+                                                             },
+                                                             {
+                                                                 "process_id":  "640",
+                                                                 "name":  "/c echo \"acroNGLLog.txt\""
+                                                             }
+                                                         ]
+                                        },
+                                        {
+                                            "process_id":  "2892",
+                                            "name":  "%WINDIR%\\explorer.exe",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "3060",
+                                                                 "name":  "%SAMPLEPATH%\\forfiles.exe",
+                                                                 "children":  [
+                                                                                  {
+                                                                                      "process_id":  "2484",
+                                                                                      "name":  "C:\\Windows\\SysWOW64\\cmd.exe"
+                                                                                  },
+                                                                                  {
+                                                                                      "process_id":  "2252",
+                                                                                      "name":  "C:\\Windows\\SysWOW64\\cmd.exe"
+                                                                                  },
+                                                                                  {
+                                                                                      "process_id":  "3116",
+                                                                                      "name":  "C:\\Windows\\SysWOW64\\cmd.exe"
+                                                                                  },
+                                                                                  {
+                                                                                      "process_id":  "2096",
+                                                                                      "name":  "C:\\Windows\\SysWOW64\\cmd.exe"
+                                                                                  },
+                                                                                  {
+                                                                                      "process_id":  "4000",
+                                                                                      "name":  "C:\\Windows\\SysWOW64\\cmd.exe"
+                                                                                  },
+                                                                                  {
+                                                                                      "process_id":  "3876",
+                                                                                      "name":  "C:\\Windows\\SysWOW64\\cmd.exe"
+                                                                                  },
+                                                                                  {
+                                                                                      "process_id":  "2480",
+                                                                                      "name":  "C:\\Windows\\SysWOW64\\cmd.exe"
+                                                                                  },
+                                                                                  {
+                                                                                      "process_id":  "2492",
+                                                                                      "name":  "C:\\Windows\\SysWOW64\\cmd.exe"
+                                                                                  },
+                                                                                  {
+                                                                                      "process_id":  "2428",
+                                                                                      "name":  "C:\\Windows\\SysWOW64\\cmd.exe"
+                                                                                  }
+                                                                              ]
+                                                             }
+                                                         ]
+                                        },
+                                        {
+                                            "process_id":  "624",
+                                            "name":  "C:\\Windows\\System32\\svchost.exe",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "3600",
+                                                                 "name":  "C:\\Windows\\System32\\wuapihost.exe"
+                                                             }
+                                                         ]
+                                        },
+                                        {
+                                            "process_id":  "5128",
+                                            "name":  "C:\\Users\\user\\Desktop\\forfiles.exe",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "2824",
+                                                                 "name":  "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1"
+                                                             },
+                                                             {
+                                                                 "process_id":  "5632",
+                                                                 "name":  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"BQJUWOYRTO.pdf\""
+                                                             },
+                                                             {
+                                                                 "process_id":  "1340",
+                                                                 "name":  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"BUFZSQPCOH\""
+                                                             },
+                                                             {
+                                                                 "process_id":  "1388",
+                                                                 "name":  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"PWZOQIFCAN.docx\""
+                                                             },
+                                                             {
+                                                                 "process_id":  "5624",
+                                                                 "name":  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"PWZOQIFCAN.xlsx\""
+                                                             },
+                                                             {
+                                                                 "process_id":  "3628",
+                                                                 "name":  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"desktop.ini\""
+                                                             },
+                                                             {
+                                                                 "process_id":  "5636",
+                                                                 "name":  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"DUKNXICOZT\""
+                                                             },
+                                                             {
+                                                                 "process_id":  "5160",
+                                                                 "name":  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"forfiles.exe\""
+                                                             },
+                                                             {
+                                                                 "process_id":  "6748",
+                                                                 "name":  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"GNLQNHOLWB.png\""
+                                                             },
+                                                             {
+                                                                 "process_id":  "3552",
+                                                                 "name":  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"UBVUNTSCZJ.jpg\""
+                                                             },
+                                                             {
+                                                                 "process_id":  "2744",
+                                                                 "name":  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"WHZAGPPPLA.png\""
+                                                             },
+                                                             {
+                                                                 "process_id":  "3988",
+                                                                 "name":  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"MIVTQDBATG\""
+                                                             },
+                                                             {
+                                                                 "process_id":  "660",
+                                                                 "name":  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"NIRMEKAMZH\""
+                                                             },
+                                                             {
+                                                                 "process_id":  "6404",
+                                                                 "name":  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"NIRMEKAMZH.docx\""
+                                                             },
+                                                             {
+                                                                 "process_id":  "4728",
+                                                                 "name":  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"OVWVVIANZH.mp3\""
+                                                             },
+                                                             {
+                                                                 "process_id":  "3496",
+                                                                 "name":  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"PWZOQIFCAN\""
+                                                             },
+                                                             {
+                                                                 "process_id":  "4460",
+                                                                 "name":  "C:\\Windows\\SysWOW64\\cmd.exe /c echo \"UBVUNTSCZJ\""
+                                                             }
+                                                         ]
+                                        }
+                                    ],
+                 "memory_dumps":  [
+                                      {
+                                          "file_name":  "00000001.00000002.1052039215.0000000000210000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\forfiles.exe",
+                                          "size":  "4096",
+                                          "base_address":  "2162688",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1052242713.000000000300E000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\forfiles.exe",
+                                          "size":  "8192",
+                                          "base_address":  "50388992",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1052277681.0000000003078000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\forfiles.exe",
+                                          "size":  "73728",
+                                          "base_address":  "50823168",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1052316472.00000000033D0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\forfiles.exe",
+                                          "size":  "20480",
+                                          "base_address":  "54329344",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1052220167.0000000002F8E000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\forfiles.exe",
+                                          "size":  "8192",
+                                          "base_address":  "49864704",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1052298610.00000000031AE000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\forfiles.exe",
+                                          "size":  "8192",
+                                          "base_address":  "52092928",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1052229653.0000000002FCE000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\forfiles.exe",
+                                          "size":  "8192",
+                                          "base_address":  "50126848",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1052048772.0000000000211000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\forfiles.exe",
+                                          "size":  "32768",
+                                          "base_address":  "2166784",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1052277681.0000000003070000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\forfiles.exe",
+                                          "size":  "24576",
+                                          "base_address":  "50790400",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1052172419.0000000002BFC000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\forfiles.exe",
+                                          "size":  "16384",
+                                          "base_address":  "46120960",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000000.1042665379.000000000021A000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\forfiles.exe",
+                                          "size":  "12288",
+                                          "base_address":  "2203648",
+                                          "stage":  "MEM_STAGE_NEW"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1052095791.0000000002B70000.00000004.00000020.00040000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\forfiles.exe",
+                                          "size":  "4096",
+                                          "base_address":  "45547520",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000000.1042652647.0000000000211000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\forfiles.exe",
+                                          "size":  "32768",
+                                          "base_address":  "2166784",
+                                          "stage":  "MEM_STAGE_NEW"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1052203679.0000000002F40000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\forfiles.exe",
+                                          "size":  "24576",
+                                          "base_address":  "49545216",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1052078583.000000000021A000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\forfiles.exe",
+                                          "size":  "12288",
+                                          "base_address":  "2203648",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1052307369.00000000031EF000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\forfiles.exe",
+                                          "size":  "4096",
+                                          "base_address":  "52359168",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1052152690.0000000002B80000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\forfiles.exe",
+                                          "size":  "4096",
+                                          "base_address":  "45613056",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000000.1042645257.0000000000210000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\forfiles.exe",
+                                          "size":  "4096",
+                                          "base_address":  "2162688",
+                                          "stage":  "MEM_STAGE_NEW"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1052254323.000000000304E000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\forfiles.exe",
+                                          "size":  "8192",
+                                          "base_address":  "50651136",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1052185794.0000000002E3C000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\forfiles.exe",
+                                          "size":  "16384",
+                                          "base_address":  "48480256",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      }
+                                  ],
+                 "tags":  [
+                              "IDLE",
+                              "DETECT_DEBUG_ENVIRONMENT"
+                          ],
+                 "mbc":  [
+                             {
+                                 "id":  "C0018",
+                                 "objective":  "Process",
+                                 "behavior":  "Terminate Process",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "2"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1083",
+                                 "objective":  "Discovery",
+                                 "behavior":  "File and Directory Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "6"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0046.001",
+                                 "objective":  "Discovery",
+                                 "behavior":  "Code Discovery",
+                                 "method":  "Enumerate PE Sections",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "7"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1083",
+                                 "objective":  "Discovery",
+                                 "behavior":  "File and Directory Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "8"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0017",
+                                 "objective":  "Process",
+                                 "behavior":  "Create Process",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "10"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1083",
+                                 "objective":  "Discovery",
+                                 "behavior":  "File and Directory Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "11"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "OC0006"
+                             },
+                             {
+                                 "id":  "C0002"
+                             }
+                         ],
+                 "processes_injected":  [
+                                            "C:\\Program Files\\Google3216_1122235346\\bin\\updater.exe"
+                                        ],
+                 "command_executions":  [
+                                            "/c echo \"acrobat_sbx\"",
+                                            "/c echo \"acrocef_low\"",
+                                            "/c echo \"acroNGLLog.txt\"",
+                                            "\"%SAMPLEPATH%\\forfiles.exe\" ",
+                                            "/c echo \"Detonate.exe\"",
+                                            "/c echo \"Detonate.exe.config\"",
+                                            "/c echo \"Detonate.pdb\"",
+                                            "/c echo \"Detonate.xml\"",
+                                            "/c echo \"Microsoft.Sonar.Findings.dll\"",
+                                            "/c echo \"Microsoft.WCD.FileMetadata.dll\"",
+                                            "/c echo \"run.cmd\"",
+                                            "/c echo \"Sysmon\"",
+                                            "/c echo \"version.txt\"",
+                                            "C:\\Windows\\System32\\wuapihost.exe -Embedding",
+                                            "\"%SAMPLEPATH%\\d81a80fe838790e3a1bc7daf3bde666c71d4a8aba8b4f8a371b2db2ff236a72e.exe\" ",
+                                            "C:\\Windows\\system32\\UI0Detect.exe",
+                                            "\"C:\\Program Files\\Google3216_1122235346\\bin\\updater.exe\" --update --system --enable-logging --vmodule=*/chrome/updater/*=2 /sessionid {C18E65A9-B175-4E4E-A3A0-02918B0AE48B}"
+                                        ],
+                 "attack_techniques":  {
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "parse PE header",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "1"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1614":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get geographical location",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "5"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1083":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get common file path",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "6"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "enumerate files on Windows",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "8"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get file version info",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "11"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1071":  [
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "Adversaries may communicate using application layer protocols to avoid detection/network filtering by blending in with existing traffic."
+                                                         }
+                                                     ],
+                                           "T1070.006":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "Binary contains a suspicious time stamp",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "234"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1082":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Reads software policies",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "509"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

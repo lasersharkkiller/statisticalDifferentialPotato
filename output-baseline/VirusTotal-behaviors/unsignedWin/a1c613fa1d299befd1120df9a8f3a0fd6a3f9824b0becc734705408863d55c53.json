@@ -1,0 +1,2098 @@
+{
+    "data":  {
+                 "signature_matches":  [
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "resolve function by parsing PE exports",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "sara-rn"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: resolve function by parsing PE exports\n    namespace: load-code/pe\n    authors:\n      - sara-rn\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic, offset, mnemonic features\n    examples:\n      - 73CE04892E5F39EC82B00C02FC04C70F:0x406BA1\n  features:\n    - and:\n      - os: windows\n      - or:\n        - characteristic: loop\n        - mnemonic: movzx\n      - and:\n        - offset: 0x3C = IMAGE_DOS_HEADER.PE.e_lfanew\n        - or:\n          - and:\n            - arch: i386\n            - offset: 0x78 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n          - and:\n            - arch: amd64\n            - offset: 0x88 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n        - 3 or more:\n          - offset: 0x14 = IMAGE_EXPORT_DIRECTORY.NumberOfFunctions\n          - offset: 0x24 = IMAGE_EXPORT_DIRECTORY.AddressOfNameOrdinals\n          - offset: 0x20 = IMAGE_EXPORT_DIRECTORY.AddressOfNames\n          - offset: 0x18 = IMAGE_EXPORT_DIRECTORY.NumberOfNames\n          - offset: 0x1C = IMAGE_EXPORT_DIRECTORY.AddressOfFunctions\n      - optional:\n        - or:\n          - api: LoadLibrary\n          - api: strcmp\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "parse credit card information",
+                                               "description":  "collection/credit-card",
+                                               "authors":  [
+                                                               "@_re_fox"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: parse credit card information\n    namespace: collection/credit-card\n    authors:\n      - \"@_re_fox\"\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic features\n    mbc:\n      - Data::Check String [C0019]\n    examples:\n      - 1d8fd13c890060464019c0f07b928b1a:0x402860\n  features:\n    - and:\n      - 3 or more:\n        - instruction:\n          - mnemonic: cmp\n          - number: 0x5E = \u0027^\u0027 (Track 1 separator)\n        - instruction:\n          - mnemonic: cmp\n          - number: 0x3D = \u0027=\u0027 (Track 2 separator)\n        - instruction:\n          - mnemonic: cmp\n          - number: 0x25 = \u0027%\u0027 (Track 1 start sentinel)\n        - instruction:\n          - mnemonic: cmp\n          - number: 0x42 = \u0027B\u0027 (Format code)\n        - instruction:\n          - mnemonic: cmp\n          - number: 0x44 = \u0027D\u0027 (Format code)\n        - instruction:\n          - mnemonic: cmp\n          - number: 0x3F = \u0027?\u0027 (Track 1 \u0026 2 end sentinel)\n        - instruction:\n          - mnemonic: cmp\n          - number: 0x3B = \u0027;\u0027 (Track 2 start sentinel)\n      - not:\n        - description: if a function also compares these non-hex characters it\u0027s most likely NOT parsing CC data\n        - and:\n          - instruction:\n            - mnemonic: cmp\n            - number: 0x6D = \u0027m\u0027\n          - instruction:\n            - mnemonic: cmp\n            - number: 0x6E = \u0027n\u0027\n          - instruction:\n            - mnemonic: cmp\n            - number: 0x6F = \u0027o\u0027\n          - instruction:\n            - mnemonic: cmp\n            - number: 0x70 = \u0027p\u0027\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "encrypt data using RC4 PRGA",
+                                               "description":  "data-manipulation/encryption/rc4",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: encrypt data using RC4 PRGA\n    namespace: data-manipulation/encryption/rc4\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic, mnemonic, basicblock features\n    att\u0026ck:\n      - Defense Evasion::Obfuscated Files or Information [T1027]\n    mbc:\n      - Cryptography::Encrypt Data::RC4 [C0027.009]\n      - Cryptography::Generate Pseudo-random Sequence::RC4 PRGA [C0021.004]\n    examples:\n      - 34404A3FB9804977C6AB86CB991FB130:0x403DB0\n      - 34404A3FB9804977C6AB86CB991FB130:0x403E50\n      - 9324D1A8AE37A36AE560C37448C9705A:0x4049F0\n      - 73CE04892E5F39EC82B00C02FC04C70F:0x4064C6\n  features:\n    - and:\n      # TODO: maybe add characteristic for nzxor reg size\n      - count(characteristic(nzxor)): 1\n      - or:\n        - match: calculate modulo 256 via x86 assembly\n        # compiler may do this via zero-extended mov from 8-bit register\n        - count(mnemonic(movzx)): 4 or more\n      # should not call (many) functions\n      - count(characteristic(calls from)): (0, 4)\n      # should not be too simple or too complex (50 is picked by intuition)\n      - count(basic blocks): (4, 50)\n      - match: contain loop\n      - optional:\n        - or:\n          - number: 0xFF\n          - number: 0x100\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "hash data using murmur3",
+                                               "description":  "data-manipulation/hashing/murmur",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: hash data using murmur3\n    namespace: data-manipulation/hashing/murmur\n    authors:\n      - william.ballenthin@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic, mnemonic features\n    mbc:\n      - Data::Non-Cryptographic Hash::MurmurHash [C0030.001]\n    references:\n      - https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp\n    examples:\n      - c66172b12971a329f8d5ff01665f204b:0x404A18\n  features:\n    - or:\n      - and:\n        - number: 0x85ebca6b = 32-bit finalization mix constant 1\n        - number: 0xc2b2ae35 = 32-bit finalization mix constant 2\n      - and:\n        - number: 0xff51afd7ed558ccd = 64-bit finalization mix constant 1\n        - number: 0xc4ceb9fe1a85ec53 = 64-bit finalization mix constant 2\n      - and:\n        - number: 0xcc9e2d51 = c1 32-bit hash\n        - number: 0x1b873593 = c2 32-bit hash\n      - and:\n        - number: 0x239b961b = 32-bit c1 for 128-bit hash\n        - number: 0xab0e9789 = 32-bit c2 for 128-bit hash\n        - number: 0x38b34ae5 = 32-bit c3 for 128-bit hash\n        - number: 0xa1e38b93 = 32-bit c4 for 128-bit hash\n      - and:\n        - number: 0x87c37b91114253d5 = 64-bit c1 for 128-bit hash\n        - number: 0x4cf5ad432745937f = 64-bit c2 for 128-bit hash\n      - basic block:\n        - and:\n          - description: \u0027hash \u003e\u003e 16; hash \u003e\u003e 13; hash \u003e\u003e 16\u0027\n          - count(mnemonic(shr)): 3\n          - instruction:\n            - mnemonic: shr\n            - number: 16\n          - instruction:\n            - mnemonic: shr\n            - number: 13\n          - optional:\n            - count(characteristic(nzxor)): 3 or more\n      - and:\n        # Group this two blocks under an `and` as on their own they are not\n        # unique enough and would cause false positives\n        - instruction:\n          - description: k ROL r1\n          - mnemonic: rol\n          - number: 15 = r1\n        - instruction:\n          - description: hash ROL r2\n          - mnemonic: rol\n          - number: 13 = r2\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "encode data using ADD XOR SUB operations",
+                                               "description":  "data-manipulation/encoding : Data encoding using a sequence of ADD/XOR/SUB (or SUB/XOR/ADD) operations common for PlugX but also used by other malware families.",
+                                               "authors":  [
+                                                               "jakub.jozwiak@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: encode data using ADD XOR SUB operations\n    namespace: data-manipulation/encoding\n    authors:\n      - jakub.jozwiak@mandiant.com\n    description: Data encoding using a sequence of ADD/XOR/SUB (or SUB/XOR/ADD) operations common for PlugX but also used by other malware families.\n    scopes:\n      static: function\n      dynamic: unsupported  # requires basic block, characteristic, mnemonic features\n    att\u0026ck:\n      - Defense Evasion::Obfuscated Files or Information [T1027]\n    mbc:\n      - Defense Evasion::Obfuscated Files or Information::Encoding-Custom Algorithm [E1027.m03]\n    examples:\n      - df814d4b55912e4ba404c62080b3a7eda70a3c6283ea740f8a14a9116d803259:0x1000100F\n  features:\n    - and:\n      - count(basic blocks): 6 or fewer\n      - basic block:\n        - and:\n          - characteristic: tight loop\n          - characteristic: nzxor\n          - count(mnemonic(add)): 1\n          - count(mnemonic(sub)): 1\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "encode data using Base64",
+                                               "description":  "data-manipulation/encoding/base64",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: encode data using Base64\n    namespace: data-manipulation/encoding/base64\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported\n    att\u0026ck:\n      - Defense Evasion::Obfuscated Files or Information [T1027]\n    mbc:\n      - Defense Evasion::Obfuscated Files or Information::Encoding-Standard Algorithm [E1027.m02]\n      - Data::Encode Data::Base64 [C0026.001]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x1314889C\n      - 074072B261FC27B65C72671F13510C05:0x100049B2\n      - 5DB2D2BE20D59AA0BE6709A6850F1775:0x18001CC30\n      - 08AC667C65D36D6542917655571E61C8:0x406EAA\n  features:\n    - or:\n      - and:\n        - mnemonic: shl\n        - mnemonic: shr\n        - number: 0x3F = modulo 64\n        - or:\n          - number: 0x3D = \u0027=\u0027\n          - number: 0x3D3D = \u0027==\u0027\n        - match: contain loop\n        - optional:\n          - number: 2\n          - number: 3\n          - number: 4\n          - number: 6\n          - number: 0xF\n          - string: \"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/\"\n      - api: System.Convert::ToBase64String\n      - api: System.Convert::ToBase64CharArray\n      - api: System.Convert::TryToBase64Chars\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "compiled with Go",
+                                               "description":  "compiler/go",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: compiled with Go\n    namespace: compiler/go\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    examples:\n      - 49a34cfbeed733c24392c9217ef46bb6\n  features:\n    - or:\n      - string: /^Go build ID:/\n      - substring: \"go.buildid\"\n      - string: /^Go buildinf:/\n      - string: /\\bgo1\\.\\d/\n      - substring: \"runtime.main\"\n      - substring: \"main.main\"\n      - substring: \"runtime.gcWork\"\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "encrypt data using Salsa20 or ChaCha",
+                                               "description":  "data-manipulation/encryption/salsa20",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: encrypt data using Salsa20 or ChaCha\n    namespace: data-manipulation/encryption/salsa20\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Defense Evasion::Obfuscated Files or Information [T1027]\n    references:\n      - http://cr.yp.to/snuffle/ecrypt.c\n  features:\n    # The constant words spell \"expand 32-byte k\" in ASCII (i.e. the 4 words are \"expa\", \"nd 3\", \"2-by\", and \"te k\")\n    - or:\n      - description: part of key setup\n      - string: \"expand 32-byte k\"\n        description: sigma\n      - string: \"expand 16-byte k\"\n        description: tau\n      # if sigma and tau are in contiguous memory, may result in concatenated string\n      - string: \"expand 32-byte kexpand 16-byte k\"\n      - bytes: 65 78 70 61 6E 64 20 33 32 2D 62 79 74 65 20 6B = \"expand 32-byte k\"\n      - bytes: 65 78 70 61 6E 64 20 31 36 2D 62 79 74 65 20 6B = \"expand 16-byte k\"\n      - and:\n        - string: \"expa\"\n        - string: \"nd 3\"\n        - string: \"2-by\"\n        - string: \"te k\"\n      - and:\n        - number: 0x61707865 = \"apxe\"\n        - number: 0x3320646E = \"3 dn\"\n        - number: 0x79622D32 = \"yb-2\"\n        - number: 0x6B206574 = \"k et\"\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "http://cr.yp.to/snuffle/ecrypt.c"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "reference anti-VM strings",
+                                               "description":  "anti-analysis/anti-vm/vm-detection",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: reference anti-VM strings\n    namespace: anti-analysis/anti-vm/vm-detection\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    att\u0026ck:\n      - Defense Evasion::Virtualization/Sandbox Evasion::System Checks [T1497.001]\n    mbc:\n      - Anti-Behavioral Analysis::Virtual Machine Detection [B0009]\n    references:\n      - https://github.com/ctxis/CAPE/blob/master/modules/signatures/antivm_*\n      - https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/AntiVM/Generic.cpp\n    examples:\n      - Practical Malware Analysis Lab 17-02.dll_\n  features:\n    - or:\n      - string: /HARDWARE\\\\ACPI\\\\(DSDT|FADT|RSDT)\\\\BOCHS/i\n      - string: /HARDWARE\\\\DESCRIPTION\\\\System\\\\(SystemBiosVersion|VideoBiosVersion)/i\n      - string: /HARDWARE\\\\DESCRIPTION\\\\System\\\\CentralProcessor/i\n      - string: /HARDWARE\\\\DEVICEMAP\\\\Scsi\\\\Scsi Port 0\\\\Scsi Bus 0\\\\Target Id 0\\\\Logical Unit Id 0/i\n      - string: /SYSTEM\\\\(CurrentControlSet|ControlSet001)\\\\Enum\\\\IDE/i\n      - string: /SYSTEM\\\\(CurrentControlSet|ControlSet001)\\\\Services\\\\Disk\\\\Enum\\\\/i\n      - string: /SYSTEM\\\\(CurrentControlSet|ControlSet001)\\\\Control\\\\SystemInformation\\\\SystemManufacturer/i\n      - string: /A M I/i\n      - string: /Hyper-V/i\n      - string: /Kernel-VMDetection-Private/i\n      # https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/AntiVM/Generic.cpp#L699\n      - string: /KVMKVMKVM/i\n        description: KVM\n      - string: /Microsoft Hv/i\n        description: Microsoft Hyper-V or Windows Virtual PC\n      # https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/AntiVM/Generic.cpp#L8\n      - string: /avghookx.dll/i\n        description: AVG\n      - string: /avghooka.dll/i\n        description: AVG\n      - string: /snxhk.dll/i\n        description: Avast\n      - string: /pstorec.dll/i\n        description: SunBelt Sandbox\n      - string: /vmcheck.dll/i\n        description: Virtual PC\n      - string: /wpespy.dll/i\n        description: WPE Pro\n      - string: /cmdvrt64.dll/i\n        description: Comodo Container\n      - string: /cmdvrt32.dll/i\n        description: Comodo Container\n      # https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/AntiVM/Generic.cpp#L46\n      - string: /sample.exe/i\n      - string: /bot.exe/i\n      - string: /sandbox.exe/i\n      - string: /malware.exe/i\n      - string: /test.exe/i\n      - string: /klavme.exe/i\n      - string: /myapp.exe/i\n      - string: /testapp.exe/i\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://github.com/ctxis/CAPE/blob/master/modules/signatures/antivm_*"
+                                                            },
+                                                            {
+                                                                "ref":  "https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/AntiVM/Generic.cpp"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "reference analysis tools strings",
+                                               "description":  "anti-analysis",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: reference analysis tools strings\n    namespace: anti-analysis\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    mbc:\n      - Discovery::Analysis Tool Discovery::Process detection [B0013.001]\n    references:\n      - https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/AntiAnalysis/process.cpp\n    examples:\n      - al-khaser_x86.exe_\n  features:\n    - or:\n      - string: /ollydbg(\\.exe)?/i\n      - string: /ProcessHacker(\\.exe)?/i\n      - string: /tcpview(\\.exe)?/i\n      - string: /autoruns(\\.exe)?/i\n      - string: /autorunsc(\\.exe)?/i\n      - string: /filemon(\\.exe)?/i\n      - string: /procmon(\\.exe)?/i\n      - string: /regmon(\\.exe)?/i\n      - string: /procexp(\\.exe)?/i\n      - string: /(?\u003c!\\w)ida[gqtuw]?(\\.exe)?$/i\n      - string: /ida[gqtuw]?64(\\.exe)?$/i\n      - string: /ImmunityDebugger(\\.exe)?/i\n      - string: /Wireshark(\\.exe)?/i\n      - string: /dumpcap(\\.exe)?/i\n      - string: /HookExplorer(\\.exe)?/i\n      - string: /ImportREC(\\.exe)?/i\n      - string: /PETools(\\.exe)?/i\n      - string: /LordPE(\\.exe)?/i\n      - string: /SysInspector(\\.exe)?/i\n      - string: /proc_analyzer(\\.exe)?/i\n      - string: /sysAnalyzer(\\.exe)?/i\n      - string: /sniff_hit(\\.exe)?/i\n      - string: /windbg(\\.exe)?/i\n      - string: /joeboxcontrol(\\.exe)?/i\n      - string: /joeboxserver(\\.exe)?/i\n      - string: /ResourceHacker(\\.exe)?/i\n      - string: /x32dbg(\\.exe)?/i\n      - string: /x64dbg(\\.exe)?/i\n      - string: /Fiddler(\\.exe)?/i\n      - string: /httpdebugger(\\.exe)?/i\n      - string: /fakenet(\\.exe)?/i\n      - string: /netmon(\\.exe)?/i\n      - string: /WPE PRO(\\.exe)?/i\n      - string: /decompile(\\.exe)?/i\n      - string: /scylla/i\n      - string: /megadumper/i\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/AntiAnalysis/process.cpp"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "hash data using fnv",
+                                               "description":  "data-manipulation/hashing/fnv : can be any Fowler-Noll-Vo (FNV) hash variant, including FNV-1, FNV-1a, FNV-0",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "@_re_fox",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: hash data using fnv\n    namespace: data-manipulation/hashing/fnv\n    authors:\n      - moritz.raabe@mandiant.com\n      - \"@_re_fox\"\n      - michael.hunhoff@mandiant.com\n    description: can be any Fowler-Noll-Vo (FNV) hash variant, including FNV-1, FNV-1a, FNV-0\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic, mnemonic features\n    mbc:\n      - Data::Non-Cryptographic Hash::FNV [C0030.005]\n    references:\n      - https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function\n      - http://isthe.com/chongo/tech/comp/fnv/\n      - https://create.stephan-brumme.com/fnv-hash/\n    examples:\n      - ad4229879180e267f431ac6666b6a0a2:0x14007B4D4\n      - 09BF850BE5DA44A1C3629A1F62813A83:0x10006010\n  features:\n    - and:\n      - optional:\n        - characteristic: loop\n        - number: 0xcbf29ce484222325 = FNV_offset_basis, unused by FNV-0\n        - number: 0x811c9dc5 = FNV_offset_basis, unused by FNV-0\n        - and:\n          - number: 0xcbf29ce4 = FNV_offset_basis 64 bits, 32-bit value\n          - number: 0x84222325 = FNV_offset_basis 64 bits, 32-bit value\n      - or:\n        - number: 0x100000001b3 = FNV prime\n        - number: 0x01000193 = FNV prime\n        - and:\n          - number: 0x100 = FNV prime 64 bits, split in DWORD\n          - number: 0x1b3 = FNV prime 64 bits, split in DWORD\n      - basic block:\n        # FNV-1 hash does multiply then XOR\n        # FNV-1a hash does XOR then multiply\n        - and:\n          - characteristic: nzxor\n          - or:\n            - mnemonic: imul\n            - mnemonic: mul\n            - api: _allmul\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function"
+                                                            },
+                                                            {
+                                                                "ref":  "http://isthe.com/chongo/tech/comp/fnv/"
+                                                            },
+                                                            {
+                                                                "ref":  "https://create.stephan-brumme.com/fnv-hash/"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "encode data using XOR",
+                                               "description":  "data-manipulation/encoding/xor",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: encode data using XOR\n    namespace: data-manipulation/encoding/xor\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: unsupported  # requires characteristic, Not features\n    att\u0026ck:\n      - Defense Evasion::Obfuscated Files or Information [T1027]\n    mbc:\n      - Defense Evasion::Obfuscated Files or Information::Encoding-Standard Algorithm [E1027.m02]\n      - Data::Encode Data::XOR [C0026.002]\n    examples:\n      - 2D3EDC218A90F03089CC01715A9F047F:0x403D7E\n  features:\n    - and:\n      - characteristic: tight loop\n      - characteristic: nzxor\n      - not:\n        - description: filter for potential false positives\n        - or:\n          - or:\n            - description: unsigned bitwise negation operation (~i)\n            - number: 0xFFFFFFFF = bitwise negation for unsigned 32 bits\n            - number: 0xFFFFFFFFFFFFFFFF = bitwise negation for unsigned 64 bits\n          - or:\n            - description: signed bitwise negation operation (~i)\n            - number: 0x0FFFFFFF = bitwise negation for signed 32 bits\n            - number: 0x0FFFFFFFFFFFFFFF = bitwise negation for signed 64 bits\n          - or:\n            - description: Magic constants used in the implementation of strings functions.\n            # such as `strlen` and `strcat` in the Windows standard library:\n            # (((i - 0x81010101) ^ ~i) \u0026 0x81010100)\n            ## 32 bits\n            - number: 0x7EFEFEFF = optimized string constant for 32 bits\n            - number: 0x81010101 = -0x81010101 = 0x7EFEFEFF\n            - number: 0x81010100 = 0x81010100 = ~0x7EFEFEFF\n            ## 64 bits\n            - number: 0x7EFEFEFEFEFEFEFF = optimized string constant for 64 bits\n            - number: 0x8101010101010101 = -0x8101010101010101 = 0x7EFEFEFEFEFEFEFF\n            - number: 0x8101010101010100 = 0x8101010101010100 = ~0x7EFEFEFEFEFEFEFF\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "allocate thread local storage",
+                                               "description":  "host-interaction/thread/tls",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: allocate thread local storage\n    namespace: host-interaction/thread/tls\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Process::Allocate Thread Local Storage [C0040]\n    examples:\n      - 03B236B23B1EC37C663527C1F53AF3FE:0x18000ADF6\n  features:\n    - or:\n      - api: kernel32.TlsAlloc\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "encrypt data using AES via x86 extensions",
+                                               "description":  "data-manipulation/encryption/aes",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: encrypt data using AES via x86 extensions\n    namespace: data-manipulation/encryption/aes\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic features\n    att\u0026ck:\n      - Defense Evasion::Obfuscated Files or Information [T1027]\n    mbc:\n      - Defense Evasion::Obfuscated Files or Information::Encryption-Standard Algorithm [E1027.m05]\n      - Cryptography::Encrypt Data::AES [C0027.001]\n  features:\n    - or:\n      - mnemonic: aesenc = Perform One Round of an AES Encryption Flow\n      - mnemonic: vaesenc\n      - mnemonic: aesenclast = Perform Last Round of an AES Encryption Flow\n      - mnemonic: vaesenclast\n      - mnemonic: aesimc = Perform the AES InvMixColumn Transformation\n      - mnemonic: vaesimc\n      - mnemonic: aeskeygenassist = AES Round Key Generation Assist\n      - mnemonic: vaeskeygenassist\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "access PEB ldr_data",
+                                               "description":  "linking/runtime-linking",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: access PEB ldr_data\n    namespace: linking/runtime-linking\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: unsupported  # requires offset features\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    references:\n      - https://www.geoffchappell.com/studies/windows/km/ntoskrnl/inc/api/ntpsapi_x/peb_ldr_data.htm\n      - https://github.com/d35ha/CallObfuscator/blob/5834aff9ff4511f1408ae4ce80b79737af4ae77b/ShellCode/shell_x64.asm#L8\n    examples:\n      - 3FDFB2D522E7DEECAAAF2F87420F7E75:0x4117B7\n  features:\n    - or:\n      - and:\n        - arch: i386\n        - description: x32\n\n        - match: PEB access\n\n        # x86 Windows uses fs:0 to access the TIB which contains SEH information at offset 0\n        # checking for fs:0 and a (possibly unrelated) number or offset often results in false positives\n\n        - offset: 0x0C = PEB.LDR_DATA\n\n        - or:\n          - description: resolve a module list\n          - offset: 0x0C = PEB.LDR_DATA.InLoadOrderModuleList\n          - offset: 0x14 = PEB.LDR_DATA.InMemoryOrderModuleList\n          - offset: 0x1C = PEB.LDR_DATA.InInitializationOrderModuleList\n\n      - and:\n        - arch: amd64\n        - description: x64\n\n        - match: PEB access\n\n        - offset: 0x18 = PEB.LDR_DATA\n\n        - or:\n          - description: resolve a module list\n          - offset: 0x10 = PEB.LDR_DATA.InLoadOrderModuleList\n          - offset: 0x20 = PEB.LDR_DATA.InMemoryOrderModuleList\n          - offset: 0x30 = PEB.LDR_DATA.InInitializationOrderModuleList\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://www.geoffchappell.com/studies/windows/km/ntoskrnl/inc/api/ntpsapi_x/peb_ldr_data.htm"
+                                                            },
+                                                            {
+                                                                "ref":  "https://github.com/d35ha/CallObfuscator/blob/5834aff9ff4511f1408ae4ce80b79737af4ae77b/ShellCode/shell_x64.asm#L8"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get kernel32 base address",
+                                               "description":  "linking/runtime-linking",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get kernel32 base address\n    namespace: linking/runtime-linking\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: unsupported  # requires offset features\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    references:\n      - https://idafchev.github.io/exploit/2017/09/26/writing_windows_shellcode.html\n      - https://www.geoffchappell.com/studies/windows/win32/ntdll/structs/ldr_data_table_entry.htm\n    examples:\n      - 67f8302a2fd28d15f62d6d20d748bfe350334e5353cbdef112bd1f8231b5599d:0x406936\n  features:\n    - and:\n      # PEB -\u003e PEB.Ldr -\u003e PEB_LDR_DATA.InLoadOrderModuleList.Flink\n      - match: access PEB ldr_data\n      # -\u003e current module -\u003e ntdll\n      - count(offset(0)): 2\n      # -\u003e kernel32 -\u003e LDR_DATA_TABLE_ENTRY.DllBase\n      - or:\n        - and:\n          - arch: i386\n          - offset: 0x18 = LDR_DATA_TABLE_ENTRY.DllBase\n        - and:\n          - arch: amd64\n          - offset: 0x30 = LDR_DATA_TABLE_ENTRY.DllBase\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://idafchev.github.io/exploit/2017/09/26/writing_windows_shellcode.html"
+                                                            },
+                                                            {
+                                                                "ref":  "https://www.geoffchappell.com/studies/windows/win32/ntdll/structs/ldr_data_table_entry.htm"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "resumethread_remote_process",
+                                               "name":  "resumethread_remote_process",
+                                               "description":  "Resumed a thread in another process",
+                                               "match_data":  [
+                                                                  "{\"thread_resumed\": \"Process gofmt.exe with process ID 5780 resumed a thread in another process with the process ID 5780\"}",
+                                                                  "{\"type\": \"call\", \"pid\": 5780, \"cid\": 99}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_LOW"
+                                           },
+                                           {
+                                               "id":  "network_http",
+                                               "name":  "network_http",
+                                               "description":  "Performs some HTTP requests",
+                                               "match_data":  [
+                                                                  "{\"url\": \"http://ocsp.digicert.com/MFEwTzBNMEswSTAJBgUrDgMCGgUABBQ50otx%2Fh0Ztl%2Bz8SiPI7wEWVxDlQQUTiJUIBiV5uNu5g%2F6%2BrkS7QYXjzkCEApDqVCbATUviZV57HIIulA%3D\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_LOW"
+                                           },
+                                           {
+                                               "id":  "packer_unknown_pe_section_name",
+                                               "name":  "packer_unknown_pe_section_name",
+                                               "description":  "The binary contains an unknown PE section name indicative of packing",
+                                               "match_data":  [
+                                                                  "{\"unknown section\": {\"name\": \".symtab\", \"raw_address\": \"0x002d7400\", \"virtual_address\": \"0x00328000\", \"virtual_size\": \"0x00032f84\", \"size_of_data\": \"0x00033000\", \"characteristics\": \"IMAGE_SCN_MEM_DISC"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_LOW"
+                                           },
+                                           {
+                                               "id":  "procmem_yara",
+                                               "name":  "procmem_yara",
+                                               "description":  "Yara detections observed in process dumps, payloads or dropped files",
+                                               "match_data":  [
+                                                                  "{\"Hit\": \"PID 5780 triggered the Yara rule \u0027shellcode_get_eip\u0027 with data \u0027[\u0027{ E8 00 00 00 00 59 }\u0027]\u0027\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_MEDIUM"
+                                           },
+                                           {
+                                               "id":  "static_pe_anomaly",
+                                               "name":  "static_pe_anomaly",
+                                               "description":  "Anomalous binary characteristics",
+                                               "match_data":  [
+                                                                  "{\"anomaly\": \"Entrypoint of binary is located outside of any mapped sections\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_MEDIUM"
+                                           },
+                                           {
+                                               "id":  "418",
+                                               "description":  "Submission file is bigger than most known malware samples",
+                                               "match_data":  [
+                                                                  "File size 3187712 \u003e 1048576"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "871",
+                                               "description":  "Sample execution stops while process was sleeping (likely an evasion)",
+                                               "match_data":  [
+                                                                  "Thread delayed"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "415",
+                                               "description":  "PE file has an executable .text section and no other executable section",
+                                               "match_data":  [
+                                                                  "Section: .text IMAGE_SCN_CNT_CODE, IMAGE_SCN_MEM_EXECUTE, IMAGE_SCN_MEM_READ"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "509",
+                                               "description":  "Reads software policies",
+                                               "match_data":  [
+                                                                  "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "#registry_keys_opened",
+                                                                "value":  "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "1654",
+                                               "description":  "Sample might require command line arguments",
+                                               "match_data":  [
+                                                                  "_cgo_pthread_key_created missingruntime: sudog with non-nil elemruntime: sudog with non-nil nextruntime: sudog with non-nil prevruntime: mcall function returnedruntime: newstack called from g=runtime:",
+                                                                  "go/printer: unsupported node type %Tlfstack node allocated from the heap) is larger than maximum page size (runtime: invalid typeBitsBulkBarrieruncaching span but s.allocCount == 0/memory/classes/meta",
+                                                                  "net/addrselect.go"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "337",
+                                               "description":  "Queries the volume information (name, serial number etc) of a device",
+                                               "match_data":  [
+                                                                  "C:\\Users\\user\\AppData\\Roaming\\go\\telemetry\\local\\weekends VolumeInformation",
+                                                                  "C:\\Users\\user\\AppData\\Roaming\\go\\telemetry\\local\\gofmt@go1.23.6-go1.23.6-windows-amd64-2025-02-04.v1.count VolumeInformation"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "408",
+                                               "description":  "PE file has a big code size",
+                                               "match_data":  [
+                                                                  "Virtual size of .text is bigger than: 0x100000"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "715",
+                                               "description":  "Classification label",
+                                               "match_data":  [
+                                                                  "clean1.winEXE@2/2@0/0"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "381",
+                                               "description":  "Disables application error messsages (SetErrorMode)",
+                                               "match_data":  [
+                                                                  "NOGPFAULTERRORBOX | NOOPENFILEERRORBOX"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "626",
+                                               "description":  "Sample tries to load a library which is not present or installed on the analysis machine, adding the library might reveal more behavior",
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "229",
+                                               "description":  "Spawns processes",
+                                               "match_data":  [
+                                                                  "C:\\Users\\user\\Desktop\\gofmt.exe \"C:\\Users\\user\\Desktop\\gofmt.exe\"",
+                                                                  "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "406",
+                                               "description":  "Contains modern PE file flags such as dynamic base (ASLR) or NX",
+                                               "match_data":  [
+                                                                  "HIGH_ENTROPY_VA, DYNAMIC_BASE, NX_COMPAT, TERMINAL_SERVER_AWARE"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "908",
+                                               "description":  "Sample may offer command line options, please run it with the \u0027Execute binary with arguments\u0027 cookbook (it\u0027s possible that the command line switches require additional characters like: \"-\", \"/\", \"--\")",
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "187",
+                                               "description":  "Tries to load missing DLLs",
+                                               "match_data":  [
+                                                                  "apphelp.dll"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "263",
+                                               "description":  "May try to detect the virtual machine to hinder analysis (VM artifact strings found in memory)",
+                                               "match_data":  [
+                                                                  "Hyper-V RAW%SystemRoot%\\system32\\mswsock.dllWWM"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "#memory_dumps",
+                                                                "value":  "gofmt.exe, 00000000.00000002.1241128526.000002A6C6548000.00000004.00000020.00020000.00000000.sdmp"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "95",
+                                               "description":  "Creates mutexes",
+                                               "match_data":  [
+                                                                  "\\Sessions\\1\\BaseNamedObjects\\Local\\SM0:6564:120:WilError_01"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "199",
+                                               "description":  "PE file contains sections with non-standard names",
+                                               "match_data":  [
+                                                                  "section name: .xdata",
+                                                                  "section name: .symtab"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "90",
+                                               "description":  "Creates files inside the user directory",
+                                               "match_data":  [
+                                                                  "C:\\Users\\user\\AppData\\Roaming\\go"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "410",
+                                               "description":  "PE file has a big raw section",
+                                               "match_data":  [
+                                                                  "Raw size of .text is bigger than: 0x100000 \u003c 0x149200",
+                                                                  "Raw size of .rdata is bigger than: 0x100000 \u003c 0x160600"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           }
+                                       ],
+                 "ip_traffic":  [
+                                    {
+                                        "destination_ip":  "a83f:8110:7600:5f00:3200:3800:3200:3800",
+                                        "destination_port":  53,
+                                        "transport_layer_protocol":  "UDP"
+                                    },
+                                    {
+                                        "destination_ip":  "20.99.186.246",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "192.168.0.44",
+                                        "destination_port":  137,
+                                        "transport_layer_protocol":  "UDP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.204.150.28",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "104.98.118.178",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "20.99.133.109",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.213.37.172",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "a83f:8110:106b:300:0:0:0:0",
+                                        "destination_port":  53,
+                                        "transport_layer_protocol":  "UDP"
+                                    },
+                                    {
+                                        "destination_ip":  "192.168.0.55",
+                                        "destination_port":  137,
+                                        "transport_layer_protocol":  "UDP"
+                                    },
+                                    {
+                                        "destination_ip":  "52.154.209.174",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    }
+                                ],
+                 "modules_loaded":  [
+                                        "%SAMPLEPATH%\\a1c613fa1d299befd1120df9a8f3a0fd6a3f9824b0becc734705408863d55c53.exe",
+                                        "bcryptprimitives.dll",
+                                        "ntdll.dll",
+                                        "winmm.dll"
+                                    ],
+                 "processes_injected":  [
+                                            "%SAMPLEPATH%\\gofmt.exe",
+                                            "\\\\?\\C:\\Windows\\system32\\wbem\\WMIADAP.EXE",
+                                            "%SAMPLEPATH%\\a1c613fa1d299befd1120df9a8f3a0fd6a3f9824b0becc734705408863d55c53.exe"
+                                        ],
+                 "memory_dumps":  [
+                                      {
+                                          "file_name":  "5780.dmp",
+                                          "process":  "C:\\Users\\Bruno\\Desktop\\gofmt.exe",
+                                          "size":  "67309568",
+                                          "base_address":  "6881280"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C00003C000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "8192",
+                                          "base_address":  "824633966592",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000018000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824633819136",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C00002C000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824633901056",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1241083592.000002A6C64E0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "2915314827264",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1241063423.000000E6D31FE000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "8192",
+                                          "base_address":  "991384559616",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1241051982.000000E6D2DFF000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "991380369408",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C00008E000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634302464",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240670793.0000000000648000.00000004.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "16384",
+                                          "base_address":  "6586368",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1241027399.000000C000100000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634769408",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1241197141.000002A6EB900000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "2915939909632",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C0000B2000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634449920",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000060000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634114048",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C0000B4000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634458112",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240651266.0000000000638000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "6520832",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240609068.000000000062C000.00000004.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "6471680",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1241190999.000002A6EB8C0000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "8192",
+                                          "base_address":  "2915939647488",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000080000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634245120",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1241070793.000000E6D33FF000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "991386660864",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1241092465.000002A6C6500000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "2915314958336",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240712520.00000000006A0000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "241664",
+                                          "base_address":  "6946816",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C00008C000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634294272",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000000.1000247820.0000000000380000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "3670016",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C0000C9000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634544128",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000000.1000349955.000000000069F000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "6942720",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240578287.00000000004CB000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "1445888",
+                                          "base_address":  "5025792",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000033000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824633929728",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240656950.0000000000639000.00000004.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "53248",
+                                          "base_address":  "6524928",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C0000CB000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634552320",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C00000A000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824633761792",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000000.1000344075.0000000000695000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "40960",
+                                          "base_address":  "6901760",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000020000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824633851904",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C00009E000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634368000",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C0000C2000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634515456",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C0000BA000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634482688",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000000.1000335100.000000000062C000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "118784",
+                                          "base_address":  "6471680",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000000.1000254176.0000000000381000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "1351680",
+                                          "base_address":  "3674112",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1241183409.000002A6EB860000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "2915939254272",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1241092465.000002A6C650C000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "16384",
+                                          "base_address":  "2915315007488",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240662462.0000000000646000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "8192",
+                                          "base_address":  "6578176",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000082000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634253312",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1241092465.000002A6C650A000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "2915314999296",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000062000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634122240",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240625360.000000000062E000.00000004.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "6479872",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240551181.0000000000381000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "1351680",
+                                          "base_address":  "3674112",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000016000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824633810944",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000008000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824633753600",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000098000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634343424",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000092000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634318848",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C00000E000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824633778176",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C0000A4000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634392576",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000002000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824633729024",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C00001C000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824633835520",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C00004F000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634044416",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000053000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634060800",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C0000C0000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634507264",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C0000AE000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634433536",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1241128526.000002A6C6540000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "28672",
+                                          "base_address":  "2915315220480",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000043000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824633995264",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1241078126.000002A6C63B0000.00000004.00000020.00040000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "2915313582080",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1241044435.000000E6D27FD000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "12288",
+                                          "base_address":  "991374069760",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240670793.0000000000669000.00000004.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "6721536",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000066000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "12288",
+                                          "base_address":  "824634138624",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C0000BE000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634499072",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240616469.000000000062D000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "6475776",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000010000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824633786368",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000046000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634007552",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000000.1000294767.00000000004CB000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "1445888",
+                                          "base_address":  "5025792",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C0000B0000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634441728",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000000.1000359104.00000000006A0000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "241664",
+                                          "base_address":  "6946816",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1241092465.000002A6C6508000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "2915314991104",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C0000B6000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634466304",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000094000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634327040",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240707101.000000000069F000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "6942720",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240695200.0000000000695000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "40960",
+                                          "base_address":  "6901760",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1241057907.000000E6D2FFE000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "8192",
+                                          "base_address":  "991382462464",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000014000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824633802752",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240642328.0000000000637000.00000004.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "6516736",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000004000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824633737216",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1241092465.000002A6C6504000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "2915314974720",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000012000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824633794560",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000064000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634130432",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240635904.000000000062F000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "32768",
+                                          "base_address":  "6483968",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C00000C000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824633769984",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1241128526.000002A6C6548000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "90112",
+                                          "base_address":  "2915315253248",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "refs":  [
+                                                       {
+                                                           "ref":  "#signature_matches",
+                                                           "value":  "263"
+                                                       }
+                                                   ],
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1241034044.000000C00018A000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "8192",
+                                          "base_address":  "824635334656",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C00001E000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824633843712",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1241034044.000000C00018F000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824635355136",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1241204974.000002A6EB940000.00000004.00000001.00040000.00000005.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "2915940171776",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000086000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634269696",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000041000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824633987072",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000031000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824633921536",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000048000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "16384",
+                                          "base_address":  "824634015744",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C00002E000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824633909248",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C00001A000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824633827328",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240722082.000000C000074000.00000004.00001000.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "824634195968",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240670793.0000000000690000.00000004.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "8192",
+                                          "base_address":  "6881280",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1240546017.0000000000380000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                          "size":  "4096",
+                                          "base_address":  "3670016",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "3628"
+                                      }
+                                  ],
+                 "tags":  [
+                              "OBFUSCATED"
+                          ],
+                 "dns_lookups":  [
+                                     {
+                                         "hostname":  "res.public.onecdn.static.microsoft",
+                                         "resolved_ips":  [
+                                                              "104.98.118.178",
+                                                              "104.98.118.163",
+                                                              "104.98.118.146",
+                                                              "104.98.118.152"
+                                                          ]
+                                     },
+                                     {
+                                         "hostname":  "www.microsoft.com",
+                                         "resolved_ips":  [
+                                                              "23.213.37.172"
+                                                          ]
+                                     }
+                                 ],
+                 "mbc":  [
+                             {
+                                 "id":  "C0019",
+                                 "objective":  "Data",
+                                 "behavior":  "Check String",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "parse credit card information"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0027.009",
+                                 "objective":  "Cryptography",
+                                 "behavior":  "Encrypt Data",
+                                 "method":  "RC4",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "encrypt data using RC4 PRGA"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0021.004",
+                                 "objective":  "Cryptography",
+                                 "behavior":  "Generate Pseudo-random Sequence",
+                                 "method":  "RC4 PRGA",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "encrypt data using RC4 PRGA"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0030.001",
+                                 "objective":  "Data",
+                                 "behavior":  "Non-Cryptographic Hash",
+                                 "method":  "MurmurHash",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "hash data using murmur3"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1027.m03",
+                                 "objective":  "Defense Evasion",
+                                 "behavior":  "Obfuscated Files or Information",
+                                 "method":  "Encoding-Custom Algorithm",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "encode data using ADD XOR SUB operations"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1027.m02",
+                                 "objective":  "Defense Evasion",
+                                 "behavior":  "Obfuscated Files or Information",
+                                 "method":  "Encoding-Standard Algorithm",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "encode data using Base64"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0026.001",
+                                 "objective":  "Data",
+                                 "behavior":  "Encode Data",
+                                 "method":  "Base64",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "encode data using Base64"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0009",
+                                 "objective":  "Anti-Behavioral Analysis",
+                                 "behavior":  "Virtual Machine Detection",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "reference anti-VM strings"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0013.001",
+                                 "objective":  "Discovery",
+                                 "behavior":  "Analysis Tool Discovery",
+                                 "method":  "Process detection",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "reference analysis tools strings"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0030.005",
+                                 "objective":  "Data",
+                                 "behavior":  "Non-Cryptographic Hash",
+                                 "method":  "FNV",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "hash data using fnv"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1027.m02",
+                                 "objective":  "Defense Evasion",
+                                 "behavior":  "Obfuscated Files or Information",
+                                 "method":  "Encoding-Standard Algorithm",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "encode data using XOR"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0026.002",
+                                 "objective":  "Data",
+                                 "behavior":  "Encode Data",
+                                 "method":  "XOR",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "encode data using XOR"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0040",
+                                 "objective":  "Process",
+                                 "behavior":  "Allocate Thread Local Storage",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "allocate thread local storage"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1027.m05",
+                                 "objective":  "Defense Evasion",
+                                 "behavior":  "Obfuscated Files or Information",
+                                 "method":  "Encryption-Standard Algorithm",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "encrypt data using AES via x86 extensions"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0027.001",
+                                 "objective":  "Cryptography",
+                                 "behavior":  "Encrypt Data",
+                                 "method":  "AES",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "encrypt data using AES via x86 extensions"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "OC0006"
+                             },
+                             {
+                                 "id":  "C0002"
+                             },
+                             {
+                                 "id":  "OB0001"
+                             },
+                             {
+                                 "id":  "OB0002"
+                             },
+                             {
+                                 "id":  "OB0006"
+                             },
+                             {
+                                 "id":  "F0001"
+                             }
+                         ],
+                 "processes_created":  [
+                                           "\"C:\\Users\\\u003cUSER\u003e\\Desktop\\gofmt.exe\"",
+                                           "%SAMPLEPATH%\\gofmt.exe",
+                                           "%SAMPLEPATH%\\a1c613fa1d299befd1120df9a8f3a0fd6a3f9824b0becc734705408863d55c53.exe",
+                                           "\"C:\\Users\\user\\Desktop\\gofmt.exe\"",
+                                           "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1"
+                                       ],
+                 "files_opened":  [
+                                      "C:\\Users\\\u003cUSER\u003e\\AppData\\Roaming\\go\\telemetry\\mode",
+                                      "C:\\Users\\\u003cUSER\u003e\\AppData\\Roaming\\go\\telemetry\\local\\weekends",
+                                      "C:\\Users\\\u003cUSER\u003e\\AppData\\Roaming\\go\\telemetry\\local",
+                                      "C:\\Users\\\u003cUSER\u003e\\AppData\\Roaming\\go\\telemetry",
+                                      "C:\\Users\\\u003cUSER\u003e\\AppData\\Roaming\\go",
+                                      "C:\\Users\\\u003cUSER\u003e\\AppData\\Roaming",
+                                      "C:\\Users\\\u003cUSER\u003e\\AppData\\Roaming\\go\\telemetry\\local\\gofmt@go1.23.6-go1.23.6-windows-amd64-2025-02-05.v1.count",
+                                      "C:\\Windows\\system32\\bcryptprimitives.dll",
+                                      "C:\\Users\\user\\AppData\\Roaming\\go",
+                                      "C:\\Users\\user\\AppData\\Roaming\\go\\telemetry",
+                                      "C:\\Users\\user\\AppData\\Roaming\\go\\telemetry\\local",
+                                      "C:\\Users\\user\\AppData\\Roaming\\go\\telemetry\\local\\weekends",
+                                      "C:\\Users\\user\\AppData\\Roaming\\go\\telemetry\\mode",
+                                      "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                      "C:\\Windows\\AppPatch\\sysmain.sdb",
+                                      "C:\\Windows\\Globalization\\Sorting\\sortdefault.nls",
+                                      "C:\\Windows\\SYSTEM32\\apphelp.dll",
+                                      "C:\\Windows\\SYSTEM32\\ntdll.dll",
+                                      "C:\\Windows\\SYSTEM32\\ntmarta.dll",
+                                      "C:\\Windows\\SYSTEM32\\ole32.dll",
+                                      "C:\\Windows\\SYSTEM32\\wintypes.dll",
+                                      "C:\\Windows\\System32\\CoreMessaging.dll",
+                                      "C:\\Windows\\System32\\CoreUIComponents.dll",
+                                      "C:\\Windows\\System32\\KERNEL32.DLL",
+                                      "C:\\Windows\\System32\\KERNELBASE.dll",
+                                      "C:\\Windows\\System32\\TextInputFramework.dll",
+                                      "C:\\Windows\\System32\\en-US\\mswsock.dll.mui",
+                                      "C:\\Windows\\System32\\en-US\\user32.dll.mui",
+                                      "C:\\Windows\\System32\\en-US\\wshqos.dll.mui",
+                                      "C:\\Windows\\System32\\mswsock.dll",
+                                      "C:\\Windows\\System32\\wshqos.dll",
+                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_d3fbe61b7c93d9f0",
+                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_d3fbe61b7c93d9f0\\comctl32.DLL",
+                                      "C:\\Windows\\system32\\IMM32.DLL",
+                                      "C:\\Windows\\system32\\conhost.exe",
+                                      "C:\\Windows\\system32\\dwmapi.dll",
+                                      "C:\\Windows\\system32\\en-US\\conhost.exe.mui",
+                                      "C:\\Windows\\system32\\rpcss.dll",
+                                      "C:\\Windows\\system32\\uxtheme.dll",
+                                      "C:\\Windows\\system32\\uxtheme.dll.Config"
+                                  ],
+                 "registry_keys_opened":  [
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Segment Heap",
+                                              "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\LanguageOverlay\\OverlayPackages\\en-US",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\MUI\\Settings",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Microsoft\\WindowsStore",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Policies\\Microsoft\\Cryptography\\Configuration",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\AppModel\\Lookaside\\Packages"
+                                          ],
+                 "command_executions":  [
+                                            "%SAMPLEPATH%",
+                                            "\"%SAMPLEPATH%\\gofmt.exe\" ",
+                                            "\"%SAMPLEPATH%\\a1c613fa1d299befd1120df9a8f3a0fd6a3f9824b0becc734705408863d55c53.exe\" "
+                                        ],
+                 "files_written":  [
+                                       "C:\\Users\\\u003cUSER\u003e\\AppData\\Roaming\\go\\telemetry\\local\\weekends",
+                                       "C:\\Users\\\u003cUSER\u003e\\AppData\\Roaming\\go\\telemetry\\local\\gofmt@go1.23.6-go1.23.6-windows-amd64-2025-02-05.v1.count",
+                                       "C:\\Users\\user\\AppData\\Roaming\\go",
+                                       "C:\\Users\\user\\AppData\\Roaming\\go\\telemetry",
+                                       "C:\\Users\\user\\AppData\\Roaming\\go\\telemetry\\local",
+                                       "C:\\Users\\user\\AppData\\Roaming\\go\\telemetry\\local\\gofmt@go1.23.6-go1.23.6-windows-amd64-2025-02-04.v1.count",
+                                       "C:\\Users\\user\\AppData\\Roaming\\go\\telemetry\\local\\weekends",
+                                       "\\Device\\ConDrv\\\\Connect"
+                                   ],
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "2576",
+                                            "name":  "%CONHOST% \"-7651030051737092337426277921140687678464424300-1252429796-15884460181479678438"
+                                        },
+                                        {
+                                            "process_id":  "2508",
+                                            "name":  "%SAMPLEPATH%"
+                                        },
+                                        {
+                                            "process_id":  "2736",
+                                            "name":  "wmiadap.exe /F /T /R"
+                                        },
+                                        {
+                                            "process_id":  "2784",
+                                            "name":  "%windir%\\system32\\wbem\\wmiprvse.exe"
+                                        },
+                                        {
+                                            "process_id":  "5780",
+                                            "name":  "\"C:\\Users\\\u003cUSER\u003e\\Desktop\\gofmt.exe\"",
+                                            "files_written":  [
+                                                                  "C:\\Users\\Bruno\\AppData\\Roaming\\go\\telemetry\\local\\weekends",
+                                                                  "C:\\Users\\Bruno\\AppData\\Roaming\\go\\telemetry\\local\\gofmt@go1.23.6-go1.23.6-windows-amd64-2025-02-05.v1.count"
+                                                              ]
+                                        },
+                                        {
+                                            "process_id":  "1864",
+                                            "name":  "%WINDIR%\\explorer.exe",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "2856",
+                                                                 "name":  "%SAMPLEPATH%\\gofmt.exe"
+                                                             }
+                                                         ]
+                                        },
+                                        {
+                                            "process_id":  "3628",
+                                            "name":  "\"C:\\Users\\user\\Desktop\\gofmt.exe\"",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "6564",
+                                                                 "name":  "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1",
+                                                                 "files_opened":  [
+                                                                                      "C:\\Windows\\Globalization\\Sorting\\sortdefault.nls",
+                                                                                      "C:\\Windows\\SYSTEM32\\ntmarta.dll",
+                                                                                      "C:\\Windows\\SYSTEM32\\ole32.dll",
+                                                                                      "C:\\Windows\\SYSTEM32\\wintypes.dll",
+                                                                                      "C:\\Windows\\System32\\CoreMessaging.dll",
+                                                                                      "C:\\Windows\\System32\\CoreUIComponents.dll",
+                                                                                      "C:\\Windows\\System32\\TextInputFramework.dll",
+                                                                                      "C:\\Windows\\System32\\en-US\\user32.dll.mui",
+                                                                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_d3fbe61b7c93d9f0",
+                                                                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_d3fbe61b7c93d9f0\\comctl32.DLL",
+                                                                                      "C:\\Windows\\system32\\IMM32.DLL",
+                                                                                      "C:\\Windows\\system32\\conhost.exe",
+                                                                                      "C:\\Windows\\system32\\dwmapi.dll",
+                                                                                      "C:\\Windows\\system32\\en-US\\conhost.exe.mui",
+                                                                                      "C:\\Windows\\system32\\rpcss.dll",
+                                                                                      "C:\\Windows\\system32\\uxtheme.dll",
+                                                                                      "C:\\Windows\\system32\\uxtheme.dll.Config"
+                                                                                  ]
+                                                             }
+                                                         ],
+                                            "files_opened":  [
+                                                                 "C:\\Users\\user\\AppData\\Roaming\\go",
+                                                                 "C:\\Users\\user\\AppData\\Roaming\\go\\telemetry",
+                                                                 "C:\\Users\\user\\AppData\\Roaming\\go\\telemetry\\local",
+                                                                 "C:\\Users\\user\\AppData\\Roaming\\go\\telemetry\\local\\weekends",
+                                                                 "C:\\Users\\user\\AppData\\Roaming\\go\\telemetry\\mode",
+                                                                 "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                                                 "C:\\Windows\\AppPatch\\sysmain.sdb",
+                                                                 "C:\\Windows\\SYSTEM32\\apphelp.dll",
+                                                                 "C:\\Windows\\SYSTEM32\\ntdll.dll",
+                                                                 "C:\\Windows\\System32\\KERNEL32.DLL",
+                                                                 "C:\\Windows\\System32\\KERNELBASE.dll",
+                                                                 "C:\\Windows\\System32\\en-US\\mswsock.dll.mui",
+                                                                 "C:\\Windows\\System32\\en-US\\wshqos.dll.mui",
+                                                                 "C:\\Windows\\System32\\mswsock.dll",
+                                                                 "C:\\Windows\\System32\\wshqos.dll"
+                                                             ],
+                                            "files_written":  [
+                                                                  "C:\\Users\\user\\AppData\\Roaming\\go",
+                                                                  "C:\\Users\\user\\AppData\\Roaming\\go\\telemetry",
+                                                                  "C:\\Users\\user\\AppData\\Roaming\\go\\telemetry\\local",
+                                                                  "C:\\Users\\user\\AppData\\Roaming\\go\\telemetry\\local\\gofmt@go1.23.6-go1.23.6-windows-amd64-2025-02-04.v1.count",
+                                                                  "C:\\Users\\user\\AppData\\Roaming\\go\\telemetry\\local\\weekends",
+                                                                  "\\Device\\ConDrv\\\\Connect"
+                                                              ]
+                                        }
+                                    ],
+                 "verdicts":  [
+                                  "UNKNOWN_VERDICT",
+                                  "CLEAN"
+                              ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1027",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "encrypt data using RC4 PRGA",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "encrypt data using RC4 PRGA"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1027",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "encode data using ADD XOR SUB operations",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "encode data using ADD XOR SUB operations"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1027",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "encode data using Base64",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "encode data using Base64"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1027",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "encrypt data using Salsa20 or ChaCha",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "encrypt data using Salsa20 or ChaCha"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1497.001",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "reference anti-VM strings",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "reference anti-VM strings"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1027",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "encode data using XOR",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "encode data using XOR"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1027",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "encrypt data using AES via x86 extensions",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "encrypt data using AES via x86 extensions"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "access PEB ldr_data",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "access PEB ldr_data"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get kernel32 base address",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "get kernel32 base address"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1071",
+                                                     "signature_description":  "Adversaries may communicate using application layer protocols to avoid detection/network filtering by blending in with existing traffic."
+                                                 },
+                                                 {
+                                                     "id":  "T1055",
+                                                     "signature_description":  "Adversaries may inject code into processes in order to evade process-based defenses as well as possibly elevate privileges."
+                                                 },
+                                                 {
+                                                     "id":  "T1027",
+                                                     "signature_description":  "Adversaries may attempt to make an executable or file difficult to discover or analyze by encrypting, encoding, or otherwise obfuscating its contents on the system or in transit."
+                                                 },
+                                                 {
+                                                     "id":  "T1027.002",
+                                                     "signature_description":  "Adversaries may perform software packing or virtual machine software protection to conceal their code."
+                                                 },
+                                                 {
+                                                     "id":  "T1059",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Sample might require command line arguments, analyze it with the command line cookbook",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "1654"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1059",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Sample may offer command line options, please run it with the command line option cookbook (it\u0027s possible that the command line switches require additional characters like)",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "908"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1574.002",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Tries to load missing DLLs",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "187"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1036",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Creates files inside the user directory",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "90"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1518.001",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "May try to detect the virtual machine to hinder analysis (VM artifact strings found in memory)",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "263"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Queries the volume information (name, serial number etc) of a device",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "337"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Reads software policies",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "509"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "processes_terminated":  [
+                                              "%CONHOST% \"-7651030051737092337426277921140687678464424300-1252429796-15884460181479678438",
+                                              "%SAMPLEPATH%",
+                                              "wmiadap.exe /F /T /R"
+                                          ],
+                 "files_dropped":  [
+                                       {
+                                           "path":  "weekends",
+                                           "sha256":  "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+                                           "type":  "TEXT",
+                                           "process_name":  "\"C:\\Users\\\u003cUSER\u003e\\Desktop\\gofmt.exe\"",
+                                           "process_id":  "5780"
+                                       },
+                                       {
+                                           "path":  "gofmt@go1.23.6-go1.23.6-windows-amd64-2025-02-05.v1.count",
+                                           "sha256":  "93c5233f9bbc0e8b77f3fb729911363e0122f667e578234b3bee9de5f0d00f26",
+                                           "process_name":  "\"C:\\Users\\\u003cUSER\u003e\\Desktop\\gofmt.exe\"",
+                                           "process_id":  "5780"
+                                       },
+                                       {
+                                           "path":  "%USERPROFILE%\\AppData\\Roaming\\go"
+                                       },
+                                       {
+                                           "path":  "%USERPROFILE%\\AppData\\Roaming\\go\\telemetry"
+                                       },
+                                       {
+                                           "path":  "%USERPROFILE%\\AppData\\Roaming\\go\\telemetry\\local"
+                                       },
+                                       {
+                                           "path":  "%USERPROFILE%\\AppData\\Roaming\\go\\telemetry\\local\\weekends"
+                                       },
+                                       {
+                                           "path":  "%USERPROFILE%\\AppData\\Roaming\\go\\telemetry\\local\\gofmt@go1.23.6-go1.23.6-windows-amd64-2025-02-04.v1.count"
+                                       },
+                                       {
+                                           "path":  "%USERPROFILE%\\AppData\\Roaming\\go\\telemetry\\local\\gofmt@go1.23.6-go1.23.6-windows-amd64-2025-02-15.v1.count"
+                                       },
+                                       {
+                                           "path":  "C:\\Users\\user\\AppData\\Roaming\\go\\telemetry\\local\\weekends",
+                                           "sha256":  "f0b5c2c2211c8d67ed15e75e656c7862d086e9245420892a7de62cd9ec582a06",
+                                           "type":  "TEXT",
+                                           "process_name":  "C:\\Users\\user\\Desktop\\gofmt.exe",
+                                           "process_id":  "3628"
+                                       }
+                                   ],
+                 "verdict_confidence":  99,
+                 "files_deleted":  [
+                                       "C:\\Windows\\System32\\wbem\\Performance\\WmiApRpl.h",
+                                       "C:\\Windows\\System32\\wbem\\Performance\\WmiApRpl.ini"
+                                   ],
+                 "attack_techniques":  {
+                                           "T1027":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "encrypt data using RC4 PRGA",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "encrypt data using RC4 PRGA"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "encode data using ADD XOR SUB operations",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "encode data using ADD XOR SUB operations"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "encode data using Base64",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "encode data using Base64"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "encrypt data using Salsa20 or ChaCha",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "encrypt data using Salsa20 or ChaCha"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "encode data using XOR",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "encode data using XOR"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "encrypt data using AES via x86 extensions",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "encrypt data using AES via x86 extensions"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "Adversaries may attempt to make an executable or file difficult to discover or analyze by encrypting, encoding, or otherwise obfuscating its contents on the system or in transit."
+                                                         }
+                                                     ],
+                                           "T1497.001":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "reference anti-VM strings",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "reference anti-VM strings"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "access PEB ldr_data",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "access PEB ldr_data"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get kernel32 base address",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "get kernel32 base address"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1071":  [
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "Adversaries may communicate using application layer protocols to avoid detection/network filtering by blending in with existing traffic."
+                                                         }
+                                                     ],
+                                           "T1055":  [
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "Adversaries may inject code into processes in order to evade process-based defenses as well as possibly elevate privileges."
+                                                         }
+                                                     ],
+                                           "T1027.002":  [
+                                                             {
+                                                                 "severity":  "UNKNOWN",
+                                                                 "description":  "Adversaries may perform software packing or virtual machine software protection to conceal their code."
+                                                             }
+                                                         ],
+                                           "T1059":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Sample might require command line arguments, analyze it with the command line cookbook",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "1654"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Sample may offer command line options, please run it with the command line option cookbook (it\u0027s possible that the command line switches require additional characters like)",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "908"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1574.002":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "Tries to load missing DLLs",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "187"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1036":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Creates files inside the user directory",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "90"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1518.001":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "May try to detect the virtual machine to hinder analysis (VM artifact strings found in memory)",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "263"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1082":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Queries the volume information (name, serial number etc) of a device",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "337"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Reads software policies",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "509"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

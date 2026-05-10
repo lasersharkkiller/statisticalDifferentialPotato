@@ -1,0 +1,234 @@
+{
+    "data":  {
+                 "signature_matches":  [
+                                           {
+                                               "id":  "1",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "access PEB ldr_data",
+                                               "description":  "linking/runtime-linking",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "PEB access",
+                                                                  "gs access"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: access PEB ldr_data\n    namespace: linking/runtime-linking\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: unsupported  # requires offset features\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    references:\n      - https://www.geoffchappell.com/studies/windows/km/ntoskrnl/inc/api/ntpsapi_x/peb_ldr_data.htm\n      - https://github.com/d35ha/CallObfuscator/blob/5834aff9ff4511f1408ae4ce80b79737af4ae77b/ShellCode/shell_x64.asm#L8\n    examples:\n      - 3FDFB2D522E7DEECAAAF2F87420F7E75:0x4117B7\n  features:\n    - or:\n      - and:\n        - arch: i386\n        - description: x32\n\n        - match: PEB access\n\n        # x86 Windows uses fs:0 to access the TIB which contains SEH information at offset 0\n        # checking for fs:0 and a (possibly unrelated) number or offset often results in false positives\n\n        - offset: 0x0C = PEB.LDR_DATA\n\n        - or:\n          - description: resolve a module list\n          - offset: 0x0C = PEB.LDR_DATA.InLoadOrderModuleList\n          - offset: 0x14 = PEB.LDR_DATA.InMemoryOrderModuleList\n          - offset: 0x1C = PEB.LDR_DATA.InInitializationOrderModuleList\n\n      - and:\n        - arch: amd64\n        - description: x64\n\n        - match: PEB access\n\n        - offset: 0x18 = PEB.LDR_DATA\n\n        - or:\n          - description: resolve a module list\n          - offset: 0x10 = PEB.LDR_DATA.InLoadOrderModuleList\n          - offset: 0x20 = PEB.LDR_DATA.InMemoryOrderModuleList\n          - offset: 0x30 = PEB.LDR_DATA.InInitializationOrderModuleList\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://www.geoffchappell.com/studies/windows/km/ntoskrnl/inc/api/ntpsapi_x/peb_ldr_data.htm"
+                                                            },
+                                                            {
+                                                                "ref":  "https://github.com/d35ha/CallObfuscator/blob/5834aff9ff4511f1408ae4ce80b79737af4ae77b/ShellCode/shell_x64.asm#L8"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "2",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "resolve function by parsing PE exports",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "sara-rn"
+                                                           ],
+                                               "match_data":  [
+                                                                  "loop",
+                                                                  "mnemonic: movzx"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: resolve function by parsing PE exports\n    namespace: load-code/pe\n    authors:\n      - sara-rn\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic, offset, mnemonic features\n    examples:\n      - 73CE04892E5F39EC82B00C02FC04C70F:0x406BA1\n  features:\n    - and:\n      - os: windows\n      - or:\n        - characteristic: loop\n        - mnemonic: movzx\n      - and:\n        - offset: 0x3C = IMAGE_DOS_HEADER.PE.e_lfanew\n        - or:\n          - and:\n            - arch: i386\n            - offset: 0x78 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n          - and:\n            - arch: amd64\n            - offset: 0x88 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n        - 3 or more:\n          - offset: 0x14 = IMAGE_EXPORT_DIRECTORY.NumberOfFunctions\n          - offset: 0x24 = IMAGE_EXPORT_DIRECTORY.AddressOfNameOrdinals\n          - offset: 0x20 = IMAGE_EXPORT_DIRECTORY.AddressOfNames\n          - offset: 0x18 = IMAGE_EXPORT_DIRECTORY.NumberOfNames\n          - offset: 0x1C = IMAGE_EXPORT_DIRECTORY.AddressOfFunctions\n      - optional:\n        - or:\n          - api: LoadLibrary\n          - api: strcmp\n"
+                                           },
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check for time delay via QueryPerformanceCounter",
+                                               "description":  "anti-analysis/anti-debugging/debugger-detection",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check for time delay via QueryPerformanceCounter\n    namespace: anti-analysis/anti-debugging/debugger-detection\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Anti-Behavioral Analysis::Debugger Detection::Timing/Delay Check QueryPerformanceCounter [B0001.033]\n    examples:\n      - Practical Malware Analysis Lab 16-03.exe_:0x4011e0\n  features:\n    - and:\n      - count(api(kernel32.QueryPerformanceCounter)): 2 or more\n"
+                                           },
+                                           {
+                                               "id":  "4",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "hash data using fnv",
+                                               "description":  "data-manipulation/hashing/fnv : can be any Fowler-Noll-Vo (FNV) hash variant, including FNV-1, FNV-1a, FNV-0",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "@_re_fox",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "loop",
+                                                                  "FNV_offset_basis, unused by FNV-0",
+                                                                  "FNV prime"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: hash data using fnv\n    namespace: data-manipulation/hashing/fnv\n    authors:\n      - moritz.raabe@mandiant.com\n      - \"@_re_fox\"\n      - michael.hunhoff@mandiant.com\n    description: can be any Fowler-Noll-Vo (FNV) hash variant, including FNV-1, FNV-1a, FNV-0\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic, mnemonic features\n    mbc:\n      - Data::Non-Cryptographic Hash::FNV [C0030.005]\n    references:\n      - https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function\n      - http://isthe.com/chongo/tech/comp/fnv/\n      - https://create.stephan-brumme.com/fnv-hash/\n    examples:\n      - ad4229879180e267f431ac6666b6a0a2:0x14007B4D4\n      - 09BF850BE5DA44A1C3629A1F62813A83:0x10006010\n  features:\n    - and:\n      - optional:\n        - characteristic: loop\n        - number: 0xcbf29ce484222325 = FNV_offset_basis, unused by FNV-0\n        - number: 0x811c9dc5 = FNV_offset_basis, unused by FNV-0\n        - and:\n          - number: 0xcbf29ce4 = FNV_offset_basis 64 bits, 32-bit value\n          - number: 0x84222325 = FNV_offset_basis 64 bits, 32-bit value\n      - or:\n        - number: 0x100000001b3 = FNV prime\n        - number: 0x01000193 = FNV prime\n        - and:\n          - number: 0x100 = FNV prime 64 bits, split in DWORD\n          - number: 0x1b3 = FNV prime 64 bits, split in DWORD\n      - basic block:\n        # FNV-1 hash does multiply then XOR\n        # FNV-1a hash does XOR then multiply\n        - and:\n          - characteristic: nzxor\n          - or:\n            - mnemonic: imul\n            - mnemonic: mul\n            - api: _allmul\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function"
+                                                            },
+                                                            {
+                                                                "ref":  "http://isthe.com/chongo/tech/comp/fnv/"
+                                                            },
+                                                            {
+                                                                "ref":  "https://create.stephan-brumme.com/fnv-hash/"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "6",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "encrypt data using RC4 PRGA",
+                                               "description":  "data-manipulation/encryption/rc4",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "loop",
+                                                                  "contain loop",
+                                                                  "tight loop"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: encrypt data using RC4 PRGA\n    namespace: data-manipulation/encryption/rc4\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic, mnemonic, basicblock features\n    att\u0026ck:\n      - Defense Evasion::Obfuscated Files or Information [T1027]\n    mbc:\n      - Cryptography::Encrypt Data::RC4 [C0027.009]\n      - Cryptography::Generate Pseudo-random Sequence::RC4 PRGA [C0021.004]\n    examples:\n      - 34404A3FB9804977C6AB86CB991FB130:0x403DB0\n      - 34404A3FB9804977C6AB86CB991FB130:0x403E50\n      - 9324D1A8AE37A36AE560C37448C9705A:0x4049F0\n      - 73CE04892E5F39EC82B00C02FC04C70F:0x4064C6\n  features:\n    - and:\n      # TODO: maybe add characteristic for nzxor reg size\n      - count(characteristic(nzxor)): 1\n      - or:\n        - match: calculate modulo 256 via x86 assembly\n        # compiler may do this via zero-extended mov from 8-bit register\n        - count(mnemonic(movzx)): 4 or more\n      # should not call (many) functions\n      - count(characteristic(calls from)): (0, 4)\n      # should not be too simple or too complex (50 is picked by intuition)\n      - count(basic blocks): (4, 50)\n      - match: contain loop\n      - optional:\n        - or:\n          - number: 0xFF\n          - number: 0x100\n"
+                                           },
+                                           {
+                                               "id":  "7",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "write file on Windows",
+                                               "description":  "host-interaction/file-system/write",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: fwrite",
+                                                                  "FILE_WRITE_DATA"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: write file on Windows\n    namespace: host-interaction/file-system/write\n    authors:\n      - william.ballenthin@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - File System::Writes File [C0052]\n    examples:\n      - Practical Malware Analysis Lab 01-04.exe_:0x4011FC\n      # ntdll\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x1400025C4\n  features:\n    - or:\n      - and:\n        - os: windows\n        - optional:\n          - basic block:\n            - or:\n              - number: 0x40000000 = GENERIC_WRITE\n              - number: 0x2 = FILE_WRITE_DATA\n              - match: create or open file\n          - call:\n            - or:\n              - number: 0x40000000 = GENERIC_WRITE\n              - number: 0x2 = FILE_WRITE_DATA\n              - match: create or open file\n        - or:\n          - api: kernel32.WriteFile\n          - api: kernel32.WriteFileEx\n          - api: NtWriteFile\n          - api: ZwWriteFile\n          - api: _fwrite\n          - api: fwrite\n      - api: System.IO.File::WriteAllBytes\n      - api: System.IO.File::WriteAllBytesAsync\n      - api: System.IO.File::WriteAllLines\n      - api: System.IO.File::WriteAllLinesAsync\n      - api: System.IO.File::WriteAllText\n      - api: System.IO.File::WriteAllTextAsync\n      - api: System.IO.File::AppendAllLines\n      - api: System.IO.File::AppendAllLinesAsync\n      - api: System.IO.File::AppendAllText\n      - api: System.IO.File::AppendAllTextAsync\n      - api: System.IO.File::AppendText\n      - api: System.IO.FileInfo::AppendText\n"
+                                           },
+                                           {
+                                               "id":  "8",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "contains PDB path",
+                                               "description":  "executable/pe/pdb",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "regex: /:\\\\.*\\.pdb/"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: contains PDB path\n    namespace: executable/pe/pdb\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    examples:\n      - 464EF2CA59782CE697BC329713698CCC  # level32.exe\n  features:\n    - string: /:\\\\.*\\.pdb/\n"
+                                           }
+                                       ],
+                 "mbc":  [
+                             {
+                                 "id":  "B0001.033",
+                                 "objective":  "Anti-Behavioral Analysis",
+                                 "behavior":  "Debugger Detection",
+                                 "method":  "Timing/Delay Check QueryPerformanceCounter",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "3"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0030.005",
+                                 "objective":  "Data",
+                                 "behavior":  "Non-Cryptographic Hash",
+                                 "method":  "FNV",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "4"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0027.009",
+                                 "objective":  "Cryptography",
+                                 "behavior":  "Encrypt Data",
+                                 "method":  "RC4",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "6"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0021.004",
+                                 "objective":  "Cryptography",
+                                 "behavior":  "Generate Pseudo-random Sequence",
+                                 "method":  "RC4 PRGA",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "6"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0052",
+                                 "objective":  "File System",
+                                 "behavior":  "Writes File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "7"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "access PEB ldr_data",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "1"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1027",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "encrypt data using RC4 PRGA",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "6"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "attack_techniques":  {
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "access PEB ldr_data",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "1"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1027":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "encrypt data using RC4 PRGA",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "6"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

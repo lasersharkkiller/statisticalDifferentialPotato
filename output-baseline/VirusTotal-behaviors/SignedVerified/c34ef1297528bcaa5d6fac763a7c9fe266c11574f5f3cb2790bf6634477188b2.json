@@ -1,0 +1,323 @@
+{
+    "data":  {
+                 "signature_matches":  [
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create or open registry key",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create or open registry key\n    authors:\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    lib: true\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - Operating System::Registry::Create Registry Key [C0036.004]\n      - Operating System::Registry::Open Registry Key [C0036.003]\n    examples:\n      - Practical Malware Analysis Lab 03-02.dll_:0x10004706\n      - Practical Malware Analysis Lab 11-01.exe_:0x401000\n      - 493167E85E45363D09495D0841C30648:0x404D60\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x4045F2\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x40433E\n      - 692f7fd6d198e804d6af98eb9e390d61:0x6000003\n  features:\n    - or:\n      - api: advapi32.RegOpenKey\n      - api: advapi32.RegOpenKeyEx\n      - api: advapi32.RegCreateKey\n      - api: advapi32.RegCreateKeyEx\n      - api: advapi32.RegOpenCurrentUser\n      - api: advapi32.RegOpenKeyTransacted\n      - api: advapi32.RegOpenUserClassesRoot\n      - api: advapi32.RegCreateKeyTransacted\n      - api: ZwOpenKey\n      - api: ZwOpenKeyEx\n      - api: ZwCreateKey\n      - api: ZwOpenKeyTransacted\n      - api: ZwOpenKeyTransactedEx\n      - api: ZwCreateKeyTransacted\n      - api: NtOpenKey\n      - api: NtCreateKey\n      - api: SHRegOpenUSKey\n      - api: SHRegCreateUSKey\n      - api: RtlCreateRegistryKey\n      - api: Microsoft.Win32.RegistryKey::OpenSubKey\n      - api: Microsoft.Win32.RegistryKey::OpenBaseKey\n      - api: Microsoft.Win32.RegistryKey::OpenRemoteBaseKey\n      - api: Microsoft.Win32.RegistryKey::CreateSubKey\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "encode data using XOR",
+                                               "description":  "data-manipulation/encoding/xor",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: encode data using XOR\n    namespace: data-manipulation/encoding/xor\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: unsupported  # requires characteristic, Not features\n    att\u0026ck:\n      - Defense Evasion::Obfuscated Files or Information [T1027]\n    mbc:\n      - Defense Evasion::Obfuscated Files or Information::Encoding-Standard Algorithm [E1027.m02]\n      - Data::Encode Data::XOR [C0026.002]\n    examples:\n      - 2D3EDC218A90F03089CC01715A9F047F:0x403D7E\n  features:\n    - and:\n      - characteristic: tight loop\n      - characteristic: nzxor\n      - not:\n        - description: filter for potential false positives\n        - or:\n          - or:\n            - description: unsigned bitwise negation operation (~i)\n            - number: 0xFFFFFFFF = bitwise negation for unsigned 32 bits\n            - number: 0xFFFFFFFFFFFFFFFF = bitwise negation for unsigned 64 bits\n          - or:\n            - description: signed bitwise negation operation (~i)\n            - number: 0x0FFFFFFF = bitwise negation for signed 32 bits\n            - number: 0x0FFFFFFFFFFFFFFF = bitwise negation for signed 64 bits\n          - or:\n            - description: Magic constants used in the implementation of strings functions.\n            # such as `strlen` and `strcat` in the Windows standard library:\n            # (((i - 0x81010101) ^ ~i) \u0026 0x81010100)\n            ## 32 bits\n            - number: 0x7EFEFEFF = optimized string constant for 32 bits\n            - number: 0x81010101 = -0x81010101 = 0x7EFEFEFF\n            - number: 0x81010100 = 0x81010100 = ~0x7EFEFEFF\n            ## 64 bits\n            - number: 0x7EFEFEFEFEFEFEFF = optimized string constant for 64 bits\n            - number: 0x8101010101010101 = -0x8101010101010101 = 0x7EFEFEFEFEFEFEFF\n            - number: 0x8101010101010100 = 0x8101010101010100 = ~0x7EFEFEFEFEFEFEFF\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "contain loop",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: contain loop\n    authors:\n      - moritz.raabe@mandiant.com\n    lib: true\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic features\n    examples:\n      - 08AC667C65D36D6542917655571E61C8:0x406EAA\n  features:\n    - or:\n      - characteristic: loop\n      - characteristic: tight loop\n      - characteristic: recursive call\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "encrypt or decrypt data via BCrypt",
+                                               "description":  "data-manipulation/encryption",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: encrypt or decrypt data via BCrypt\n    namespace: data-manipulation/encryption\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    att\u0026ck:\n      - Defense Evasion::Obfuscated Files or Information [T1027]\n    mbc:\n      - Cryptography::Decrypt Data [C0031]\n      - Cryptography::Encrypt Data [C0027]\n  features:\n    - and:\n      - or:\n        - api: BCryptDecrypt\n        - api: BCryptEncrypt\n      - optional:\n        - api: BCryptOpenAlgorithmProvider\n        - api: BCryptCloseAlgorithmProvider\n        - api: BCryptImportKey\n        - api: BCryptImportKeyPair\n        - api: BCryptGenerateKeyPair\n        - api: BCryptGenerateSymmetricKey\n        - api: BCryptDestroyKey\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "hash data via BCrypt",
+                                               "description":  "data-manipulation/hashing",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: hash data via BCrypt\n    namespace: data-manipulation/hashing\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    att\u0026ck:\n      - Defense Evasion::Obfuscated Files or Information [T1027]\n    mbc:\n      - Cryptography::Cryptographic Hash [C0029]\n  features:\n    - and:\n      - or:\n        - api: BCryptHash\n        - and:\n          - api: BCryptHashData\n          - optional:\n            - api: BCryptFinishHash\n            - api: BCryptDestroyHash\n            - api: BCryptCreateHash\n      - optional:\n        - api: BCryptOpenAlgorithmProvider\n        - api: BCryptCloseAlgorithmProvider\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "query or enumerate registry value",
+                                               "description":  "host-interaction/registry",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: query or enumerate registry value\n    namespace: host-interaction/registry\n    authors:\n      - william.ballenthin@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    att\u0026ck:\n      - Discovery::Query Registry [T1012]\n    mbc:\n      - Operating System::Registry::Query Registry Value [C0036.006]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13145B5A\n      - Practical Malware Analysis Lab 03-02.dll_:0x100047AD\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegGetValue\n        - api: advapi32.RegEnumValue\n        - api: advapi32.RegQueryValue\n        - api: advapi32.RegQueryValueEx\n        - api: advapi32.RegQueryMultipleValues\n        - api: ZwQueryValueKey\n        - api: ZwEnumerateValueKey\n        - api: NtQueryValueKey\n        - api: NtEnumerateValueKey\n        - api: RtlQueryRegistryValues\n        - api: SHGetValue\n        - api: SHEnumValue\n        - api: SHRegGetInt\n        - api: SHRegGetPath\n        - api: SHRegGetValue\n        - api: SHQueryValueEx\n        - api: SHRegGetUSValue\n        - api: SHOpenRegStream\n        - api: SHRegEnumUSValue\n        - api: SHOpenRegStream2\n        - api: SHRegQueryUSValue\n        - api: SHRegGetBoolUSValue\n        - api: SHRegGetValueFromHKCUHKLM\n        - api: SHRegGetBoolValueFromHKCUHKLM\n        - api: Microsoft.Win32.RegistryKey::GetValue\n        - api: Microsoft.Win32.RegistryKey::GetValueKind\n        - api: Microsoft.Win32.RegistryKey::GetValueNames\n        - api: Microsoft.Win32.Registry::GetValue\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "generate random numbers via WinAPI",
+                                               "description":  "data-manipulation/prng",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "johnk3r"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: generate random numbers via WinAPI\n    namespace: data-manipulation/prng\n    authors:\n      - michael.hunhoff@mandiant.com\n      - johnk3r\n    scopes:\n      static: function\n      dynamic: thread\n    mbc:\n      - Cryptography::Generate Pseudo-random Sequence::Use API [C0021.003]\n    examples:\n      - ba947eb07d8c823949316a97364d060f:0x1400031E0\n      - 3ca359f5085bb96a7950d4735b089ffe:0x403A80\n      - e59ffeaf7acb0c326e452fa30bb71a36:0x40403E\n      - 1195d0d18be9362fb8dd9e1738404c9d:0x404E90\n  features:\n    - and:\n      - or:\n        - api: BCryptGenRandom\n        - api: CryptGenRandom\n      - optional:\n        - api: BCryptOpenAlgorithmProvider\n        - api: BCryptCloseAlgorithmProvider\n        - api: CryptAquireContext\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "hash data with CRC32",
+                                               "description":  "data-manipulation/checksum/crc32",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: hash data with CRC32\n    namespace: data-manipulation/checksum/crc32\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires operand[1].number, characteristic, bytes, mnemonic features\n    mbc:\n      - Data::Checksum::CRC32 [C0032.001]\n    examples:\n      - 2D3EDC218A90F03089CC01715A9F047F:0x403CBD\n      - 7D28CB106CB54876B2A5C111724A07CD:0x402350  # RtlComputeCrc32\n      - 7EFF498DE13CC734262F87E6B3EF38AB:0x100084A6\n  features:\n    - or:\n      - and:\n        - number: 1 = bits in a byte\n        - instruction:\n          - description: is bit set?\n          - or:\n            - mnemonic: and\n            - mnemonic: test\n          - operand[1].number: 1\n        - instruction:\n          - mnemonic: shr\n          - number: 1\n        - characteristic: nzxor\n        - operand[1].number: 0xEDB88320\n      - and:\n        - number: 0x8320\n        - number: 0xEDB8\n        - characteristic: nzxor\n      - api: RtlComputeCrc32\n      - bytes: 00 00 00 00 96 30 07 77 2C 61 0E EE BA 51 09 99 19 C4 6D 07 8F F4 6A 70 35 A5 63 E9 A3 95 64 9E = crc32_tab\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "forwarded export",
+                                               "description":  "executable/pe/export",
+                                               "authors":  [
+                                                               "ronnie.salomonsen@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: forwarded export\n    namespace: executable/pe/export\n    authors:\n      - ronnie.salomonsen@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 76FA734236DAA023444DEC26863401DC\n  features:\n    - characteristic: forwarded export\n"
+                                           }
+                                       ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1027",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "encode data using XOR",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "encode data using XOR"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1027",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "encrypt or decrypt data via BCrypt",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "encrypt or decrypt data via BCrypt"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1027",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "hash data via BCrypt",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "hash data via BCrypt"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1012",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "query or enumerate registry value",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "query or enumerate registry value"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "forwarded export",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "forwarded export"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "mbc":  [
+                             {
+                                 "id":  "C0036.004",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Create Registry Key",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "create or open registry key"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.003",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Open Registry Key",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "create or open registry key"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1027.m02",
+                                 "objective":  "Defense Evasion",
+                                 "behavior":  "Obfuscated Files or Information",
+                                 "method":  "Encoding-Standard Algorithm",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "encode data using XOR"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0026.002",
+                                 "objective":  "Data",
+                                 "behavior":  "Encode Data",
+                                 "method":  "XOR",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "encode data using XOR"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0031",
+                                 "objective":  "Cryptography",
+                                 "behavior":  "Decrypt Data",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "encrypt or decrypt data via BCrypt"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0027",
+                                 "objective":  "Cryptography",
+                                 "behavior":  "Encrypt Data",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "encrypt or decrypt data via BCrypt"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0029",
+                                 "objective":  "Cryptography",
+                                 "behavior":  "Cryptographic Hash",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "hash data via BCrypt"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.006",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Query Registry Value",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "query or enumerate registry value"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0021.003",
+                                 "objective":  "Cryptography",
+                                 "behavior":  "Generate Pseudo-random Sequence",
+                                 "method":  "Use API",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "generate random numbers via WinAPI"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0032.001",
+                                 "objective":  "Data",
+                                 "behavior":  "Checksum",
+                                 "method":  "CRC32",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "hash data with CRC32"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "attack_techniques":  {
+                                           "T1027":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "encode data using XOR",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "encode data using XOR"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "encrypt or decrypt data via BCrypt",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "encrypt or decrypt data via BCrypt"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "hash data via BCrypt",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "hash data via BCrypt"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1012":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "query or enumerate registry value",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "query or enumerate registry value"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "forwarded export",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "forwarded export"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

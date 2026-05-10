@@ -1,0 +1,162 @@
+{
+    "data":  {
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1083",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "check if file exists",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "4"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "signature_matches":  [
+                                           {
+                                               "id":  "0",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "unmanaged call",
+                                               "description":  "runtime : managed code calls unmanaged (native) code, often seen in .NET",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: unmanaged call\n    namespace: runtime\n    authors:\n      - michael.hunhoff@mandiant.com\n    description: managed code calls unmanaged (native) code, often seen in .NET\n    scopes:\n      static: function\n      dynamic: unsupported\n  features:\n    - or:\n      - characteristic: unmanaged call\n      - match: unmanaged call via dynamic PInvoke in .NET\n      - api: System.Runtime.InteropServices.Marshal::GetDelegateForFunctionPointer\n"
+                                           },
+                                           {
+                                               "id":  "1",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "contains PDB path",
+                                               "description":  "executable/pe/pdb",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "regex: /:\\\\.*\\.pdb/"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: contains PDB path\n    namespace: executable/pe/pdb\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    examples:\n      - 464EF2CA59782CE697BC329713698CCC  # level32.exe\n  features:\n    - string: /:\\\\.*\\.pdb/\n"
+                                           },
+                                           {
+                                               "id":  "2",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "write clipboard data",
+                                               "description":  "host-interaction/clipboard",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Windows.Forms.Clipboard::SetText"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: write clipboard data\n    namespace: host-interaction/clipboard\n    authors:\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Impact::Clipboard Modification [E1510]\n    references:\n      - https://learn.microsoft.com/en-us/windows/win32/dataxchg/using-the-clipboard\n    examples:\n      - 6F99A2C8944CB02FF28C6F9CED59B161:0x403180\n  features:\n    - and:\n      - optional:\n        - match: open clipboard\n        - api: user32.EmptyClipboard\n        - api: System.Windows.Forms.Clipboard::Clear\n      - or:\n        - api: user32.SetClipboardData\n        - api: System.Windows.Forms.Clipboard::SetAudio\n        - api: System.Windows.Forms.Clipboard::SetData\n        - api: System.Windows.Forms.Clipboard::SetDataObject\n        - api: System.Windows.Forms.Clipboard::SetFileDropList\n        - api: System.Windows.Forms.Clipboard::SetImage\n        - api: System.Windows.Forms.Clipboard::SetText\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://learn.microsoft.com/en-us/windows/win32/dataxchg/using-the-clipboard"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "access .NET resource",
+                                               "description":  "executable/resource",
+                                               "authors":  [
+                                                               "@mr-tz"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Resources.ResourceManager::ctor"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: access .NET resource\n    namespace: executable/resource\n    authors:\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: span of calls\n    examples:\n      - 387f15043f0198fd3a637b0758c2b6dde9ead795c3ed70803426fc355731b173:0x06000084\n  features:\n    - and:\n      - format: dotnet\n      - or:\n        - api: System.Resources.ResourceManager::ctor\n        - api: System.Reflection.Assembly::GetManifestResourceStream\n"
+                                           },
+                                           {
+                                               "id":  "4",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check if file exists",
+                                               "description":  "host-interaction/file-system/exists",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.IO.File::Exists"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check if file exists\n    namespace: host-interaction/file-system/exists\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    examples:\n      - 31600AD0D1A7EA615690DF111AE36C73:0x401284\n  features:\n    - or:\n      - basic block:\n        - and:\n          - api: kernel32.GetFileAttributes\n          - instruction:\n            - mnemonic: cmp\n            - number: 0xFFFFFFFF = INVALID_FILE_ATTRIBUTES\n      - basic block:\n        - and:\n          - api: kernel32.GetLastError\n          - instruction:\n            - mnemonic: cmp\n            - number: 2 = ERROR_FILE_NOT_FOUND\n      - api: shlwapi.PathFileExists\n      - api: System.IO.File::Exists\n      - property/read: System.IO.FileSystemInfo::Exists\n"
+                                           },
+                                           {
+                                               "id":  "6",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "compiled to the .NET platform",
+                                               "description":  "runtime/dotnet",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: compiled to the .NET platform\n    namespace: runtime/dotnet\n    authors:\n      - william.ballenthin@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    examples:\n      - b9f5bd514485fb06da39beff051b9fdc\n  features:\n    - or:\n      - format: dotnet\n      - import: mscoree._CorExeMain\n      - import: mscoree._corexemain\n      - import: mscoree._CorDllMain\n      - import: mscoree._cordllmain\n"
+                                           },
+                                           {
+                                               "id":  "7",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create or open mutex on Windows",
+                                               "description":  "host-interaction/mutex",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com",
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Threading.Mutex::ctor"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create or open mutex on Windows\n    namespace: host-interaction/mutex\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n      - mehunhoff@google.com\n    scopes:\n      static: instruction\n      dynamic: call\n    mbc:\n      - Process::Create Mutex [C0042]\n    examples:\n      - Practical Malware Analysis Lab 01-01.dll_:0x10001010\n  features:\n    - or:\n      - api: kernel32.OpenMutex\n      - api: kernel32.CreateMutex\n      - api: kernel32.CreateMutexEx\n      - api: ntdll.NtCreateMutant\n      - api: ntdll.NtOpenMutant\n      - and:\n        - format: dotnet\n        - or:\n          - api: System.Threading.Mutex::ctor\n          - api: System.Threading.Mutex::OpenExisting\n          - api: System.Threading.Mutex::TryOpenExisting\n"
+                                           }
+                                       ],
+                 "mbc":  [
+                             {
+                                 "id":  "E1510",
+                                 "objective":  "Impact",
+                                 "behavior":  "Clipboard Modification",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "2"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1083",
+                                 "objective":  "Discovery",
+                                 "behavior":  "File and Directory Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "4"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0042",
+                                 "objective":  "Process",
+                                 "behavior":  "Create Mutex",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "7"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "attack_techniques":  {
+                                           "T1083":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "check if file exists",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "4"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

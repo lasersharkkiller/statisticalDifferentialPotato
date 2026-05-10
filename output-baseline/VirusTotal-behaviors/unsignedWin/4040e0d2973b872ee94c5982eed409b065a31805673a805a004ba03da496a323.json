@@ -1,0 +1,123 @@
+{
+    "data":  {
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "2216",
+                                            "name":  "%windir%\\System32\\svchost.exe -k WerSvcGroup"
+                                        },
+                                        {
+                                            "process_id":  "2580",
+                                            "name":  "%SANDBOX_DLL_LOADER_X86% %SAMPLEPATH% %WORKDIR% 483",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "2748",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,WNetDisconnectDialogWorker"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2728",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,WNetConnectionDialogWorker"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2688",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,ShowReconnectDialogUIWorker"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2672",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,DoProfileErrorDialogWorker"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2664",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,DoPasswordDialogWorker"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2696",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,ShowReconnectDialogWorker"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2680",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,ShowReconnectDialogEndWorker"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2656",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,DoCommandLinePromptWorker"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2648",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,DoBroadcastSystemMessageWorker"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2708",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,WNetConnectionDialog1WWorker"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2740",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,WNetDisconnectDialog1WWorker"
+                                                             }
+                                                         ]
+                                        },
+                                        {
+                                            "process_id":  "2900",
+                                            "name":  "wmiadap.exe /F /T /R"
+                                        },
+                                        {
+                                            "process_id":  "2940",
+                                            "name":  "%windir%\\system32\\wbem\\wmiprvse.exe"
+                                        }
+                                    ],
+                 "verdicts":  [
+                                  "UNKNOWN_VERDICT"
+                              ],
+                 "processes_terminated":  [
+                                              "%windir%\\System32\\svchost.exe -k WerSvcGroup",
+                                              "wmiadap.exe /F /T /R"
+                                          ],
+                 "signature_matches":  [
+                                           {
+                                               "id":  "0",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "prompt user for credentials",
+                                               "description":  "collection/credentials",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: CredUIPromptForCredentials"
+                                                              ],
+                                               "rule_src":  "# generated using capa explorer for IDA Pro\nrule:\n  meta:\n    name: prompt user for credentials\n    namespace: collection/credentials\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    references:\n      - https://www.ired.team/offensive-security/credential-access-and-credential-dumping/credentials-collection-via-creduipromptforcredentials\n  features:\n    - and:\n      - or:\n        - api: credui.CredUIPromptForCredentials\n        - api: credui.CredUIPromptForWindowsCredentials\n      - optional:\n        - api: credui.CredUnPackAuthenticationBuffer # unpack credentials for collection\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://www.ired.team/offensive-security/credential-access-and-credential-dumping/credentials-collection-via-creduipromptforcredentials"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "2",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "terminate process",
+                                               "description":  "host-interaction/process/terminate",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: TerminateProcess"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: terminate process\n    namespace: host-interaction/process/terminate\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Process::Terminate Process [C0018]\n    examples:\n      - C91887D861D9BD4A5872249B641BC9F9:0x401A77\n      - 9B7CCAA2AE6A5B96E3110EBCBC4311F6:0x10010307\n  features:\n    - or:\n      - api: System.Diagnostics.Process::Kill\n      - api: System.Diagnostics.Process::WaitForExit\n      - api: System.Diagnostics.Process::WaitForExitAsync\n      - api: System.Environment::Exit\n      - api: System.Windows.Forms.Application::Exit\n      - api: exit\n      - api: Exit\n      - and:\n        - os: linux\n        - api: exit_group\n      - and:\n        - optional:\n          - match: open process\n        - or:\n          - api: kernel32.TerminateProcess\n          - api: ntdll.NtTerminateProcess\n          - api: kernel32.ExitProcess\n"
+                                           }
+                                       ],
+                 "mbc":  [
+                             {
+                                 "id":  "C0018",
+                                 "objective":  "Process",
+                                 "behavior":  "Terminate Process",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "2"
+                                              }
+                                          ]
+                             }
+                         ]
+             }
+}

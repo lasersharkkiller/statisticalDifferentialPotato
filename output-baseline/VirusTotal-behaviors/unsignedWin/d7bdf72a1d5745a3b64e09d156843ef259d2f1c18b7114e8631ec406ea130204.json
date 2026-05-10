@@ -1,0 +1,108 @@
+{
+    "data":  {
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "2208",
+                                            "name":  "%windir%\\System32\\svchost.exe -k WerSvcGroup"
+                                        },
+                                        {
+                                            "process_id":  "2576",
+                                            "name":  "%SANDBOX_DLL_LOADER_AMD64% %SAMPLEPATH% %WORKDIR% 483"
+                                        },
+                                        {
+                                            "process_id":  "2784",
+                                            "name":  "wmiadap.exe /F /T /R"
+                                        },
+                                        {
+                                            "process_id":  "2832",
+                                            "name":  "%windir%\\system32\\wbem\\wmiprvse.exe"
+                                        }
+                                    ],
+                 "processes_terminated":  [
+                                              "%windir%\\System32\\svchost.exe -k WerSvcGroup",
+                                              "wmiadap.exe /F /T /R"
+                                          ],
+                 "verdicts":  [
+                                  "UNKNOWN_VERDICT"
+                              ],
+                 "signature_matches":  [
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "access PEB ldr_data",
+                                               "description":  "linking/runtime-linking",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: access PEB ldr_data\n    namespace: linking/runtime-linking\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: unsupported  # requires offset features\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    references:\n      - https://www.geoffchappell.com/studies/windows/win32/ntdll/structs/peb_ldr_data.htm\n      - https://github.com/d35ha/CallObfuscator/blob/5834aff9ff4511f1408ae4ce80b79737af4ae77b/ShellCode/shell_x64.asm#L8\n    examples:\n      - 3FDFB2D522E7DEECAAAF2F87420F7E75:0x4117B7\n  features:\n    - or:\n      - and:\n        - arch: i386\n        - description: x32\n\n        - match: PEB access\n\n        # x86 Windows uses fs:0 to access the TIB which contains SEH information at offset 0\n        # checking for fs:0 and a (possibly unrelated) number or offset often results in false positives\n\n        - offset: 0x0C = PEB.LDR_DATA\n\n        - or:\n          - description: resolve a module list\n          - offset: 0x0C = PEB.LDR_DATA.InLoadOrderModuleList\n          - offset: 0x14 = PEB.LDR_DATA.InMemoryOrderModuleList\n          - offset: 0x1C = PEB.LDR_DATA.InInitializationOrderModuleList\n\n      - and:\n        - arch: amd64\n        - description: x64\n\n        - match: PEB access\n\n        - offset: 0x18 = PEB.LDR_DATA\n\n        - or:\n          - description: resolve a module list\n          - offset: 0x10 = PEB.LDR_DATA.InLoadOrderModuleList\n          - offset: 0x20 = PEB.LDR_DATA.InMemoryOrderModuleList\n          - offset: 0x30 = PEB.LDR_DATA.InInitializationOrderModuleList\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://www.geoffchappell.com/studies/windows/win32/ntdll/structs/peb_ldr_data.htm"
+                                                            },
+                                                            {
+                                                                "ref":  "https://github.com/d35ha/CallObfuscator/blob/5834aff9ff4511f1408ae4ce80b79737af4ae77b/ShellCode/shell_x64.asm#L8"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "interact with driver via IOCTL",
+                                               "description":  "host-interaction/driver",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: interact with driver via IOCTL\n    namespace: host-interaction/driver\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: thread\n    examples:\n      - Practical Malware Analysis Lab 10-03.exe_:0x40108c\n  features:\n    - or:\n      - api: DeviceIoControl\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "terminate process",
+                                               "description":  "host-interaction/process/terminate",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: terminate process\n    namespace: host-interaction/process/terminate\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    mbc:\n      - Process::Terminate Process [C0018]\n    examples:\n      - C91887D861D9BD4A5872249B641BC9F9:0x401A77\n      - 9B7CCAA2AE6A5B96E3110EBCBC4311F6:0x10010307\n  features:\n    - or:\n      - api: System.Diagnostics.Process::Kill\n      - api: System.Diagnostics.Process::WaitForExit\n      - api: System.Diagnostics.Process::WaitForExitAsync\n      - api: System.Environment::Exit\n      - api: System.Windows.Forms.Application::Exit\n      - api: exit\n      - api: Exit\n      - and:\n        - optional:\n          - match: open process\n        - or:\n          - api: kernel32.TerminateProcess\n          - api: ntdll.NtTerminateProcess\n          - api: kernel32.ExitProcess\n"
+                                           }
+                                       ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "access PEB ldr_data",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "access PEB ldr_data"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "mbc":  [
+                             {
+                                 "id":  "C0018",
+                                 "objective":  "Process",
+                                 "behavior":  "Terminate Process",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "terminate process"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "attack_techniques":  {
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "access PEB ldr_data",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "access PEB ldr_data"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

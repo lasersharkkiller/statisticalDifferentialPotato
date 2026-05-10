@@ -1,0 +1,733 @@
+{
+    "data":  {
+                 "signature_matches":  [
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "delay execution",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "@ramen0x3f"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: delay execution\n    authors:\n      - michael.hunhoff@mandiant.com\n      - \"@ramen0x3f\"\n    lib: true\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - Anti-Behavioral Analysis::Dynamic Analysis Evasion::Delayed Execution [B0003.003]\n    references:\n      - https://docs.microsoft.com/en-us/windows/win32/sync/wait-functions\n      - https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/TimingAttacks/timing.cpp\n    examples:\n      - al-khaser_x86.exe_:0x449770\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x402FA6\n  features:\n    - or:\n      - and:\n        - os: windows\n        - or:\n          - api: kernel32.Sleep\n          - api: kernel32.SleepEx\n          - api: kernel32.WaitForSingleObject\n          - api: kernel32.SignalObjectAndWait\n          - api: kernel32.WaitForSingleObjectEx\n          - api: kernel32.WaitForMultipleObjects\n          - api: kernel32.WaitForMultipleObjectsEx\n          - api: kernel32.RegisterWaitForSingleObject\n          - api: WaitOnAddress\n          - api: user32.MsgWaitForMultipleObjects\n          - api: user32.MsgWaitForMultipleObjectsEx\n          - api: NtDelayExecution\n          - api: KeWaitForSingleObject\n          - api: KeDelayExecutionThread\n      - and:\n        - os: linux\n        - or:\n          - api: sleep\n          - api: usleep\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://docs.microsoft.com/en-us/windows/win32/sync/wait-functions"
+                                                            },
+                                                            {
+                                                                "ref":  "https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/TimingAttacks/timing.cpp"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "allocate memory",
+                                               "authors":  [
+                                                               "0x534a@mailbox.org",
+                                                               "@mr-tz"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: allocate memory\n    authors:\n      - 0x534a@mailbox.org\n      - \"@mr-tz\"\n    lib: true\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - Memory::Allocate Memory [C0007]\n    examples:\n      - Practical Malware Analysis Lab 03-03.exe_:0x4010EA\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x140001ABA  # ntdll.NtAllocateVirtualMemory\n  features:\n    - or:\n      - api: kernel32.VirtualAlloc\n      - api: kernel32.VirtualAllocEx\n      - api: kernel32.VirtualAllocExNuma\n      - api: NtAllocateVirtualMemory\n      - api: ZwAllocateVirtualMemory\n      - api: NtMapViewOfSection\n      - api: ZwMapViewOfSection\n      - and:\n        - match: link function at runtime on Windows\n        - or:\n          - string: \"VirtualAlloc\"\n          - string: \"VirtualAllocEx\"\n          - string: \"VirtualAllocExNuma\"\n          - string: \"NtAllocateVirtualMemory\"\n          - string: \"ZwAllocateVirtualMemory\"\n          - string: \"NtMapViewOfSection\"\n          - string: \"ZwMapViewOfSection\"\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "allocate or change RW memory",
+                                               "authors":  [
+                                                               "0x534a@mailbox.org",
+                                                               "@mr-tz"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: allocate or change RW memory\n    authors:\n      - 0x534a@mailbox.org\n      - \"@mr-tz\"\n    lib: true\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - Memory::Allocate Memory [C0007]\n    examples:\n      - Practical Malware Analysis Lab 17-02.dll_:0x1000D10D\n  features:\n    - and:\n      - or:\n        - match: allocate memory\n        - match: change memory protection\n      - or:\n        - number: 0x4 = PAGE_READWRITE\n        # lea     r9d, [rcx+4]  ; flProtect\n        # call    cs:VirtualAlloc\n        - instruction:\n          - mnemonic: lea\n          - offset: 0x4 = PAGE_READWRITE\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "encode data using XOR",
+                                               "description":  "data-manipulation/encoding/xor",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: encode data using XOR\n    namespace: data-manipulation/encoding/xor\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: unsupported  # requires characteristic, Not features\n    att\u0026ck:\n      - Defense Evasion::Obfuscated Files or Information [T1027]\n    mbc:\n      - Defense Evasion::Obfuscated Files or Information::Encoding-Standard Algorithm [E1027.m02]\n      - Data::Encode Data::XOR [C0026.002]\n    examples:\n      - 2D3EDC218A90F03089CC01715A9F047F:0x403D7E\n  features:\n    - and:\n      - characteristic: tight loop\n      - characteristic: nzxor\n      - not:\n        - description: filter for potential false positives\n        - or:\n          - or:\n            - description: unsigned bitwise negation operation (~i)\n            - number: 0xFFFFFFFF = bitwise negation for unsigned 32 bits\n            - number: 0xFFFFFFFFFFFFFFFF = bitwise negation for unsigned 64 bits\n          - or:\n            - description: signed bitwise negation operation (~i)\n            - number: 0x0FFFFFFF = bitwise negation for signed 32 bits\n            - number: 0x0FFFFFFFFFFFFFFF = bitwise negation for signed 64 bits\n          - or:\n            - description: Magic constants used in the implementation of strings functions.\n            # such as `strlen` and `strcat` in the Windows standard library:\n            # (((i - 0x81010101) ^ ~i) \u0026 0x81010100)\n            ## 32 bits\n            - number: 0x7EFEFEFF = optimized string constant for 32 bits\n            - number: 0x81010101 = -0x81010101 = 0x7EFEFEFF\n            - number: 0x81010100 = 0x81010100 = ~0x7EFEFEFF\n            ## 64 bits\n            - number: 0x7EFEFEFEFEFEFEFF = optimized string constant for 64 bits\n            - number: 0x8101010101010101 = -0x8101010101010101 = 0x7EFEFEFEFEFEFEFF\n            - number: 0x8101010101010100 = 0x8101010101010100 = ~0x7EFEFEFEFEFEFEFF\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create thread",
+                                               "description":  "host-interaction/thread/create",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "joakim@intezer.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create thread\n    namespace: host-interaction/thread/create\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - joakim@intezer.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: thread\n    mbc:\n      - Process::Create Thread [C0038]\n    examples:\n      - 946A99F36A46D335DEC080D9A4371940:0x10001DA0\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x408020\n  features:\n    - or:\n      - and:\n        - os: windows\n        - or:\n          - api: kernel32.CreateThread\n          - api: _beginthread\n          - api: _beginthreadex\n          - api: PsCreateSystemThread\n          - api: SHCreateThread\n          - api: SHCreateThreadWithHandle\n          - api: kernel32.CreateRemoteThread\n          - api: kernel32.CreateRemoteThreadEx\n          - api: RtlCreateUserThread\n          - api: ntdll.NtCreateThread\n          - api: ntdll.NtCreateThreadEx\n          - api: ntdll.ZwCreateThread\n          - api: ntdll.ZwCreateThreadEx\n      - and:\n        - os: linux\n        - api: pthread_create\n      - and:\n        - api: System.Threading.Thread::Start\n        - optional:\n          - api: System.Threading.Thread::ctor\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "change memory protection",
+                                               "authors":  [
+                                                               "@mr-tz"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: change memory protection\n    authors:\n      - \"@mr-tz\"\n    lib: true\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - Memory::Change Memory Protection [C0008]\n    examples:\n      - Practical Malware Analysis Lab 11-02.dll_:0x10001203\n  features:\n    - or:\n      - api: kernel32.VirtualProtect\n      - api: kernel32.VirtualProtectEx\n      - api: NtProtectVirtualMemory\n      - api: ZwProtectVirtualMemory\n      - and:\n        - match: link function at runtime on Windows\n        - or:\n          - string: \"VirtualProtect\"\n          - string: \"VirtualProtectEx\"\n          - string: \"NtProtectVirtualMemory\"\n          - string: \"ZwProtectVirtualMemory\"\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "open process",
+                                               "authors":  [
+                                                               "0x534a@mailbox.org"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: open process\n    authors:\n      - 0x534a@mailbox.org\n    lib: true\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - Process::Open Process [C0065]\n    examples:\n      - Practical Malware Analysis Lab 17-02.dll_:0x1000D10D\n  features:\n    - or:\n      - api: kernel32.OpenProcess\n      - api: NtOpenProcess\n      - api: ZwOpenProcess\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "open thread",
+                                               "authors":  [
+                                                               "0x534a@mailbox.org"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: open thread\n    authors:\n      - 0x534a@mailbox.org\n    lib: true\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - Process::Open Thread [C0066]\n    examples:\n      - 787cbc8a6d1bc58ea169e51e1ad029a637f22560660cc129ab8a099a745bd50e:00502F4C\n  features:\n    - or:\n      - api: kernel32.OpenThread\n      - api: NtOpenThread\n      - api: ZwOpenThread\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "contain loop",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: contain loop\n    authors:\n      - moritz.raabe@mandiant.com\n    lib: true\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic features\n    examples:\n      - 08AC667C65D36D6542917655571E61C8:0x406EAA\n  features:\n    - or:\n      - characteristic: loop\n      - characteristic: tight loop\n      - characteristic: recursive call\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "resolve function by parsing PE exports",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "sara-rn"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: resolve function by parsing PE exports\n    namespace: load-code/pe\n    authors:\n      - sara-rn\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic, offset, mnemonic features\n    examples:\n      - 73CE04892E5F39EC82B00C02FC04C70F:0x406BA1\n  features:\n    - and:\n      - os: windows\n      - or:\n        - characteristic: loop\n        - mnemonic: movzx\n      - and:\n        - offset: 0x3C = IMAGE_DOS_HEADER.PE.e_lfanew\n        - or:\n          - and:\n            - arch: i386\n            - offset: 0x78 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n          - and:\n            - arch: amd64\n            - offset: 0x88 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n        - 3 or more:\n          - offset: 0x14 = IMAGE_EXPORT_DIRECTORY.NumberOfFunctions\n          - offset: 0x24 = IMAGE_EXPORT_DIRECTORY.AddressOfNameOrdinals\n          - offset: 0x20 = IMAGE_EXPORT_DIRECTORY.AddressOfNames\n          - offset: 0x18 = IMAGE_EXPORT_DIRECTORY.NumberOfNames\n          - offset: 0x1C = IMAGE_EXPORT_DIRECTORY.AddressOfFunctions\n      - optional:\n        - or:\n          - api: LoadLibrary\n          - api: strcmp\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get thread local storage value",
+                                               "description":  "host-interaction/process",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get thread local storage value\n    namespace: host-interaction/process\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n  features:\n    - and:\n      - api: kernel32.TlsGetValue\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "encrypt data using RC4 PRGA",
+                                               "description":  "data-manipulation/encryption/rc4",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: encrypt data using RC4 PRGA\n    namespace: data-manipulation/encryption/rc4\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic, mnemonic, basicblock features\n    att\u0026ck:\n      - Defense Evasion::Obfuscated Files or Information [T1027]\n    mbc:\n      - Cryptography::Encrypt Data::RC4 [C0027.009]\n      - Cryptography::Generate Pseudo-random Sequence::RC4 PRGA [C0021.004]\n    examples:\n      - 34404A3FB9804977C6AB86CB991FB130:0x403DB0\n      - 34404A3FB9804977C6AB86CB991FB130:0x403E50\n      - 9324D1A8AE37A36AE560C37448C9705A:0x4049F0\n      - 73CE04892E5F39EC82B00C02FC04C70F:0x4064C6\n  features:\n    - and:\n      # TODO: maybe add characteristic for nzxor reg size\n      - count(characteristic(nzxor)): 1\n      - or:\n        - match: calculate modulo 256 via x86 assembly\n        # compiler may do this via zero-extended mov from 8-bit register\n        - count(mnemonic(movzx)): 4 or more\n      # should not call (many) functions\n      - count(characteristic(calls from)): (0, 4)\n      # should not be too simple or too complex (50 is picked by intuition)\n      - count(basic blocks): (4, 50)\n      - match: contain loop\n      - optional:\n        - or:\n          - number: 0xFF\n          - number: 0x100\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "set thread local storage value",
+                                               "description":  "host-interaction/thread/tls",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: set thread local storage value\n    namespace: host-interaction/thread/tls\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    mbc:\n      - Process::Set Thread Local Storage Value [C0041]\n    examples:\n      - 03B236B23B1EC37C663527C1F53AF3FE:0x18000AE21\n  features:\n    - and:\n      - api: kernel32.TlsSetValue\n      - optional:\n        - match: allocate thread local storage\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "hash data using fnv",
+                                               "description":  "data-manipulation/hashing/fnv : can be any Fowler-Noll-Vo (FNV) hash variant, including FNV-1, FNV-1a, FNV-0",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "@_re_fox",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: hash data using fnv\n    namespace: data-manipulation/hashing/fnv\n    authors:\n      - moritz.raabe@mandiant.com\n      - \"@_re_fox\"\n      - michael.hunhoff@mandiant.com\n    description: can be any Fowler-Noll-Vo (FNV) hash variant, including FNV-1, FNV-1a, FNV-0\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic, mnemonic features\n    mbc:\n      - Data::Non-Cryptographic Hash::FNV [C0030.005]\n    references:\n      - https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function\n      - http://isthe.com/chongo/tech/comp/fnv/\n      - https://create.stephan-brumme.com/fnv-hash/\n    examples:\n      - ad4229879180e267f431ac6666b6a0a2:0x14007B4D4\n      - 09BF850BE5DA44A1C3629A1F62813A83:0x10006010\n  features:\n    - and:\n      - optional:\n        - characteristic: loop\n        - number: 0xcbf29ce484222325 = FNV_offset_basis, unused by FNV-0\n        - number: 0x811c9dc5 = FNV_offset_basis, unused by FNV-0\n        - and:\n          - number: 0xcbf29ce4 = FNV_offset_basis 64 bits, 32-bit value\n          - number: 0x84222325 = FNV_offset_basis 64 bits, 32-bit value\n      - or:\n        - number: 0x100000001b3 = FNV prime\n        - number: 0x01000193 = FNV prime\n        - and:\n          - number: 0x100 = FNV prime 64 bits, split in DWORD\n          - number: 0x1b3 = FNV prime 64 bits, split in DWORD\n      - basic block:\n        # FNV-1 hash does multiply then XOR\n        # FNV-1a hash does XOR then multiply\n        - and:\n          - characteristic: nzxor\n          - or:\n            - mnemonic: imul\n            - mnemonic: mul\n            - api: _allmul\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function"
+                                                            },
+                                                            {
+                                                                "ref":  "http://isthe.com/chongo/tech/comp/fnv/"
+                                                            },
+                                                            {
+                                                                "ref":  "https://create.stephan-brumme.com/fnv-hash/"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "link function at runtime on Windows",
+                                               "description":  "linking/runtime-linking",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: link function at runtime on Windows\n    namespace: linking/runtime-linking\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic features\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x404130\n      - Practical Malware Analysis Lab 01-04.exe_:0x401350\n  features:\n    - and:\n      - os: windows\n      - or:\n        - api: kernel32.GetProcAddress\n        - api: ntdll.LdrGetProcedureAddress\n      - optional:\n        - characteristic: indirect call\n        - api: kernel32.LoadLibrary\n        - api: kernel32.GetModuleHandle\n        - api: kernel32.GetModuleHandleEx\n        - api: ntdll.LdrLoadDll\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "allocate thread local storage",
+                                               "description":  "host-interaction/thread/tls",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: allocate thread local storage\n    namespace: host-interaction/thread/tls\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Process::Allocate Thread Local Storage [C0040]\n    examples:\n      - 03B236B23B1EC37C663527C1F53AF3FE:0x18000ADF6\n  features:\n    - or:\n      - api: kernel32.TlsAlloc\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "enumerate PE sections",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "@Ana06",
+                                                               "@mr-tz"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: enumerate PE sections\n    namespace: load-code/pe\n    authors:\n      - \"@Ana06\"\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: unsupported  # requires offset, operand[1].offset, characteristic, mnemonic, basicblock features\n    mbc:\n      - Discovery::Code Discovery::Enumerate PE Sections [B0046.001]\n    references:\n      - https://0x00sec.org/t/reflective-dll-injection/3080\n      - https://www.ired.team/offensive-security/code-injection-process-injection/reflective-dll-injection\n    examples:\n      - E4C33AC3638EEF68311F8AC0D72483C7:0x401510\n  features:\n    - and:\n      - os: windows\n      # there should be some complexity to functions like this\n      - count(basic blocks): 3 or more\n      - optional:\n        - offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n      - instruction:\n        - or:\n          - mnemonic: mov\n          - mnemonic: movzx\n        - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n      - basic block:\n        - or:\n          - and:\n            - description: IMAGE_FIRST_SECTION(nt_header)\n            - instruction:\n              - or:\n                - mnemonic: add\n                - mnemonic: mov\n                - mnemonic: movzx\n              - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n            - operand[1].offset: 0x18 = FileHeader.SizeOfOptionalHeader\n          - and:\n            - description: (DWORD)dll_raw + dos_header-\u003ee_lfanew + sizeof(IMAGE_NT_HEADERS) + sizeof(IMAGE_SECTION_HEADER) * i\n            - number: 0x28 = sizeof(IMAGE_SECTION_HEADER)\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0xF8 = sizeof(IMAGE_NT_HEADERS32)\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x108 = sizeof(IMAGE_NT_HEADERS64)\n      - 2 or more:\n        - operand[1].offset: 0xC = IMAGE_SECTION_HEADER.VirtualAddress\n        - operand[1].offset: 0x14 = IMAGE_SECTION_HEADER.PointerToRawData\n        - operand[1].offset: 0x10 = IMAGE_SECTION_HEADER.SizeOfRawData\n        # there\u0027s also offset 0x8 = IMAGE_SECTION_HEADER.Misc.PhysicalAddress, but it\u0027s likely too common\n      - not:\n        # non-zeroing XOR was observed in FPs\n        - characteristic: nzxor\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://0x00sec.org/t/reflective-dll-injection/3080"
+                                                            },
+                                                            {
+                                                                "ref":  "https://www.ired.team/offensive-security/code-injection-process-injection/reflective-dll-injection"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get system information on Windows",
+                                               "description":  "host-interaction/os/info",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "joakim@intezer.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get system information on Windows\n    namespace: host-interaction/os/info\n    authors:\n      - moritz.raabe@mandiant.com\n      - joakim@intezer.com\n    scopes:\n      static: function\n      dynamic: thread\n    att\u0026ck:\n      - Discovery::System Information Discovery [T1082]\n    examples:\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x140002280\n  features:\n    - and:\n      - os: windows\n      - or:\n        - api: kernel32.GetSystemInfo\n        - api: kernel32.GetNativeSystemInfo\n        - api: NtQuerySystemInformation\n        - api: NtQuerySystemInformationEx\n        - api: ntdll.RtlGetNativeSystemInformation\n        - api: ZwQuerySystemInformation\n        - api: ZwQuerySystemInformationEx\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create mutex",
+                                               "description":  "host-interaction/mutex",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create mutex\n    namespace: host-interaction/mutex\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Process::Create Mutex [C0042]\n    examples:\n      - Practical Malware Analysis Lab 01-01.dll_:0x10001010\n  features:\n    - or:\n      - api: kernel32.CreateMutex\n      - api: kernel32.CreateMutexEx\n      - api: System.Threading.Mutex::ctor\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "print debug messages",
+                                               "description":  "host-interaction/log/debug/write-event",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: print debug messages\n    namespace: host-interaction/log/debug/write-event\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    examples:\n      - 493167E85E45363D09495D0841C30648:0x401000\n  features:\n    - or:\n      - api: DbgPrint\n      - api: kernel32.OutputDebugString\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check if file exists",
+                                               "description":  "host-interaction/file-system/exists",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check if file exists\n    namespace: host-interaction/file-system/exists\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    examples:\n      - 31600AD0D1A7EA615690DF111AE36C73:0x401284\n  features:\n    - or:\n      - basic block:\n        - and:\n          - api: kernel32.GetFileAttributes\n          - instruction:\n            - mnemonic: cmp\n            - number: 0xFFFFFFFF = INVALID_FILE_ATTRIBUTES\n      - basic block:\n        - and:\n          - api: kernel32.GetLastError\n          - instruction:\n            - mnemonic: cmp\n            - number: 2 = ERROR_FILE_NOT_FOUND\n      - api: shlwapi.PathFileExists\n      - api: System.IO.File::Exists\n      - property/read: System.IO.FileSystemInfo::Exists\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "set socket configuration",
+                                               "description":  "communication/socket",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: set socket configuration\n    namespace: communication/socket\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Communication::Socket Communication::Set Socket Config [C0001.001]\n    examples:\n      - 6A352C3E55E8AE5ED39DC1BE7FB964B1:0x1000C1F0\n  features:\n    - or:\n      - api: ws2_32.setsockopt\n      - api: ws2_32.ioctlsocket\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "initialize Winsock library",
+                                               "description":  "communication/socket",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: initialize Winsock library\n    namespace: communication/socket\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Communication::Socket Communication::Initialize Winsock Library [C0001.009]\n    examples:\n      - 6A352C3E55E8AE5ED39DC1BE7FB964B1:0x10001D30\n  features:\n    - and:\n      - api: ws2_32.WSAStartup\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "write file on Windows",
+                                               "description":  "host-interaction/file-system/write",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: write file on Windows\n    namespace: host-interaction/file-system/write\n    authors:\n      - william.ballenthin@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    mbc:\n      - File System::Writes File [C0052]\n    examples:\n      - Practical Malware Analysis Lab 01-04.exe_:0x4011FC\n      # ntdll\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x1400025C4\n  features:\n    - or:\n      - and:\n        - os: windows\n        - optional:\n          - basic block:\n            - or:\n              - number: 0x40000000 = GENERIC_WRITE\n              - number: 0x2 = FILE_WRITE_DATA\n              - match: create or open file\n          - call:\n            - or:\n              - number: 0x40000000 = GENERIC_WRITE\n              - number: 0x2 = FILE_WRITE_DATA\n              - match: create or open file\n        - or:\n          - api: kernel32.WriteFile\n          - api: kernel32.WriteFileEx\n          - api: NtWriteFile\n          - api: ZwWriteFile\n          - api: _fwrite\n          - api: fwrite\n      - api: System.IO.File::WriteAllBytes\n      - api: System.IO.File::WriteAllBytesAsync\n      - api: System.IO.File::WriteAllLines\n      - api: System.IO.File::WriteAllLinesAsync\n      - api: System.IO.File::WriteAllText\n      - api: System.IO.File::WriteAllTextAsync\n      - api: System.IO.File::AppendAllLines\n      - api: System.IO.File::AppendAllLinesAsync\n      - api: System.IO.File::AppendAllText\n      - api: System.IO.File::AppendAllTextAsync\n      - api: System.IO.File::AppendText\n      - api: System.IO.FileInfo::AppendText\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "read file on Windows",
+                                               "description":  "host-interaction/file-system/read",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: read file on Windows\n    namespace: host-interaction/file-system/read\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    mbc:\n      - File System::Read File [C0051]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x1314567B\n  features:\n    - or:\n      - and:\n        - os: windows\n        - optional:\n          - and:\n            - number: 0x80000000 = GENERIC_READ\n            - match: create or open file\n        - or:\n          - api: kernel32.ReadFile\n          - api: ReadFileEx\n          - api: NtReadFile\n          - api: ZwReadFile\n          - api: LZRead\n          - api: _read\n          - api: fread\n      - api: System.IO.File::ReadAllBytes\n      - api: System.IO.File::ReadAllBytesAsync\n      - api: System.IO.File::ReadAllLines\n      - api: System.IO.File::ReadAllLinesAsync\n      - api: System.IO.File::ReadAllText\n      - api: System.IO.File::ReadAllTextAsync\n      - api: System.IO.File::ReadLines\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "query service status",
+                                               "description":  "host-interaction/service",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: query service status\n    namespace: host-interaction/service\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Service Discovery [T1007]\n    examples:\n      - 9DC209F66DA77858E362E624D0BE86B3:0x403C70\n  features:\n    - or:\n      - api: advapi32.QueryServiceStatusEx\n      - api: advapi32.QueryServiceStatus\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get service handle",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get service handle\n    authors:\n      - moritz.raabe@mandiant.com\n    lib: true\n    scopes:\n      static: function\n      dynamic: call\n    examples:\n      - Practical Malware Analysis Lab 03-02.dll_:0x10004706\n  features:\n    - or:\n      - api: advapi32.CreateService\n      - api: advapi32.OpenService\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "start service",
+                                               "description":  "host-interaction/service/start",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: start service\n    namespace: host-interaction/service/start\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    att\u0026ck:\n      - Persistence::Create or Modify System Process::Windows Service [T1543.003]\n    examples:\n      - E544A4D616B60147D9774B48C2B65EF2:0x401FA0\n  features:\n    - and:\n      - optional:\n        - match: get service handle\n      - api: advapi32.StartService\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "run as service",
+                                               "description":  "host-interaction/service",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: run as service\n    namespace: host-interaction/service\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    mbc:\n      - Anti-Behavioral Analysis::Conditional Execution::Runs as Service [B0025.007]\n    examples:\n      - Practical Malware Analysis Lab 03-02.dll_\n  features:\n    - or:\n      - export: ServiceMain\n      - function:\n        - or:\n          - api: RegisterServiceCtrlHandler\n          - api: RegisterServiceCtrlHandlerEx\n          - api: StartServiceCtrlDispatcher\n          - api: System.ServiceProcess.ServiceBase::Run\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "implement COM DLL",
+                                               "description":  "executable/pe",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: implement COM DLL\n    namespace: executable/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    references:\n      - https://learn.microsoft.com/en-us/windows/win32/api/combaseapi/nf-combaseapi-dllgetclassobject\n  features:\n    - and:\n      - export: DllGetClassObject\n      - optional:\n        - export: DllRegisterServer\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://learn.microsoft.com/en-us/windows/win32/api/combaseapi/nf-combaseapi-dllgetclassobject"
+                                                            }
+                                                        ]
+                                           }
+                                       ],
+                 "mbc":  [
+                             {
+                                 "id":  "B0003.003",
+                                 "objective":  "Anti-Behavioral Analysis",
+                                 "behavior":  "Dynamic Analysis Evasion",
+                                 "method":  "Delayed Execution",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "delay execution"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0007",
+                                 "objective":  "Memory",
+                                 "behavior":  "Allocate Memory",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "allocate memory"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0007",
+                                 "objective":  "Memory",
+                                 "behavior":  "Allocate Memory",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "allocate or change RW memory"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1027.m02",
+                                 "objective":  "Defense Evasion",
+                                 "behavior":  "Obfuscated Files or Information",
+                                 "method":  "Encoding-Standard Algorithm",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "encode data using XOR"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0026.002",
+                                 "objective":  "Data",
+                                 "behavior":  "Encode Data",
+                                 "method":  "XOR",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "encode data using XOR"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0038",
+                                 "objective":  "Process",
+                                 "behavior":  "Create Thread",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "create thread"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0008",
+                                 "objective":  "Memory",
+                                 "behavior":  "Change Memory Protection",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "change memory protection"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0065",
+                                 "objective":  "Process",
+                                 "behavior":  "Open Process",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "open process"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0066",
+                                 "objective":  "Process",
+                                 "behavior":  "Open Thread",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "open thread"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0027.009",
+                                 "objective":  "Cryptography",
+                                 "behavior":  "Encrypt Data",
+                                 "method":  "RC4",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "encrypt data using RC4 PRGA"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0021.004",
+                                 "objective":  "Cryptography",
+                                 "behavior":  "Generate Pseudo-random Sequence",
+                                 "method":  "RC4 PRGA",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "encrypt data using RC4 PRGA"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0041",
+                                 "objective":  "Process",
+                                 "behavior":  "Set Thread Local Storage Value",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "set thread local storage value"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0030.005",
+                                 "objective":  "Data",
+                                 "behavior":  "Non-Cryptographic Hash",
+                                 "method":  "FNV",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "hash data using fnv"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0040",
+                                 "objective":  "Process",
+                                 "behavior":  "Allocate Thread Local Storage",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "allocate thread local storage"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0046.001",
+                                 "objective":  "Discovery",
+                                 "behavior":  "Code Discovery",
+                                 "method":  "Enumerate PE Sections",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "enumerate PE sections"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0042",
+                                 "objective":  "Process",
+                                 "behavior":  "Create Mutex",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "create mutex"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1083",
+                                 "objective":  "Discovery",
+                                 "behavior":  "File and Directory Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "check if file exists"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0001.001",
+                                 "objective":  "Communication",
+                                 "behavior":  "Socket Communication",
+                                 "method":  "Set Socket Config",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "set socket configuration"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0001.009",
+                                 "objective":  "Communication",
+                                 "behavior":  "Socket Communication",
+                                 "method":  "Initialize Winsock Library",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "initialize Winsock library"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0052",
+                                 "objective":  "File System",
+                                 "behavior":  "Writes File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "write file on Windows"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0051",
+                                 "objective":  "File System",
+                                 "behavior":  "Read File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "read file on Windows"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0025.007",
+                                 "objective":  "Anti-Behavioral Analysis",
+                                 "behavior":  "Conditional Execution",
+                                 "method":  "Runs as Service",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "run as service"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1027",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "encode data using XOR",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "encode data using XOR"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1027",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "encrypt data using RC4 PRGA",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "encrypt data using RC4 PRGA"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "link function at runtime on Windows",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "link function at runtime on Windows"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get system information on Windows",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "get system information on Windows"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1083",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "check if file exists",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "check if file exists"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1007",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "query service status",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "query service status"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1543.003",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "start service",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "start service"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "attack_techniques":  {
+                                           "T1027":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "encode data using XOR",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "encode data using XOR"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "encrypt data using RC4 PRGA",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "encrypt data using RC4 PRGA"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "link function at runtime on Windows",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "link function at runtime on Windows"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1082":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get system information on Windows",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "get system information on Windows"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1083":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "check if file exists",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "check if file exists"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1007":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "query service status",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "query service status"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1543.003":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "start service",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "start service"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ]
+                                       }
+             }
+}

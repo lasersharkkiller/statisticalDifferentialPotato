@@ -1,0 +1,282 @@
+{
+    "data":  {
+                 "signature_matches":  [
+                                           {
+                                               "id":  "0",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get local IPv4 addresses",
+                                               "description":  "host-interaction/network/address",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "joakim@intezer.com",
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "AF_UNSPEC",
+                                                                  "AF_INET",
+                                                                  "api: GetAdaptersAddresses"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get local IPv4 addresses\n    namespace: host-interaction/network/address\n    authors:\n      - moritz.raabe@mandiant.com\n      - joakim@intezer.com\n      - mehunhoff@google.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Network Configuration Discovery [T1016]\n    examples:\n      - Practical Malware Analysis Lab 05-01.dll_:0x100037e6\n      - 4C0553285D724DCAF5909924B4E3E90A:0x402010\n  features:\n    - or:\n      - api: getsockname\n      - and:\n        - api: GetAdaptersInfo\n        - offset: 0x1B0 = IP_ADAPTER_INFO.IpAddressList.IpAddress\n        # loop feature?\n      - and:\n        - api: GetAdaptersAddresses\n        - optional:\n          - or:\n            - number: 0 = AF_UNSPEC\n            - number: 2 = AF_INET\n            - number: 23 = AF_INET6\n"
+                                           },
+                                           {
+                                               "id":  "1",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "initialize Winsock library",
+                                               "description":  "communication/socket",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: WSAStartup"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: initialize Winsock library\n    namespace: communication/socket\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Communication::Socket Communication::Initialize Winsock Library [C0001.009]\n    examples:\n      - 6A352C3E55E8AE5ED39DC1BE7FB964B1:0x10001D30\n  features:\n    - or:\n      - api: ws2_32.WSAStartup\n      - api: ws2_32.#115 = WSAStartup\n"
+                                           },
+                                           {
+                                               "id":  "2",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "link function at runtime on Windows",
+                                               "description":  "linking/runtime-linking",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetProcAddress"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: link function at runtime on Windows\n    namespace: linking/runtime-linking\n    authors:\n      - moritz.raabe@mandiant.com\n      - mehunhoff@google.com\n    scopes:\n      static: instruction\n      dynamic: call\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x404130\n      - Practical Malware Analysis Lab 01-04.exe_:0x401350\n  features:\n    - and:\n      - os: windows\n      - or:\n        - api: kernel32.GetProcAddress\n        - api: ntdll.LdrGetProcedureAddress\n        - api: ntdll.LdrGetProcedureAddressEx\n        - api: ntdll.LdrGetProcedureAddressForCaller\n        - api: MmGetSystemRoutineAddress\n"
+                                           },
+                                           {
+                                               "id":  "4",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "initialize WinHTTP library",
+                                               "description":  "communication/http",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: WinHttpOpen"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: initialize WinHTTP library\n    namespace: communication/http\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Communication::HTTP Communication::WinHTTP [C0002.008]\n    examples:\n      - 6A352C3E55E8AE5ED39DC1BE7FB964B1:0x1000E670\n  features:\n    - and:\n      - api: winhttp.WinHttpOpen\n"
+                                           },
+                                           {
+                                               "id":  "5",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check if file exists",
+                                               "description":  "host-interaction/file-system/exists",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetLastError",
+                                                                  "mnemonic: cmp",
+                                                                  "ERROR_FILE_NOT_FOUND"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check if file exists\n    namespace: host-interaction/file-system/exists\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    examples:\n      - 31600AD0D1A7EA615690DF111AE36C73:0x401284\n  features:\n    - or:\n      - basic block:\n        - and:\n          - api: kernel32.GetFileAttributes\n          - instruction:\n            - mnemonic: cmp\n            - number: 0xFFFFFFFF = INVALID_FILE_ATTRIBUTES\n      - basic block:\n        - and:\n          - api: kernel32.GetLastError\n          - instruction:\n            - mnemonic: cmp\n            - number: 2 = ERROR_FILE_NOT_FOUND\n      - api: shlwapi.PathFileExists\n      - api: System.IO.File::Exists\n      - property/read: System.IO.FileSystemInfo::Exists\n"
+                                           },
+                                           {
+                                               "id":  "6",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get MAC address on Windows",
+                                               "description":  "collection/network",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "echernofsky@google.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetAdaptersAddresses"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get MAC address on Windows\n    namespace: collection/network\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - echernofsky@google.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::System Information Discovery [T1082]\n    references:\n      - https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/Shared/Utils.cpp#L128\n      - https://evasions.checkpoint.com/techniques/network.html#check-if-mac-address-is-specific\n    examples:\n      - al-khaser_x64.exe_:0x14001A1BC\n  features:\n    - and:\n      - os: windows\n      - or:\n        - and:\n          - api: iphlpapi.GetAdaptersInfo\n          - or:\n            - offset: 0x194 = IP_ADAPTER_INFO.Address\n            - offset: 0x195 = IP_ADAPTER_INFO.Address+1\n            - offset: 0x196 = IP_ADAPTER_INFO.Address+2\n            - offset: 0x197 = IP_ADAPTER_INFO.Address+3\n            - offset: 0x198 = IP_ADAPTER_INFO.Address+4\n            - offset: 0x199 = IP_ADAPTER_INFO.Address+5\n          - optional:\n            - string: \"%02X-%02X-%02X-%02X-%02X-%02X\"\n        - and:\n          - api: iphlpapi.GetAdaptersAddresses\n          - offset: 0x2C = PhysicalAddress\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/Shared/Utils.cpp#L128"
+                                                            },
+                                                            {
+                                                                "ref":  "https://evasions.checkpoint.com/techniques/network.html#check-if-mac-address-is-specific"
+                                                            }
+                                                        ]
+                                           }
+                                       ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1016",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get local IPv4 addresses",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "0"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "link function at runtime on Windows",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "2"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1083",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "check if file exists",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "5"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get MAC address on Windows",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "6"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "2832",
+                                            "name":  "%windir%\\system32\\wbem\\wmiprvse.exe"
+                                        },
+                                        {
+                                            "process_id":  "2792",
+                                            "name":  "wmiadap.exe /F /T /R"
+                                        },
+                                        {
+                                            "process_id":  "2544",
+                                            "name":  "%SANDBOX_DLL_LOADER_X86% %TEMP%\\2BG24ECXI7BZYPED.dll %WORKDIR% 483",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "2636",
+                                                                 "name":  "rundll32.exe %TEMP%\\2BG24ECXI7BZYPED.dll,GetLinkSpeedForAddress"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2620",
+                                                                 "name":  "rundll32.exe %TEMP%\\2BG24ECXI7BZYPED.dll,ConvertMultiSzToSzA"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2644",
+                                                                 "name":  "rundll32.exe %TEMP%\\2BG24ECXI7BZYPED.dll,GetSstpDestinationInfo"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2660",
+                                                                 "name":  "rundll32.exe %TEMP%\\2BG24ECXI7BZYPED.dll,GetSstpUrlForDestination"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2628",
+                                                                 "name":  "rundll32.exe %TEMP%\\2BG24ECXI7BZYPED.dll,ConvertSzToMultiSzA"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2652",
+                                                                 "name":  "rundll32.exe %TEMP%\\2BG24ECXI7BZYPED.dll,GetSstpGroupIDFromQueryString"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2668",
+                                                                 "name":  "rundll32.exe %TEMP%\\2BG24ECXI7BZYPED.dll,ValidateMultiSzA"
+                                                             }
+                                                         ]
+                                        }
+                                    ],
+                 "mbc":  [
+                             {
+                                 "id":  "C0001.009",
+                                 "objective":  "Communication",
+                                 "behavior":  "Socket Communication",
+                                 "method":  "Initialize Winsock Library",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "1"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0002.008",
+                                 "objective":  "Communication",
+                                 "behavior":  "HTTP Communication",
+                                 "method":  "WinHTTP",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "4"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1083",
+                                 "objective":  "Discovery",
+                                 "behavior":  "File and Directory Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "5"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "verdicts":  [
+                                  "UNKNOWN_VERDICT"
+                              ],
+                 "attack_techniques":  {
+                                           "T1016":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get local IPv4 addresses",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "0"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "link function at runtime on Windows",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "2"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1083":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "check if file exists",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "5"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1082":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get MAC address on Windows",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "6"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

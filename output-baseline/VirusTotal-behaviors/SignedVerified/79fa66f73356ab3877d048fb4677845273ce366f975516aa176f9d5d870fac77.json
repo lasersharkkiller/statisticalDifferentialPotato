@@ -1,0 +1,249 @@
+{
+    "data":  {
+                 "mbc":  [
+                             {
+                                 "id":  "E1082",
+                                 "objective":  "Discovery",
+                                 "behavior":  "System Information Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "0"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0001.033",
+                                 "objective":  "Anti-Behavioral Analysis",
+                                 "behavior":  "Debugger Detection",
+                                 "method":  "Timing/Delay Check QueryPerformanceCounter",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "1"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1083",
+                                 "objective":  "Discovery",
+                                 "behavior":  "File and Directory Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "2"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0027.009",
+                                 "objective":  "Cryptography",
+                                 "behavior":  "Encrypt Data",
+                                 "method":  "RC4",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "3"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0021.004",
+                                 "objective":  "Cryptography",
+                                 "behavior":  "Generate Pseudo-random Sequence",
+                                 "method":  "RC4 PRGA",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "3"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "signature_matches":  [
+                                           {
+                                               "id":  "0",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get disk information",
+                                               "description":  "host-interaction/hardware/storage",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetDriveType"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get disk information\n    namespace: host-interaction/hardware/storage\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Information Discovery [T1082]\n    mbc:\n      - Discovery::System Information Discovery [E1082]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x4052A0\n      - 972B219F18379907A045431303F4DA7D:0x41064E\n  features:\n    - or:\n      - api: kernel32.GetDriveType\n      - api: kernel32.GetLogicalDrives\n      - api: kernel32.GetVolumeInformation\n      - api: kernel32.GetVolumeNameForVolumeMountPoint\n      - api: kernel32.GetVolumePathNamesForVolumeName\n      - api: kernel32.GetLogicalDriveStrings\n      - api: kernel32.QueryDosDevice\n      - property/read: System.IO.DriveInfo::VolumeLabel\n      - property/read: System.IO.DriveInfo::DriveType\n      - property/read: System.IO.DriveInfo::DriveFormat\n      - property/read: System.IO.DriveInfo::Name\n"
+                                           },
+                                           {
+                                               "id":  "1",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check for time delay via QueryPerformanceCounter",
+                                               "description":  "anti-analysis/anti-debugging/debugger-detection",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check for time delay via QueryPerformanceCounter\n    namespace: anti-analysis/anti-debugging/debugger-detection\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Anti-Behavioral Analysis::Debugger Detection::Timing/Delay Check QueryPerformanceCounter [B0001.033]\n    examples:\n      - Practical Malware Analysis Lab 16-03.exe_:0x4011e0\n  features:\n    - and:\n      - count(api(kernel32.QueryPerformanceCounter)): 2 or more\n"
+                                           },
+                                           {
+                                               "id":  "2",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "enumerate files on Windows",
+                                               "description":  "host-interaction/file-system/files/list",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "loop",
+                                                                  "tight loop",
+                                                                  "api: FindClose"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: enumerate files on Windows\n    namespace: host-interaction/file-system/files/list\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    references:\n      - https://github.com/hfiref0x/TDL/blob/cc4b46ae1c939b14a22a734a727b163f873a41b5/Source/Furutaka/sup.c#L315\n    examples:\n      - Practical Malware Analysis Lab 01-01.exe_:0x4011E0\n      - Practical Malware Analysis Lab 20-02.exe_:0x401000\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x14000203C\n  features:\n    - or:\n      - and:\n        - or:\n          - api: kernel32.FindFirstFile\n          - api: kernel32.FindFirstFileEx\n          - api: kernel32.FindFirstFileTransacted\n          - api: kernel32.FindFirstFileName\n          - api: kernel32.FindFirstFileNameTransacted\n        - or:\n          - api: kernel32.FindNextFile\n          - api: kernel32.FindNextFileName\n        - optional:\n          - api: kernel32.FindClose\n          - match: contain loop\n      - and:\n        - or:\n          - basic block:\n            - and:\n              - number: 1 = DIRECTORY_QUERY\n              - api: ntdll.NtOpenDirectoryObject\n          - call:\n            - and:\n              - number: 1 = DIRECTORY_QUERY\n              - api: ntdll.NtOpenDirectoryObject\n        - api: ntdll.NtQueryDirectoryObject\n        - optional:\n          - api: RtlAllocateHeap\n          - match: contain loop\n          - characteristic: indirect call\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://github.com/hfiref0x/TDL/blob/cc4b46ae1c939b14a22a734a727b163f873a41b5/Source/Furutaka/sup.c#L315"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "encrypt data using RC4 PRGA",
+                                               "description":  "data-manipulation/encryption/rc4",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "loop",
+                                                                  "contain loop",
+                                                                  "tight loop"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: encrypt data using RC4 PRGA\n    namespace: data-manipulation/encryption/rc4\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic, mnemonic, basicblock features\n    att\u0026ck:\n      - Defense Evasion::Obfuscated Files or Information [T1027]\n    mbc:\n      - Cryptography::Encrypt Data::RC4 [C0027.009]\n      - Cryptography::Generate Pseudo-random Sequence::RC4 PRGA [C0021.004]\n    examples:\n      - 34404A3FB9804977C6AB86CB991FB130:0x403DB0\n      - 34404A3FB9804977C6AB86CB991FB130:0x403E50\n      - 9324D1A8AE37A36AE560C37448C9705A:0x4049F0\n      - 73CE04892E5F39EC82B00C02FC04C70F:0x4064C6\n  features:\n    - and:\n      # TODO: maybe add characteristic for nzxor reg size\n      - count(characteristic(nzxor)): 1\n      - or:\n        - match: calculate modulo 256 via x86 assembly\n        # compiler may do this via zero-extended mov from 8-bit register\n        - count(mnemonic(movzx)): 4 or more\n      # should not call (many) functions\n      - count(characteristic(calls from)): (0, 4)\n      # should not be too simple or too complex (50 is picked by intuition)\n      - count(basic blocks): (4, 50)\n      - match: contain loop\n      - optional:\n        - or:\n          - number: 0xFF\n          - number: 0x100\n"
+                                           },
+                                           {
+                                               "id":  "4",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "link function at runtime on Windows",
+                                               "description":  "linking/runtime-linking",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetProcAddress"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: link function at runtime on Windows\n    namespace: linking/runtime-linking\n    authors:\n      - moritz.raabe@mandiant.com\n      - mehunhoff@google.com\n    scopes:\n      static: instruction\n      dynamic: call\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x404130\n      - Practical Malware Analysis Lab 01-04.exe_:0x401350\n  features:\n    - and:\n      - os: windows\n      - or:\n        - api: kernel32.GetProcAddress\n        - api: ntdll.LdrGetProcedureAddress\n        - api: ntdll.LdrGetProcedureAddressEx\n        - api: ntdll.LdrGetProcedureAddressForCaller\n        - api: MmGetSystemRoutineAddress\n"
+                                           },
+                                           {
+                                               "id":  "6",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "contains PDB path",
+                                               "description":  "executable/pe/pdb",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "regex: /:\\\\.*\\.pdb/"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: contains PDB path\n    namespace: executable/pe/pdb\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    examples:\n      - 464EF2CA59782CE697BC329713698CCC  # level32.exe\n  features:\n    - string: /:\\\\.*\\.pdb/\n"
+                                           }
+                                       ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get disk information",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "0"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1083",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "enumerate files on Windows",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "2"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1027",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "encrypt data using RC4 PRGA",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "3"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "link function at runtime on Windows",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "4"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "attack_techniques":  {
+                                           "T1082":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get disk information",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "0"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1083":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "enumerate files on Windows",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "2"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1027":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "encrypt data using RC4 PRGA",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "3"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "link function at runtime on Windows",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "4"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

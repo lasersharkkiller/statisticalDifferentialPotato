@@ -1,0 +1,436 @@
+{
+    "data":  {
+                 "verdict_confidence":  1,
+                 "signature_matches":  [
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "delete file on Linux",
+                                               "description":  "host-interaction/file-system/delete",
+                                               "authors":  [
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: delete file on Linux\n    namespace: host-interaction/file-system/delete\n    authors:\n      - mehunhoff@google.com\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - File System::Delete File [C0047]\n  features:\n    - and:\n      - or:\n        - os: linux\n        - os: android\n      - or:\n        - api: unlink\n        - api: unlinkat\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "encode data using XOR",
+                                               "description":  "data-manipulation/encoding/xor",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: encode data using XOR\n    namespace: data-manipulation/encoding/xor\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: unsupported  # requires characteristic, Not features\n    att\u0026ck:\n      - Defense Evasion::Obfuscated Files or Information [T1027]\n    mbc:\n      - Defense Evasion::Obfuscated Files or Information::Encoding-Standard Algorithm [E1027.m02]\n      - Data::Encode Data::XOR [C0026.002]\n    examples:\n      - 2D3EDC218A90F03089CC01715A9F047F:0x403D7E\n  features:\n    - and:\n      - characteristic: tight loop\n      - characteristic: nzxor\n      - not:\n        - description: filter for potential false positives\n        - or:\n          - or:\n            - description: unsigned bitwise negation operation (~i)\n            - number: 0xFFFFFFFF = bitwise negation for unsigned 32 bits\n            - number: 0xFFFFFFFFFFFFFFFF = bitwise negation for unsigned 64 bits\n          - or:\n            - description: signed bitwise negation operation (~i)\n            - number: 0x0FFFFFFF = bitwise negation for signed 32 bits\n            - number: 0x0FFFFFFFFFFFFFFF = bitwise negation for signed 64 bits\n          - or:\n            - description: Magic constants used in the implementation of strings functions.\n            # such as `strlen` and `strcat` in the Windows standard library:\n            # (((i - 0x81010101) ^ ~i) \u0026 0x81010100)\n            ## 32 bits\n            - number: 0x7EFEFEFF = optimized string constant for 32 bits\n            - number: 0x81010101 = -0x81010101 = 0x7EFEFEFF\n            - number: 0x81010100 = 0x81010100 = ~0x7EFEFEFF\n            ## 64 bits\n            - number: 0x7EFEFEFEFEFEFEFF = optimized string constant for 64 bits\n            - number: 0x8101010101010101 = -0x8101010101010101 = 0x7EFEFEFEFEFEFEFF\n            - number: 0x8101010101010100 = 0x8101010101010100 = ~0x7EFEFEFEFEFEFEFF\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get file attributes",
+                                               "description":  "host-interaction/file-system/meta",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get file attributes\n    namespace: host-interaction/file-system/meta\n    authors:\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - File System::Get File Attributes [C0049]\n    examples:\n      - 03B236B23B1EC37C663527C1F53AF3FE:0x180019824\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x4028B6\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x4029E0\n  features:\n    - or:\n      - api: kernel32.GetFileAttributes\n      - api: ZwQueryDirectoryFile\n      - api: ZwQueryInformationFile\n      - api: NtQueryDirectoryFile\n      - api: NtQueryInformationFile\n      - api: System.IO.File::GetAttributes\n      - api: System.IO.File::GetCreationTime\n      - api: System.IO.File::GetCreationTimeUtc\n      - api: System.IO.File::GetLastAccessTime\n      - api: System.IO.File::GetLastAccessTimeUtc\n      - api: System.IO.File::GetLastWriteTime\n      - api: System.IO.File::GetLastWriteTimeUtc\n      - property/read: System.IO.FileSystemInfo::Attributes\n      - api: stat\n      - api: fstat\n      - api: lstat\n      - api: fstatat\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get current PID on Linux",
+                                               "description":  "host-interaction/process",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get current PID on Linux\n    namespace: host-interaction/process\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n  features:\n    - and:\n      - or:\n        - os: linux\n        - os: android\n      - or:\n        - api: getpid\n        - api: getppid\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "terminate process via kill",
+                                               "description":  "host-interaction/process/terminate",
+                                               "authors":  [
+                                                               "joakim@intezer.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: terminate process via kill\n    namespace: host-interaction/process/terminate\n    authors:\n      - joakim@intezer.com\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - Process::Terminate Process [C0018]\n    examples:\n      - 7351f8a40c5450557b24622417fc478d:0x402424\n  features:\n    - and:\n      - os: linux\n      - api: kill\n      - or:\n        - number: 1 = SIGHUP - controlling terminal closed\n        - number: 2 = SIGINT - interupt process stream, ctrl-C\n        - number: 3 = SIGQUIT - like ctrl-C but with a core dump\n        - number: 6 = SIGABRT\n        - number: 9 = SIGKILL - terminate immediately/hard kill\n        - number: 15 = SIGTERM - terminate whenever/soft kill\n        - number: 19 = SIGSTOP - Pause the process / free command line, ctrl-Z\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "truncate file on Linux",
+                                               "description":  "host-interaction/file-system/truncate",
+                                               "authors":  [
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: truncate file on Linux\n    namespace: host-interaction/file-system/truncate\n    authors:\n      - mehunhoff@google.com\n    scopes:\n      static: basic block\n      dynamic: call\n  features:\n    - and:\n      - or:\n        - os: android\n        - os: linux\n      - api: ftruncate\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create process on Linux",
+                                               "description":  "host-interaction/process/create",
+                                               "authors":  [
+                                                               "joakim@intezer.com",
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create process on Linux\n    namespace: host-interaction/process/create\n    authors:\n      - joakim@intezer.com\n      - mehunhoff@google.com\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - Process::Create Process [C0017]\n    examples:\n      - 7351f8a40c5450557b24622417fc478d:0x40236D\n  features:\n    - and:\n      - or:\n        - os: linux\n        - os: android\n      - or:\n        - api: execve\n        - and:\n          - match: execute syscall\n          - arch: aarch64\n          - number: 0xdd = execve\n        - api: execl\n        - api: execlp\n        - api: execle\n        - api: execv\n        - api: execvp\n        - api: execvpe\n        - api: posix_spawn\n        - api: posix_spawnp\n        - api: popen\n        - api: fork\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get password database entry on Linux",
+                                               "description":  "host-interaction/session",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get password database entry on Linux\n    namespace: host-interaction/session\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n  features:\n    - and:\n      - or:\n        - os: linux\n        - os: android\n      - or:\n        - api: getpwuid\n        - api: getpwuid_r\n        - api: getpwnam\n        - api: getpwnam_r\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "read file on Linux",
+                                               "description":  "host-interaction/file-system/read",
+                                               "authors":  [
+                                                               "joakim@intezer.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: read file on Linux\n    namespace: host-interaction/file-system/read\n    authors:\n      - joakim@intezer.com\n    scopes:\n      static: function\n      dynamic: thread\n    mbc:\n      - File System::Read File [C0051]\n    examples:\n      - 7351f8a40c5450557b24622417fc478d:0x4059AD\n  features:\n    - and:\n      - or:\n        - os: linux\n        - os: android\n      - optional:\n        - match: create or open file\n      - or:\n        - api: fgetc\n        - api: fgets\n        - api: getc\n        - api: getchar\n        - api: read\n        - api: getline\n        - api: getdelim\n        - api: fgetwc\n        - api: getwc\n        - api: fscanf\n        - api: vfscanf\n        - api: fread\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "set current directory",
+                                               "description":  "host-interaction/file-system",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: set current directory\n    namespace: host-interaction/file-system\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n  features:\n    - or:\n      - api: System.IO.Directory::SetCurrentDirectory\n      - api: kernel32.SetCurrentDirectory\n      - api: chdir\n      - api: fchdir\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "write file on Linux",
+                                               "description":  "host-interaction/file-system/write",
+                                               "authors":  [
+                                                               "joakim@intezer.com",
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: write file on Linux\n    namespace: host-interaction/file-system/write\n    authors:\n      - joakim@intezer.com\n      - mehunhoff@google.com\n    scopes:\n      static: function\n      dynamic: thread\n    mbc:\n      - File System::Writes File [C0052]\n    examples:\n      - 7351f8a40c5450557b24622417fc478d:0x401E14\n  features:\n    - and:\n      - or:\n        - os: linux\n        - os: android\n      - or:\n        - api: fputc\n        - api: fputs\n        - api: putc\n        - api: write\n        - api: fputwc\n        - api: putwc\n        - api: fputws\n        - api: fwrite\n        - api: putwchar\n        - api: dprintf\n        - api: vdprintf\n        - api: fprintf\n        - api: vfprintf\n      - optional:\n        - match: create or open file\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "query environment variable",
+                                               "description":  "host-interaction/environment-variable",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "@_re_fox"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: query environment variable\n    namespace: host-interaction/environment-variable\n    authors:\n      - michael.hunhoff@mandiant.com\n      - \"@_re_fox\"\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Information Discovery [T1082]\n    mbc:\n      - Discovery::System Information Discovery [E1082]\n    examples:\n      - Practical Malware Analysis Lab 14-02.exe_:0x401880\n      - 0761142efbda6c4b1e801223de723578:0x65483490\n  features:\n    - or:\n      - api: kernel32.GetEnvironmentVariable\n      - api: kernel32.GetEnvironmentStrings\n      - api: kernel32.ExpandEnvironmentStrings\n      - api: msvcr90.getenv\n      - api: msvcrt.getenv\n      - api: System.Environment::GetEnvironmentVariable\n      - api: System.Environment::GetEnvironmentVariables\n      - api: System.Environment::ExpandEnvironmentVariables\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "encrypt data using RC4 PRGA",
+                                               "description":  "data-manipulation/encryption/rc4",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: encrypt data using RC4 PRGA\n    namespace: data-manipulation/encryption/rc4\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic, mnemonic, basicblock features\n    att\u0026ck:\n      - Defense Evasion::Obfuscated Files or Information [T1027]\n    mbc:\n      - Cryptography::Encrypt Data::RC4 [C0027.009]\n      - Cryptography::Generate Pseudo-random Sequence::RC4 PRGA [C0021.004]\n    examples:\n      - 34404A3FB9804977C6AB86CB991FB130:0x403DB0\n      - 34404A3FB9804977C6AB86CB991FB130:0x403E50\n      - 9324D1A8AE37A36AE560C37448C9705A:0x4049F0\n      - 73CE04892E5F39EC82B00C02FC04C70F:0x4064C6\n  features:\n    - and:\n      # TODO: maybe add characteristic for nzxor reg size\n      - count(characteristic(nzxor)): 1\n      - or:\n        - match: calculate modulo 256 via x86 assembly\n        # compiler may do this via zero-extended mov from 8-bit register\n        - count(mnemonic(movzx)): 4 or more\n      # should not call (many) functions\n      - count(characteristic(calls from)): (0, 4)\n      # should not be too simple or too complex (50 is picked by intuition)\n      - count(basic blocks): (4, 50)\n      - match: contain loop\n      - optional:\n        - or:\n          - number: 0xFF\n          - number: 0x100\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "delete file",
+                                               "description":  "host-interaction/file-system/delete",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: delete file\n    namespace: host-interaction/file-system/delete\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    mbc:\n      - File System::Delete File [C0047]\n    examples:\n      - 946A99F36A46D335DEC080D9A4371940:0x100015F0\n      # MoveFileEx\n      - 31600AD0D1A7EA615690DF111AE36C73:0x401A15\n      # NtDeleteFile\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x140001E04\n  features:\n    - or:\n      - api: kernel32.DeleteFile\n      - api: DeleteFileTransacted\n      - api: NtDeleteFile\n      - api: ZwDeleteFile\n      - api: remove\n      - api: _wremove\n      - api: System.IO.File::Delete\n      - api: System.IO.FileSystemInfo::Delete\n      # static\n      - basic block:\n        - and:\n          - number: 3 = FO_DELETE\n          - or:\n            - api: kernel32.SHFileOperation\n      - basic block:\n        - and:\n          - number: 4 = MOVEFILE_DELAY_UNTIL_REBOOT\n          - number: 0 = NULL\n          - api: MoveFileEx\n      # dynamic\n      - call:\n        - and:\n          - number: 3 = FO_DELETE\n          - or:\n            - api: kernel32.SHFileOperation\n      - call:\n        - and:\n          - number: 4 = MOVEFILE_DELAY_UNTIL_REBOOT\n          - number: 0 = NULL\n          - api: MoveFileEx\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "link function at runtime on Linux",
+                                               "description":  "linking/runtime-linking",
+                                               "authors":  [
+                                                               "joakim@intezer.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: link function at runtime on Linux\n    namespace: linking/runtime-linking\n    authors:\n      - joakim@intezer.com\n    scopes:\n      static: function\n      dynamic: thread\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n  features:\n    - and:\n      - or:\n        - os: linux\n        - os: android\n      - or:\n        - api: dlopen\n        - api: dlmopen\n      - or:\n        - api: dlsym\n        - api: dlvsym\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get current user on Linux",
+                                               "description":  "host-interaction/session",
+                                               "authors":  [
+                                                               "joakim@intezer.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get current user on Linux\n    namespace: host-interaction/session\n    authors:\n      - joakim@intezer.com\n    scopes:\n      static: function\n      dynamic: thread\n    att\u0026ck:\n      - Discovery::System Owner/User Discovery [T1033]\n    examples:\n      - 7351f8a40c5450557b24622417fc478d:0x405438\n  features:\n    - and:\n      - or:\n        - os: linux\n        - os: android\n      - or:\n        - api: geteuid\n        - api: getpwuid\n        - api: getlogin\n        - api: getlogin_r\n        - api: cuserid\n"
+                                           }
+                                       ],
+                 "mbc":  [
+                             {
+                                 "id":  "C0047",
+                                 "objective":  "File System",
+                                 "behavior":  "Delete File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "delete file on Linux"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1027.m02",
+                                 "objective":  "Defense Evasion",
+                                 "behavior":  "Obfuscated Files or Information",
+                                 "method":  "Encoding-Standard Algorithm",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "encode data using XOR"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0026.002",
+                                 "objective":  "Data",
+                                 "behavior":  "Encode Data",
+                                 "method":  "XOR",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "encode data using XOR"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0049",
+                                 "objective":  "File System",
+                                 "behavior":  "Get File Attributes",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "get file attributes"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0018",
+                                 "objective":  "Process",
+                                 "behavior":  "Terminate Process",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "terminate process via kill"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0017",
+                                 "objective":  "Process",
+                                 "behavior":  "Create Process",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "create process on Linux"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0051",
+                                 "objective":  "File System",
+                                 "behavior":  "Read File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "read file on Linux"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0052",
+                                 "objective":  "File System",
+                                 "behavior":  "Writes File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "write file on Linux"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1082",
+                                 "objective":  "Discovery",
+                                 "behavior":  "System Information Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "query environment variable"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0027.009",
+                                 "objective":  "Cryptography",
+                                 "behavior":  "Encrypt Data",
+                                 "method":  "RC4",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "encrypt data using RC4 PRGA"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0021.004",
+                                 "objective":  "Cryptography",
+                                 "behavior":  "Generate Pseudo-random Sequence",
+                                 "method":  "RC4 PRGA",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "encrypt data using RC4 PRGA"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0047",
+                                 "objective":  "File System",
+                                 "behavior":  "Delete File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "delete file"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1027",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "encode data using XOR",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "encode data using XOR"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "query environment variable",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "query environment variable"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1027",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "encrypt data using RC4 PRGA",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "encrypt data using RC4 PRGA"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "link function at runtime on Linux",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "link function at runtime on Linux"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1033",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get current user on Linux",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "get current user on Linux"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1036",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Sample contains symbols with suspicious names"
+                                                 }
+                                             ],
+                 "text_highlighted":  [
+                                          "",
+                                          "/tmp/base: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.33\u0027 not found (required by /tmp/base)",
+                                          "/tmp/base: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.34\u0027 not found (required by /tmp/base)"
+                                      ],
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "3932",
+                                            "name":  "/tmp/base"
+                                        }
+                                    ],
+                 "verdicts":  [
+                                  "CLEAN"
+                              ],
+                 "attack_techniques":  {
+                                           "T1027":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "encode data using XOR",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "encode data using XOR"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "encrypt data using RC4 PRGA",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "encrypt data using RC4 PRGA"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1082":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "query environment variable",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "query environment variable"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "link function at runtime on Linux",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "link function at runtime on Linux"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1033":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get current user on Linux",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "get current user on Linux"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1036":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Sample contains symbols with suspicious names"
+                                                         }
+                                                     ]
+                                       }
+             }
+}

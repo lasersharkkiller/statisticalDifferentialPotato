@@ -1,0 +1,534 @@
+{
+    "data":  {
+                 "signature_matches":  [
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "link function at runtime on Windows",
+                                               "description":  "linking/runtime-linking",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: link function at runtime on Windows\n    namespace: linking/runtime-linking\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: instruction\n      dynamic: call\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x404130\n      - Practical Malware Analysis Lab 01-04.exe_:0x401350\n  features:\n    - and:\n      - os: windows\n      - or:\n        - api: kernel32.GetProcAddress\n        - api: ntdll.LdrGetProcedureAddress\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "parse PE header",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: parse PE header\n    namespace: load-code/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic, operand[1].offset features\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x403DD0\n  features:\n    - and:\n      - os: windows\n      - and:\n        - mnemonic: cmp\n        - or:\n          - number: 0x4550 = IMAGE_NT_SIGNATURE (PE)\n          - and:\n            - number: 0x50\n            - number: 0x45\n        - or:\n          - number: 0x5A4D = IMAGE_DOS_SIGNATURE (MZ)\n          - and:\n            - number: 0x4D\n            - number: 0x5A\n        - optional:\n          - and:\n            - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x30 = IMAGE_NT_HEADERS64.OptionalHeader.ImageBase\n          - basic block:\n            - and:\n              - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n              - 3 or more:\n                - operand[1].offset: 0x4 = IMAGE_NT_HEADERS.FileHeader.Machine\n                - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n                - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n                - operand[1].offset: 0x16 = IMAGE_NT_HEADERS.FileHeader.Characteristics\n                - operand[1].offset: 0x28 = IMAGE_NT_HEADERS.OptionalHeader.AddressOfEntryPoint  # for 32 and 64 bit\n                - or:\n                  - and:\n                    - arch: i386\n                    - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                  - and:\n                    - arch: amd64\n                    - operand[1].offset: 0x30 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check for time delay via GetTickCount",
+                                               "description":  "anti-analysis/anti-debugging/debugger-detection",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check for time delay via GetTickCount\n    namespace: anti-analysis/anti-debugging/debugger-detection\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic features\n    mbc:\n      - Anti-Behavioral Analysis::Debugger Detection::Timing/Delay Check GetTickCount [B0001.032]\n    examples:\n      - Practical Malware Analysis Lab 16-03.exe_:0x4013d0\n  features:\n    - and:\n      - count(api(kernel32.GetTickCount)): 2 or more\n      - basic block:\n        - and:\n          - mnemonic: sub\n          - mnemonic: cmp\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get common file path",
+                                               "description":  "host-interaction/file-system",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get common file path\n    namespace: host-interaction/file-system\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    examples:\n      - Practical Malware Analysis Lab 03-02.dll_:0x10003415\n      - 972B219F18379907A045431303F4DA7D:0x404887\n  features:\n    - or:\n      - api: kernel32.GetTempPath\n      - api: kernel32.GetTempFileName\n      - api: kernel32.GetSystemDirectory\n      - api: kernel32.GetWindowsDirectory\n      - api: kernel32.GetSystemWow64Directory\n      - api: GetAllUsersProfileDirectory\n      - api: GetAppContainerFolderPath\n      - api: GetCurrentDirectory\n      - api: GetDefaultUserProfileDirectory\n      - api: GetProfilesDirectory\n      - api: GetUserProfileDirectory\n      - api: SHGetFolderPathAndSubDir\n      - api: shell32.SHGetFolderPath\n      - api: shell32.SHGetFolderLocation\n      - api: shell32.SHGetKnownFolderPath\n      - api: shell32.SHGetSpecialFolderPath\n      - api: shell32.SHGetSpecialFolderLocation\n      - api: System.IO.Directory::GetCurrentDirectory\n      - api: System.Environment::GetFolderPath\n      - property/read: System.Environment::SystemDirectory\n      - property/read: System.Environment::CurrentDirectory\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "delete registry key",
+                                               "description":  "host-interaction/registry/delete",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "johnk3r"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: delete registry key\n    namespace: host-interaction/registry/delete\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - johnk3r\n    scopes:\n      static: function\n      dynamic: thread\n    att\u0026ck:\n      - Defense Evasion::Modify Registry [T1112]\n    mbc:\n      - Operating System::Registry::Delete Registry Key [C0036.002]\n    examples:\n      - 4f11bdb380dafa2518053c6d20147a05:0x402A36\n      - 493167E85E45363D09495D0841C30648:0x404D60\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegDeleteKey\n        - api: advapi32.RegDeleteTree\n        - api: advapi32.RegDeleteKeyEx\n        - api: advapi32.RegDeleteKeyTransacted\n        - api: ZwDeleteKey\n        - api: NtDeleteKey\n        - api: SHDeleteKey\n        - api: SHDeleteEmptyKey\n        - api: SHRegDeleteEmptyUSKey\n        - api: Microsoft.Win32.RegistryKey::DeleteSubKey\n        - api: Microsoft.Win32.RegistryKey::DeleteSubKeyTree\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "query or enumerate registry key",
+                                               "description":  "host-interaction/registry",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: query or enumerate registry key\n    namespace: host-interaction/registry\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    att\u0026ck:\n      - Discovery::Query Registry [T1012]\n    mbc:\n      - Operating System::Registry::Query Registry Key [C0036.005]\n    examples:\n      - 493167E85E45363D09495D0841C30648:0x404930\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x402608\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegEnumKey\n        - api: advapi32.RegEnumKeyEx\n        - api: advapi32.RegQueryInfoKeyA\n        - api: ZwQueryKey\n        - api: ZwEnumerateKey\n        - api: NtQueryKey\n        - api: NtEnumerateKey\n        - api: RtlCheckRegistryKey\n        - api: SHEnumKeyEx\n        - api: SHQueryInfoKey\n        - api: SHRegEnumUSKey\n        - api: SHRegQueryInfoUSKey\n        - api: Microsoft.Win32.RegistryKey::GetSubKeyNames\n        - api: Microsoft.Win32.RegistryKey::OpenBaseKey\n        - api: Microsoft.Win32.RegistryKey::OpenRemoteBaseKey\n        - api: Microsoft.Win32.RegistryKey::OpenSubKey\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "delete registry value",
+                                               "description":  "host-interaction/registry/delete",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: delete registry value\n    namespace: host-interaction/registry/delete\n    authors:\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    att\u0026ck:\n      - Defense Evasion::Modify Registry [T1112]\n    mbc:\n      - Operating System::Registry::Delete Registry Value [C0036.007]\n    examples:\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x4041A0\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegDeleteValue\n        - api: advapi32.RegDeleteKeyValue\n        - api: ZwDeleteValueKey\n        - api: NtDeleteValueKey\n        - api: RtlDeleteRegistryValue\n        - api: SHDeleteValue\n        - api: SHRegDeleteUSValue\n        - api: Microsoft.Win32.RegistryKey::DeleteValue\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get hostname",
+                                               "description":  "host-interaction/os/hostname",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "joakim@intezer.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get hostname\n    namespace: host-interaction/os/hostname\n    authors:\n      - moritz.raabe@mandiant.com\n      - joakim@intezer.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Information Discovery [T1082]\n    mbc:\n      - Discovery::System Information Discovery [E1082]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x4052A0\n      - 7351f8a40c5450557b24622417fc478d:0x405438\n  features:\n    - or:\n      - api: kernel32.GetComputerName\n      - api: kernel32.GetComputerNameEx\n      - api: GetComputerObjectName\n      - api: ws2_32.gethostname\n      - api: gethostname\n      - property/read: System.Environment::MachineName\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "initialize Winsock library",
+                                               "description":  "communication/socket",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: initialize Winsock library\n    namespace: communication/socket\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Communication::Socket Communication::Initialize Winsock Library [C0001.009]\n    examples:\n      - 6A352C3E55E8AE5ED39DC1BE7FB964B1:0x10001D30\n  features:\n    - or:\n      - api: ws2_32.WSAStartup\n      - api: ws2_32.#115 = WSAStartup\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "resolve DNS",
+                                               "description":  "communication/dns",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com",
+                                                               "johnk3r",
+                                                               "joakim@intezer.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: resolve DNS\n    namespace: communication/dns\n    authors:\n      - william.ballenthin@mandiant.com\n      - johnk3r\n      - joakim@intezer.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Communication::DNS Communication::Resolve [C0011.001]\n    examples:\n      - 17264e3126a97c319a6a0c61e6da951e:0x5FDC25D0\n  features:\n    - or:\n      - api: gethostbyname\n      - api: ws2_32.gethostbyname\n      - api: ws2_32.#52 = gethostbyname\n      - api: DnsQuery_A\n      - api: DnsQuery_W\n      - api: DnsQuery_UTF8\n      - api: DnsQueryEx\n      - api: GetAddrInfo\n      - api: ws2_32.#24 = GetAddrInfoW\n      - api: GetAddrInfoEx\n      - api: getaddrinfo\n      - api: ws2_32.#98 = getaddrinfo\n      - api: getnameinfo\n      - api: ws2_32.#99 = getnameinfo\n      - api: gethostent\n      - api: System.Net.Dns::GetHostAddresses\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get domain controller name",
+                                               "description":  "host-interaction/network/domain : Looks for calls to Windows APIs that can be used to determine the name of the domain controller for a Windows domain that a computer is connected to.",
+                                               "authors":  [
+                                                               "awillia2@cisco.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get domain controller name\n    namespace: host-interaction/network/domain\n    authors:\n      - awillia2@cisco.com\n    description: Looks for calls to Windows APIs that can be used to determine the name of the domain controller for a Windows domain that a computer is connected to.\n    scopes:\n      static: function\n      dynamic: thread\n    att\u0026ck:\n      - Discovery::System Network Configuration Discovery [T1016]\n    references:\n      - https://docs.microsoft.com/en-us/windows/win32/api/lmaccess/nf-lmaccess-netgetdcname\n      - https://docs.microsoft.com/en-us/windows/win32/api/dsgetdc/nf-dsgetdc-dsgetdcnamea\n      - https://chuongdong.com/reverse%20engineering/2021/05/23/MountLockerRansomware/\n    examples:\n      - 3808f21e56dede99bc914d90aeabe47a:0x140007144\n  features:\n    - and:\n      - or:\n        - api: NetGetDCName\n        - api: DsGetDcName\n      - optional:\n        - api: NetApiBufferFree\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://docs.microsoft.com/en-us/windows/win32/api/lmaccess/nf-lmaccess-netgetdcname"
+                                                            },
+                                                            {
+                                                                "ref":  "https://docs.microsoft.com/en-us/windows/win32/api/dsgetdc/nf-dsgetdc-dsgetdcnamea"
+                                                            },
+                                                            {
+                                                                "ref":  "https://chuongdong.com/reverse%20engineering/2021/05/23/MountLockerRansomware/"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "query or enumerate registry value",
+                                               "description":  "host-interaction/registry",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: query or enumerate registry value\n    namespace: host-interaction/registry\n    authors:\n      - william.ballenthin@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    att\u0026ck:\n      - Discovery::Query Registry [T1012]\n    mbc:\n      - Operating System::Registry::Query Registry Value [C0036.006]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13145B5A\n      - Practical Malware Analysis Lab 03-02.dll_:0x100047AD\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegGetValue\n        - api: advapi32.RegEnumValue\n        - api: advapi32.RegQueryValue\n        - api: advapi32.RegQueryValueEx\n        - api: advapi32.RegQueryMultipleValues\n        - api: ZwQueryValueKey\n        - api: ZwEnumerateValueKey\n        - api: NtQueryValueKey\n        - api: NtEnumerateValueKey\n        - api: RtlQueryRegistryValues\n        - api: SHGetValue\n        - api: SHEnumValue\n        - api: SHRegGetInt\n        - api: SHRegGetPath\n        - api: SHRegGetValue\n        - api: SHQueryValueEx\n        - api: SHRegGetUSValue\n        - api: SHOpenRegStream\n        - api: SHRegEnumUSValue\n        - api: SHOpenRegStream2\n        - api: SHRegQueryUSValue\n        - api: SHRegGetBoolUSValue\n        - api: SHRegGetValueFromHKCUHKLM\n        - api: SHRegGetBoolValueFromHKCUHKLM\n        - api: Microsoft.Win32.RegistryKey::GetValue\n        - api: Microsoft.Win32.RegistryKey::GetValueKind\n        - api: Microsoft.Win32.RegistryKey::GetValueNames\n        - api: Microsoft.Win32.Registry::GetValue\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "set registry value",
+                                               "description":  "host-interaction/registry/create",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: set registry value\n    namespace: host-interaction/registry/create\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    mbc:\n      - Operating System::Registry::Set Registry Key [C0036.001]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13147AF0\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x40433E\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x40415E\n      - 98c37c3c23bbfb362dac7754c6ba48e75cf24d73bc963a4cdfca557b9e016909:0x40294D\n  features:\n    - or:\n      - and:\n        - optional:\n          - match: create or open registry key\n        - or:\n          - api: advapi32.RegSetValue\n          - api: advapi32.RegSetValueEx\n          - api: advapi32.RegSetKeyValue\n          - api: ZwSetValueKey\n          - api: NtSetValueKey\n          - api: RtlWriteRegistryValue\n          - api: SHSetValue\n          - api: SHRegSetPath\n          - api: SHRegSetValue\n          - api: SHRegSetUSValue\n          - api: SHRegWriteUSValue\n          - api: Microsoft.Win32.RegistryKey::SetValue\n          - api: Microsoft.Win32.Registry::SetValue\n      - and:\n        - match: host-interaction/process/create\n        - string: \"/add/i\"\n        - or:\n          - string: \"/reg(|.exe)/i\"\n          - string: \"/hklm/i\"\n          - string: \"/HKEY_LOCAL_MACHINE/i\"\n          - string: \"/hkcu/i\"\n          - string: \"/HKEY_CURRENT_USER/i\"\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "implement COM DLL",
+                                               "description":  "executable/pe",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: implement COM DLL\n    namespace: executable/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    references:\n      - https://learn.microsoft.com/en-us/windows/win32/api/combaseapi/nf-combaseapi-dllgetclassobject\n  features:\n    - and:\n      - export: DllGetClassObject\n      - optional:\n        - export: DllRegisterServer\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://learn.microsoft.com/en-us/windows/win32/api/combaseapi/nf-combaseapi-dllgetclassobject"
+                                                            }
+                                                        ]
+                                           }
+                                       ],
+                 "mbc":  [
+                             {
+                                 "id":  "B0001.032",
+                                 "objective":  "Anti-Behavioral Analysis",
+                                 "behavior":  "Debugger Detection",
+                                 "method":  "Timing/Delay Check GetTickCount",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "check for time delay via GetTickCount"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1083",
+                                 "objective":  "Discovery",
+                                 "behavior":  "File and Directory Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "get common file path"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.002",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Delete Registry Key",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "delete registry key"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.005",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Query Registry Key",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "query or enumerate registry key"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.007",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Delete Registry Value",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "delete registry value"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1082",
+                                 "objective":  "Discovery",
+                                 "behavior":  "System Information Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "get hostname"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0001.009",
+                                 "objective":  "Communication",
+                                 "behavior":  "Socket Communication",
+                                 "method":  "Initialize Winsock Library",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "initialize Winsock library"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0011.001",
+                                 "objective":  "Communication",
+                                 "behavior":  "DNS Communication",
+                                 "method":  "Resolve",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "resolve DNS"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.006",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Query Registry Value",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "query or enumerate registry value"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.001",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Set Registry Key",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "set registry value"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "link function at runtime on Windows",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "link function at runtime on Windows"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "parse PE header",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "parse PE header"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1083",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get common file path",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "get common file path"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1112",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "delete registry key",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "delete registry key"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1012",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "query or enumerate registry key",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "query or enumerate registry key"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1112",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "delete registry value",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "delete registry value"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get hostname",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "get hostname"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1016",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get domain controller name",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "get domain controller name"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1012",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "query or enumerate registry value",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "query or enumerate registry value"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "verdicts":  [
+                                  "UNKNOWN_VERDICT"
+                              ],
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "1200",
+                                            "name":  "%windir%\\System32\\svchost.exe -k WerSvcGroup"
+                                        },
+                                        {
+                                            "process_id":  "1140",
+                                            "name":  "%SANDBOX_DLL_LOADER_AMD64% %SAMPLEPATH% %WORKDIR% 483",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "1764",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,DllCanUnloadNow"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2056",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,MI_Main"
+                                                             },
+                                                             {
+                                                                 "process_id":  "1796",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,DllGetClassObject"
+                                                             },
+                                                             {
+                                                                 "process_id":  "1868",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,DllMain"
+                                                             },
+                                                             {
+                                                                 "process_id":  "1832",
+                                                                 "name":  "rundll32.exe %SAMPLEPATH%,GetProviderClassID"
+                                                             }
+                                                         ]
+                                        },
+                                        {
+                                            "process_id":  "2204",
+                                            "name":  "wmiadap.exe /F /T /R"
+                                        },
+                                        {
+                                            "process_id":  "2248",
+                                            "name":  "%windir%\\system32\\wbem\\wmiprvse.exe"
+                                        }
+                                    ],
+                 "processes_terminated":  [
+                                              "%windir%\\System32\\svchost.exe -k WerSvcGroup",
+                                              "wmiadap.exe /F /T /R"
+                                          ],
+                 "attack_techniques":  {
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "link function at runtime on Windows",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "link function at runtime on Windows"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "parse PE header",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "parse PE header"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1083":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get common file path",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "get common file path"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1112":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "delete registry key",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "delete registry key"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "delete registry value",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "delete registry value"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1012":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "query or enumerate registry key",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "query or enumerate registry key"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "query or enumerate registry value",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "query or enumerate registry value"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1082":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get hostname",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "get hostname"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1016":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get domain controller name",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "get domain controller name"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

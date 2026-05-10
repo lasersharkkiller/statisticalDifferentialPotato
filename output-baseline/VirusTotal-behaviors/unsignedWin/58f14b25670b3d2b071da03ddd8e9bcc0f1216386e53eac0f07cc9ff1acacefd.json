@@ -1,0 +1,685 @@
+{
+    "data":  {
+                 "signature_matches":  [
+                                           {
+                                               "id":  "1",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create or open mutex on Windows",
+                                               "description":  "host-interaction/mutex",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com",
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: CreateMutexEx"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create or open mutex on Windows\n    namespace: host-interaction/mutex\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n      - mehunhoff@google.com\n    scopes:\n      static: instruction\n      dynamic: call\n    mbc:\n      - Process::Create Mutex [C0042]\n    examples:\n      - Practical Malware Analysis Lab 01-01.dll_:0x10001010\n  features:\n    - or:\n      - api: kernel32.OpenMutex\n      - api: kernel32.CreateMutex\n      - api: kernel32.CreateMutexEx\n      - api: ntdll.NtCreateMutant\n      - api: ntdll.NtOpenMutant\n      - and:\n        - format: dotnet\n        - or:\n          - api: System.Threading.Mutex::ctor\n          - api: System.Threading.Mutex::OpenExisting\n          - api: System.Threading.Mutex::TryOpenExisting\n"
+                                           },
+                                           {
+                                               "id":  "2",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "resolve function by parsing PE exports",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "sara-rn"
+                                                           ],
+                                               "match_data":  [
+                                                                  "mnemonic: movzx",
+                                                                  "loop"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: resolve function by parsing PE exports\n    namespace: load-code/pe\n    authors:\n      - sara-rn\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic, offset, mnemonic features\n    examples:\n      - 73CE04892E5F39EC82B00C02FC04C70F:0x406BA1\n  features:\n    - and:\n      - os: windows\n      - or:\n        - characteristic: loop\n        - mnemonic: movzx\n      - and:\n        - offset: 0x3C = IMAGE_DOS_HEADER.PE.e_lfanew\n        - or:\n          - and:\n            - arch: i386\n            - offset: 0x78 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n          - and:\n            - arch: amd64\n            - offset: 0x88 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n        - 3 or more:\n          - offset: 0x14 = IMAGE_EXPORT_DIRECTORY.NumberOfFunctions\n          - offset: 0x24 = IMAGE_EXPORT_DIRECTORY.AddressOfNameOrdinals\n          - offset: 0x20 = IMAGE_EXPORT_DIRECTORY.AddressOfNames\n          - offset: 0x18 = IMAGE_EXPORT_DIRECTORY.NumberOfNames\n          - offset: 0x1C = IMAGE_EXPORT_DIRECTORY.AddressOfFunctions\n      - optional:\n        - or:\n          - api: LoadLibrary\n          - api: strcmp\n"
+                                           },
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "prepare HTTP request",
+                                               "description":  "communication/http/client",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: WinHttpOpenRequest"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: prepare HTTP request\n    namespace: communication/http/client\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Communication::HTTP Communication::Create Request [C0002.012]\n    examples:\n      - 6A352C3E55E8AE5ED39DC1BE7FB964B1:0x10002650\n  features:\n    - or:\n      - api: winhttp.WinHttpOpenRequest\n"
+                                           },
+                                           {
+                                               "id":  "4",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "link function at runtime on Windows",
+                                               "description":  "linking/runtime-linking",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetProcAddress"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: link function at runtime on Windows\n    namespace: linking/runtime-linking\n    authors:\n      - moritz.raabe@mandiant.com\n      - mehunhoff@google.com\n    scopes:\n      static: instruction\n      dynamic: call\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x404130\n      - Practical Malware Analysis Lab 01-04.exe_:0x401350\n  features:\n    - and:\n      - os: windows\n      - or:\n        - api: kernel32.GetProcAddress\n        - api: ntdll.LdrGetProcedureAddress\n        - api: ntdll.LdrGetProcedureAddressEx\n        - api: ntdll.LdrGetProcedureAddressForCaller\n        - api: MmGetSystemRoutineAddress\n"
+                                           },
+                                           {
+                                               "id":  "6",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "initialize WinHTTP library",
+                                               "description":  "communication/http",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: WinHttpOpen"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: initialize WinHTTP library\n    namespace: communication/http\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Communication::HTTP Communication::WinHTTP [C0002.008]\n    examples:\n      - 6A352C3E55E8AE5ED39DC1BE7FB964B1:0x1000E670\n  features:\n    - and:\n      - api: winhttp.WinHttpOpen\n"
+                                           },
+                                           {
+                                               "id":  "7",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "set HTTP header",
+                                               "description":  "communication/http",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: WinHttpAddRequestHeaders"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: set HTTP header\n    namespace: communication/http\n    authors:\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Communication::HTTP Communication::Set Header [C0002.013]\n    examples:\n      - 6A352C3E55E8AE5ED39DC1BE7FB964B1:0x1000E230\n  features:\n    - or:\n      - api: winhttp.WinHttpAddRequestHeaders\n      - property/write: System.Net.WebClient::Headers\n      - and:\n        - api: System.Net.WebHeaderCollection::Add\n        - optional:\n          - property/read: System.Net.WebClient::Headers\n"
+                                           },
+                                           {
+                                               "id":  "8",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "parse PE header",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "mnemonic: cmp",
+                                                                  "IMAGE_DOS_SIGNATURE (MZ)",
+                                                                  "IMAGE_NT_SIGNATURE (PE)"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: parse PE header\n    namespace: load-code/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic, operand[1].offset features\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x403DD0\n  features:\n    - and:\n      - os: windows\n      - and:\n        - mnemonic: cmp\n        - or:\n          - number: 0x4550 = IMAGE_NT_SIGNATURE (PE)\n          - and:\n            - number: 0x50\n            - number: 0x45\n        - or:\n          - number: 0x5A4D = IMAGE_DOS_SIGNATURE (MZ)\n          - and:\n            - number: 0x4D\n            - number: 0x5A\n        - optional:\n          - and:\n            - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x30 = IMAGE_NT_HEADERS64.OptionalHeader.ImageBase\n          - basic block:\n            - and:\n              - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n              - 3 or more:\n                - operand[1].offset: 0x4 = IMAGE_NT_HEADERS.FileHeader.Machine\n                - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n                - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n                - operand[1].offset: 0x16 = IMAGE_NT_HEADERS.FileHeader.Characteristics\n                - operand[1].offset: 0x28 = IMAGE_NT_HEADERS.OptionalHeader.AddressOfEntryPoint  # for 32 and 64 bit\n                - or:\n                  - and:\n                    - arch: i386\n                    - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                  - and:\n                    - arch: amd64\n                    - operand[1].offset: 0x30 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n"
+                                           },
+                                           {
+                                               "id":  "10",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check OS version",
+                                               "description":  "host-interaction/os/version",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "johnk3r"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetVersionEx",
+                                                                  "get OS version",
+                                                                  "mnemonic: cmp"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check OS version\n    namespace: host-interaction/os/version\n    authors:\n      - michael.hunhoff@mandiant.com\n      - johnk3r\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic features\n    att\u0026ck:\n      - Discovery::System Information Discovery [T1082]\n    mbc:\n      - Discovery::System Information Discovery [E1082]\n    examples:\n      - 493167E85E45363D09495D0841C30648:0x401000\n  features:\n    - and:\n      - match: get OS version\n      - or:\n        - and:\n          - instruction:\n            - mnemonic: cmp\n            - number: 5 = Windows 2000\n          - optional:\n            - instruction:\n              - mnemonic: cmp\n              - or:\n                - number: 0\n                - number: 1 = Windows XP\n                - number: 2 = Windows XP 64-bit / Windows Server 2003 / Windows Server 2003 R2\n        - and:\n          - instruction:\n            - mnemonic: cmp\n            - number: 6 = Windows Vista / Windows Server 2008\n          - optional:\n            - instruction:\n              - mnemonic: cmp\n              - or:\n                - number: 0\n                - number: 1 = Windows Server 2008 R2 / Windows 7\n                - number: 2 = Windows Server 2012 / Windows 8\n                - number: 3 = Windows Server 2012 R2 / Windows 8.1\n        - and:\n          - instruction:\n            - mnemonic: cmp\n            - number: 10 = Windows Server 2016 / Windows Server 2019 / Windows 10\n          - optional:\n            - instruction:\n              - mnemonic: cmp\n              - number: 0\n"
+                                           },
+                                           {
+                                               "id":  "11",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "reference anti-VM strings targeting VirtualPC",
+                                               "description":  "anti-analysis/anti-vm/vm-detection",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "regex: /SOFTWARE\\\\Microsoft\\\\Virtual Machine\\\\Guest\\\\Parameters/i"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: reference anti-VM strings targeting VirtualPC\n    namespace: anti-analysis/anti-vm/vm-detection\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    att\u0026ck:\n      - Defense Evasion::Virtualization/Sandbox Evasion::System Checks [T1497.001]\n    mbc:\n      - Anti-Behavioral Analysis::Virtual Machine Detection [B0009]\n    references:\n      - https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/AntiVM/VirtualPC.cpp\n    examples:\n      - al-khaser_x86.exe_\n  features:\n    - or:\n      - string: /VirtualPC/i\n      - string: /VMSrvc\\.exe/i\n      - string: /VMUSrvc\\.exe/i\n      - string: /SOFTWARE\\\\Microsoft\\\\Virtual Machine\\\\Guest\\\\Parameters/i\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/AntiVM/VirtualPC.cpp"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "13",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "reference WMI statements",
+                                               "description":  "collection/database/wmi",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "regex: /SELECT\\s+\\*\\s+FROM\\s+Win32_./"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: reference WMI statements\n    namespace: collection/database/wmi\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Collection::Data from Information Repositories [T1213]\n    examples:\n      - al-khaser_x86.exe_:0x433490\n  features:\n    - or:\n      - string: /SELECT\\s+\\*\\s+FROM\\s+CIM_./\n      - string: /SELECT\\s+\\*\\s+FROM\\s+Win32_./\n      - string: /SELECT\\s+\\*\\s+FROM\\s+MSAcpi_./\n"
+                                           },
+                                           {
+                                               "id":  "14",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "connect to WMI namespace via WbemLocator",
+                                               "description":  "host-interaction/wmi",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "regex: /ROOT\\\\CIMV2/i",
+                                                                  "api: CoCreateInstance"
+                                                              ],
+                                               "rule_src":  "# generated using capa explorer for IDA Pro\nrule:\n  meta:\n    name: connect to WMI namespace via WbemLocator\n    namespace: host-interaction/wmi\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Execution::Windows Management Instrumentation [T1047]\n    examples:\n      - al-khaser_x64.exe_:0x14001956e\n      - al-khaser_x86.exe_:0x00445270\n  features:\n    - or:\n      - call:\n        - description: dynamic detection rule\n        - or:\n          - and:\n            - api: ole32.CoCreateInstance\n            - com/class: WbemLocator  # 11 F8 90 45 3A 1D D0 11 89 1F 00 AA 00 4B 2E 24 = CLSID_WbemLocator\n          - and:\n            - match: host-interaction/process/create\n            - or:\n              - string: /wmic(|\\.exe) /i\n              - string: /Register-WMIEvent /i\n      - and:\n        - description: static detection rule\n        - basic block:\n          - and:\n            - api: ole32.CoCreateInstance\n            - com/class: WbemLocator  # 11 F8 90 45 3A 1D D0 11 89 1F 00 AA 00 4B 2E 24 = CLSID_WbemLocator\n            - com/interface: IWbemLocator  # 87 A6 12 DC 7F 73 CF 11 88 4D 00 AA 00 4B 2E 24 = IID_IWbemLocator\n        - basic block:\n          - or:\n            - and:\n              - arch: i386\n              - offset: 0xC = ppv-\u003eConnectServer\n            - and:\n              - arch: amd64\n              - offset: 0x18 = ppv-\u003eConnectServer\n        - optional:\n          - string: /ROOT\\\\CIMV2/i\n          - string: /ROOT\\\\DEFAULT/i\n"
+                                           },
+                                           {
+                                               "id":  "15",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check if file exists",
+                                               "description":  "host-interaction/file-system/exists",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "mnemonic: cmp",
+                                                                  "api: GetLastError",
+                                                                  "ERROR_FILE_NOT_FOUND"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check if file exists\n    namespace: host-interaction/file-system/exists\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    examples:\n      - 31600AD0D1A7EA615690DF111AE36C73:0x401284\n  features:\n    - or:\n      - basic block:\n        - and:\n          - api: kernel32.GetFileAttributes\n          - instruction:\n            - mnemonic: cmp\n            - number: 0xFFFFFFFF = INVALID_FILE_ATTRIBUTES\n      - basic block:\n        - and:\n          - api: kernel32.GetLastError\n          - instruction:\n            - mnemonic: cmp\n            - number: 2 = ERROR_FILE_NOT_FOUND\n      - api: shlwapi.PathFileExists\n      - api: System.IO.File::Exists\n      - property/read: System.IO.FileSystemInfo::Exists\n"
+                                           },
+                                           {
+                                               "id":  "17",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "query or enumerate registry value",
+                                               "description":  "host-interaction/registry",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "create or open registry key",
+                                                                  "api: RegQueryValueEx",
+                                                                  "api: RegOpenKeyEx"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: query or enumerate registry value\n    namespace: host-interaction/registry\n    authors:\n      - william.ballenthin@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::Query Registry [T1012]\n    mbc:\n      - Operating System::Registry::Query Registry Value [C0036.006]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13145B5A\n      - Practical Malware Analysis Lab 03-02.dll_:0x100047AD\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegGetValue\n        - api: advapi32.RegEnumValue\n        - api: advapi32.RegQueryValue\n        - api: advapi32.RegQueryValueEx\n        - api: advapi32.RegQueryMultipleValues\n        - api: ZwQueryValueKey\n        - api: ZwEnumerateValueKey\n        - api: NtQueryValueKey\n        - api: NtEnumerateValueKey\n        - api: RtlQueryRegistryValues\n        - api: SHGetValue\n        - api: SHEnumValue\n        - api: SHRegGetInt\n        - api: SHRegGetPath\n        - api: SHRegGetValue\n        - api: SHQueryValueEx\n        - api: SHRegGetUSValue\n        - api: SHOpenRegStream\n        - api: SHRegEnumUSValue\n        - api: SHOpenRegStream2\n        - api: SHRegQueryUSValue\n        - api: SHRegGetBoolUSValue\n        - api: SHRegGetValueFromHKCUHKLM\n        - api: SHRegGetBoolValueFromHKCUHKLM\n        - api: Microsoft.Win32.RegistryKey::GetValue\n        - api: Microsoft.Win32.RegistryKey::GetValueKind\n        - api: Microsoft.Win32.RegistryKey::GetValueNames\n        - api: Microsoft.Win32.Registry::GetValue\n"
+                                           },
+                                           {
+                                               "id":  "18",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "read HTTP header",
+                                               "description":  "communication/http",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: WinHttpQueryHeaders"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: read HTTP header\n    namespace: communication/http\n    authors:\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Communication::HTTP Communication::Read Header [C0002.014]\n    examples:\n      - 6A352C3E55E8AE5ED39DC1BE7FB964B1:0x10002A30\n  features:\n    - or:\n      - api: winhttp.WinHttpQueryHeaders\n      - property/read: System.Net.WebClient::Headers\n"
+                                           },
+                                           {
+                                               "id":  "19",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "print debug messages",
+                                               "description":  "host-interaction/log/debug/write-event",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: OutputDebugString"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: print debug messages\n    namespace: host-interaction/log/debug/write-event\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    examples:\n      - 493167E85E45363D09495D0841C30648:0x401000\n  features:\n    - or:\n      - api: DbgPrint\n      - api: kernel32.OutputDebugString\n      - and:\n        - os: android\n        - api: __android_log_print\n"
+                                           },
+                                           {
+                                               "id":  "20",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "hash data via BCrypt",
+                                               "description":  "data-manipulation/hashing",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: BCryptOpenAlgorithmProvider",
+                                                                  "api: BCryptFinishHash",
+                                                                  "api: BCryptHashData"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: hash data via BCrypt\n    namespace: data-manipulation/hashing\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Defense Evasion::Obfuscated Files or Information [T1027]\n    mbc:\n      - Cryptography::Cryptographic Hash [C0029]\n  features:\n    - and:\n      - or:\n        - api: BCryptHash\n        - and:\n          - api: BCryptHashData\n          - optional:\n            - api: BCryptFinishHash\n            - api: BCryptDestroyHash\n            - api: BCryptCreateHash\n      - optional:\n        - api: BCryptOpenAlgorithmProvider\n        - api: BCryptCloseAlgorithmProvider\n"
+                                           },
+                                           {
+                                               "id":  "21",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check HTTP status code",
+                                               "description":  "communication/http/client",
+                                               "authors":  [
+                                                               "@mr-tz"
+                                                           ],
+                                               "match_data":  [
+                                                                  "mnemonic: cmp",
+                                                                  "HTTP_QUERY_FLAG_NUMBER | HTTP_QUERY_STATUS_CODE",
+                                                                  "OK"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check HTTP status code\n    namespace: communication/http/client\n    authors:\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic features\n    mbc:\n      - Communication::HTTP Communication::Read Header [C0002.014]\n    examples:\n      - 54ac78733552a62d1d05ea4ba3fc604bb49fe000d7fc948da45335b726e64d75:0x10001a20\n      - Practical Malware Analysis Lab 03-02.dll_:0x10004452\n  features:\n    - and:\n      - os: windows\n      - or:\n        - number: 0x20000013 = HTTP_QUERY_FLAG_NUMBER | HTTP_QUERY_STATUS_CODE\n        - number: 0x13 = HTTP_QUERY_STATUS_CODE\n      - optional:\n        - api: atoi\n        - api: wininet.HttpQueryInfo\n      - instruction:\n        - and:\n          - or:\n            - mnemonic: cmp\n            - mnemonic: test\n          - or:\n            - number: 200 = OK\n            - number: 400 = Bad Request\n            - number: 401 = Unauthorized\n            - number: 403 = Forbidden\n            - number: 404 = Not Found\n"
+                                           },
+                                           {
+                                               "id":  "22",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "receive HTTP response",
+                                               "description":  "communication/http/client",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: WinHttpReceiveResponse",
+                                                                  "api: WinHttpReadData",
+                                                                  "api: WinHttpQueryDataAvailable"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: receive HTTP response\n    namespace: communication/http/client\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Communication::HTTP Communication::Get Response [C0002.017]\n    examples:\n      - 6A352C3E55E8AE5ED39DC1BE7FB964B1:0x10002790\n  features:\n    - or:\n      - api: System.Net.WebRequest::GetResponse\n      - api: winhttp.WinHttpReceiveResponse\n      - and:\n        - api: winhttp.WinHttpReadData\n        - optional:\n          - api: winhttp.WinHttpQueryDataAvailable\n"
+                                           },
+                                           {
+                                               "id":  "23",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "enumerate PE sections",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "@Ana06",
+                                                               "@mr-tz"
+                                                           ],
+                                               "match_data":  [
+                                                                  "mnemonic: movzx"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: enumerate PE sections\n    namespace: load-code/pe\n    authors:\n      - \"@Ana06\"\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: unsupported  # requires offset, operand[1].offset, characteristic, mnemonic, basicblock features\n    mbc:\n      - Discovery::Code Discovery::Enumerate PE Sections [B0046.001]\n    references:\n      - https://0x00sec.org/t/reflective-dll-injection/3080\n      - https://www.ired.team/offensive-security/code-injection-process-injection/reflective-dll-injection\n    examples:\n      - E4C33AC3638EEF68311F8AC0D72483C7:0x401510\n  features:\n    - and:\n      - os: windows\n      # there should be some complexity to functions like this\n      - count(basic blocks): 3 or more\n      - optional:\n        - offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n      - instruction:\n        - or:\n          - mnemonic: mov\n          - mnemonic: movzx\n        - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n      - basic block:\n        - or:\n          - and:\n            - description: IMAGE_FIRST_SECTION(nt_header)\n            - instruction:\n              - or:\n                - mnemonic: add\n                - mnemonic: mov\n                - mnemonic: movzx\n              - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n            - operand[1].offset: 0x18 = FileHeader.SizeOfOptionalHeader\n          - and:\n            - description: (DWORD)dll_raw + dos_header-\u003ee_lfanew + sizeof(IMAGE_NT_HEADERS) + sizeof(IMAGE_SECTION_HEADER) * i\n            - number: 0x28 = sizeof(IMAGE_SECTION_HEADER)\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0xF8 = sizeof(IMAGE_NT_HEADERS32)\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x108 = sizeof(IMAGE_NT_HEADERS64)\n      - 2 or more:\n        - operand[1].offset: 0xC = IMAGE_SECTION_HEADER.VirtualAddress\n        - operand[1].offset: 0x14 = IMAGE_SECTION_HEADER.PointerToRawData\n        - operand[1].offset: 0x10 = IMAGE_SECTION_HEADER.SizeOfRawData\n        # there\u0027s also offset 0x8 = IMAGE_SECTION_HEADER.Misc.PhysicalAddress, but it\u0027s likely too common\n      - not:\n        # non-zeroing XOR was observed in FPs\n        - characteristic: nzxor\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://0x00sec.org/t/reflective-dll-injection/3080"
+                                                            },
+                                                            {
+                                                                "ref":  "https://www.ired.team/offensive-security/code-injection-process-injection/reflective-dll-injection"
+                                                            }
+                                                        ]
+                                           }
+                                       ],
+                 "mbc":  [
+                             {
+                                 "id":  "C0042",
+                                 "objective":  "Process",
+                                 "behavior":  "Create Mutex",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "1"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0002.012",
+                                 "objective":  "Communication",
+                                 "behavior":  "HTTP Communication",
+                                 "method":  "Create Request",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "3"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0002.008",
+                                 "objective":  "Communication",
+                                 "behavior":  "HTTP Communication",
+                                 "method":  "WinHTTP",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "6"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0002.013",
+                                 "objective":  "Communication",
+                                 "behavior":  "HTTP Communication",
+                                 "method":  "Set Header",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "7"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1082",
+                                 "objective":  "Discovery",
+                                 "behavior":  "System Information Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "10"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0009",
+                                 "objective":  "Anti-Behavioral Analysis",
+                                 "behavior":  "Virtual Machine Detection",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "11"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1083",
+                                 "objective":  "Discovery",
+                                 "behavior":  "File and Directory Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "15"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.006",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Query Registry Value",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "17"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0002.014",
+                                 "objective":  "Communication",
+                                 "behavior":  "HTTP Communication",
+                                 "method":  "Read Header",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "18"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0029",
+                                 "objective":  "Cryptography",
+                                 "behavior":  "Cryptographic Hash",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "20"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0002.014",
+                                 "objective":  "Communication",
+                                 "behavior":  "HTTP Communication",
+                                 "method":  "Read Header",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "21"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0002.017",
+                                 "objective":  "Communication",
+                                 "behavior":  "HTTP Communication",
+                                 "method":  "Get Response",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "22"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0046.001",
+                                 "objective":  "Discovery",
+                                 "behavior":  "Code Discovery",
+                                 "method":  "Enumerate PE Sections",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "23"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "2164",
+                                            "name":  "%windir%\\System32\\svchost.exe -k WerSvcGroup"
+                                        },
+                                        {
+                                            "process_id":  "2764",
+                                            "name":  "wmiadap.exe /F /T /R"
+                                        },
+                                        {
+                                            "process_id":  "2528",
+                                            "name":  "%SANDBOX_DLL_LOADER_X86% %TEMP%\\HNN00YY1TAODQXVP.dll %WORKDIR% 483",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "2604",
+                                                                 "name":  "rundll32.exe %TEMP%\\HNN00YY1TAODQXVP.dll,DllCsiGetHandler"
+                                                             },
+                                                             {
+                                                                 "process_id":  "2596",
+                                                                 "name":  "rundll32.exe %TEMP%\\HNN00YY1TAODQXVP.dll,DllCanUnloadNow"
+                                                             }
+                                                         ]
+                                        },
+                                        {
+                                            "process_id":  "2808",
+                                            "name":  "%windir%\\system32\\wbem\\wmiprvse.exe"
+                                        }
+                                    ],
+                 "verdicts":  [
+                                  "UNKNOWN_VERDICT"
+                              ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "link function at runtime on Windows",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "4"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "parse PE header",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "8"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "check OS version",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "10"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1497.001",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "reference anti-VM strings targeting VirtualPC",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "11"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1213",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "reference WMI statements",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "13"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1047",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "connect to WMI namespace via WbemLocator",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "14"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1083",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "check if file exists",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "15"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1012",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "query or enumerate registry value",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "17"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1027",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "hash data via BCrypt",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "20"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "attack_techniques":  {
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "link function at runtime on Windows",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "4"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "parse PE header",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "8"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1082":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "check OS version",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "10"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1497.001":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "reference anti-VM strings targeting VirtualPC",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "11"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1213":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "reference WMI statements",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "13"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1047":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "connect to WMI namespace via WbemLocator",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "14"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1083":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "check if file exists",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "15"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1012":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "query or enumerate registry value",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "17"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1027":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "hash data via BCrypt",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "20"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

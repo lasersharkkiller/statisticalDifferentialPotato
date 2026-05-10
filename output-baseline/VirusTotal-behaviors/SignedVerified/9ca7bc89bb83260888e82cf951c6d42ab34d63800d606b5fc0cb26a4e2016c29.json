@@ -1,0 +1,564 @@
+{
+    "data":  {
+                 "mbc":  [
+                             {
+                                 "id":  "E1027.m02",
+                                 "objective":  "Defense Evasion",
+                                 "behavior":  "Obfuscated Files or Information",
+                                 "method":  "Encoding-Standard Algorithm",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "encode data using XOR"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0026.002",
+                                 "objective":  "Data",
+                                 "behavior":  "Encode Data",
+                                 "method":  "XOR",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "encode data using XOR"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0042",
+                                 "objective":  "Process",
+                                 "behavior":  "Create Mutex",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "create mutex"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1083",
+                                 "objective":  "Discovery",
+                                 "behavior":  "File and Directory Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "check if file exists"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.006",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Query Registry Value",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "query or enumerate registry value"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.007",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Delete Registry Value",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "delete registry value"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.001",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Set Registry Key",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "set registry value"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.005",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Query Registry Key",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "query or enumerate registry key"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "signature_matches":  [
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "link function at runtime on Windows",
+                                               "description":  "linking/runtime-linking",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: link function at runtime on Windows\n    namespace: linking/runtime-linking\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: instruction\n      dynamic: call\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x404130\n      - Practical Malware Analysis Lab 01-04.exe_:0x401350\n  features:\n    - and:\n      - os: windows\n      - or:\n        - api: kernel32.GetProcAddress\n        - api: ntdll.LdrGetProcedureAddress\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get file system object information",
+                                               "description":  "host-interaction/file-system",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get file system object information\n    namespace: host-interaction/file-system\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    att\u0026ck:\n      - Discovery::File and Directory Discovery [T1083]\n    examples:\n      - 50D5EE1CE2CA5E30C6B1019EE64EEEC2:0x403538\n  features:\n    - or:\n      - api: SHGetFileInfo\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "encode data using XOR",
+                                               "description":  "data-manipulation/encoding/xor",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: encode data using XOR\n    namespace: data-manipulation/encoding/xor\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: unsupported  # requires characteristic, Not features\n    att\u0026ck:\n      - Defense Evasion::Obfuscated Files or Information [T1027]\n    mbc:\n      - Defense Evasion::Obfuscated Files or Information::Encoding-Standard Algorithm [E1027.m02]\n      - Data::Encode Data::XOR [C0026.002]\n    examples:\n      - 2D3EDC218A90F03089CC01715A9F047F:0x403D7E\n  features:\n    - and:\n      - characteristic: tight loop\n      - characteristic: nzxor\n      - not:\n        - description: filter for potential false positives\n        - or:\n          - or:\n            - description: unsigned bitwise negation operation (~i)\n            - number: 0xFFFFFFFF = bitwise negation for unsigned 32 bits\n            - number: 0xFFFFFFFFFFFFFFFF = bitwise negation for unsigned 64 bits\n          - or:\n            - description: signed bitwise negation operation (~i)\n            - number: 0x0FFFFFFF = bitwise negation for signed 32 bits\n            - number: 0x0FFFFFFFFFFFFFFF = bitwise negation for signed 64 bits\n          - or:\n            - description: Magic constants used in the implementation of strings functions.\n            # such as `strlen` and `strcat` in the Windows standard library:\n            # (((i - 0x81010101) ^ ~i) \u0026 0x81010100)\n            ## 32 bits\n            - number: 0x7EFEFEFF = optimized string constant for 32 bits\n            - number: 0x81010101 = -0x81010101 = 0x7EFEFEFF\n            - number: 0x81010100 = 0x81010100 = ~0x7EFEFEFF\n            ## 64 bits\n            - number: 0x7EFEFEFEFEFEFEFF = optimized string constant for 64 bits\n            - number: 0x8101010101010101 = -0x8101010101010101 = 0x7EFEFEFEFEFEFEFF\n            - number: 0x8101010101010100 = 0x8101010101010100 = ~0x7EFEFEFEFEFEFEFF\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "print debug messages",
+                                               "description":  "host-interaction/log/debug/write-event",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: print debug messages\n    namespace: host-interaction/log/debug/write-event\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    examples:\n      - 493167E85E45363D09495D0841C30648:0x401000\n  features:\n    - or:\n      - api: DbgPrint\n      - api: kernel32.OutputDebugString\n      - and:\n        - os: android\n        - api: __android_log_print\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create mutex",
+                                               "description":  "host-interaction/mutex",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create mutex\n    namespace: host-interaction/mutex\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Process::Create Mutex [C0042]\n    examples:\n      - Practical Malware Analysis Lab 01-01.dll_:0x10001010\n  features:\n    - or:\n      - api: kernel32.CreateMutex\n      - api: kernel32.CreateMutexEx\n      - api: System.Threading.Mutex::ctor\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check if file exists",
+                                               "description":  "host-interaction/file-system/exists",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check if file exists\n    namespace: host-interaction/file-system/exists\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    examples:\n      - 31600AD0D1A7EA615690DF111AE36C73:0x401284\n  features:\n    - or:\n      - basic block:\n        - and:\n          - api: kernel32.GetFileAttributes\n          - instruction:\n            - mnemonic: cmp\n            - number: 0xFFFFFFFF = INVALID_FILE_ATTRIBUTES\n      - basic block:\n        - and:\n          - api: kernel32.GetLastError\n          - instruction:\n            - mnemonic: cmp\n            - number: 2 = ERROR_FILE_NOT_FOUND\n      - api: shlwapi.PathFileExists\n      - api: System.IO.File::Exists\n      - property/read: System.IO.FileSystemInfo::Exists\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "query or enumerate registry value",
+                                               "description":  "host-interaction/registry",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: query or enumerate registry value\n    namespace: host-interaction/registry\n    authors:\n      - william.ballenthin@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    att\u0026ck:\n      - Discovery::Query Registry [T1012]\n    mbc:\n      - Operating System::Registry::Query Registry Value [C0036.006]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13145B5A\n      - Practical Malware Analysis Lab 03-02.dll_:0x100047AD\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegGetValue\n        - api: advapi32.RegEnumValue\n        - api: advapi32.RegQueryValue\n        - api: advapi32.RegQueryValueEx\n        - api: advapi32.RegQueryMultipleValues\n        - api: ZwQueryValueKey\n        - api: ZwEnumerateValueKey\n        - api: NtQueryValueKey\n        - api: NtEnumerateValueKey\n        - api: RtlQueryRegistryValues\n        - api: SHGetValue\n        - api: SHEnumValue\n        - api: SHRegGetInt\n        - api: SHRegGetPath\n        - api: SHRegGetValue\n        - api: SHQueryValueEx\n        - api: SHRegGetUSValue\n        - api: SHOpenRegStream\n        - api: SHRegEnumUSValue\n        - api: SHOpenRegStream2\n        - api: SHRegQueryUSValue\n        - api: SHRegGetBoolUSValue\n        - api: SHRegGetValueFromHKCUHKLM\n        - api: SHRegGetBoolValueFromHKCUHKLM\n        - api: Microsoft.Win32.RegistryKey::GetValue\n        - api: Microsoft.Win32.RegistryKey::GetValueKind\n        - api: Microsoft.Win32.RegistryKey::GetValueNames\n        - api: Microsoft.Win32.Registry::GetValue\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "delete registry value",
+                                               "description":  "host-interaction/registry/delete",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: delete registry value\n    namespace: host-interaction/registry/delete\n    authors:\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    att\u0026ck:\n      - Defense Evasion::Modify Registry [T1112]\n    mbc:\n      - Operating System::Registry::Delete Registry Value [C0036.007]\n    examples:\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x4041A0\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegDeleteValue\n        - api: advapi32.RegDeleteKeyValue\n        - api: ZwDeleteValueKey\n        - api: NtDeleteValueKey\n        - api: RtlDeleteRegistryValue\n        - api: SHDeleteValue\n        - api: SHRegDeleteUSValue\n        - api: Microsoft.Win32.RegistryKey::DeleteValue\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "set registry value",
+                                               "description":  "host-interaction/registry/create",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: set registry value\n    namespace: host-interaction/registry/create\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    mbc:\n      - Operating System::Registry::Set Registry Key [C0036.001]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13147AF0\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x40433E\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x40415E\n      - 98c37c3c23bbfb362dac7754c6ba48e75cf24d73bc963a4cdfca557b9e016909:0x40294D\n  features:\n    - or:\n      - and:\n        - optional:\n          - match: create or open registry key\n        - or:\n          - api: advapi32.RegSetValue\n          - api: advapi32.RegSetValueEx\n          - api: advapi32.RegSetKeyValue\n          - api: ZwSetValueKey\n          - api: NtSetValueKey\n          - api: RtlWriteRegistryValue\n          - api: SHSetValue\n          - api: SHRegSetPath\n          - api: SHRegSetValue\n          - api: SHRegSetUSValue\n          - api: SHRegWriteUSValue\n          - api: Microsoft.Win32.RegistryKey::SetValue\n          - api: Microsoft.Win32.Registry::SetValue\n      - and:\n        - match: host-interaction/process/create\n        - string: \"/add/i\"\n        - or:\n          - string: \"/reg(|.exe)/i\"\n          - string: \"/hklm/i\"\n          - string: \"/HKEY_LOCAL_MACHINE/i\"\n          - string: \"/hkcu/i\"\n          - string: \"/HKEY_CURRENT_USER/i\"\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "query or enumerate registry key",
+                                               "description":  "host-interaction/registry",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: query or enumerate registry key\n    namespace: host-interaction/registry\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    att\u0026ck:\n      - Discovery::Query Registry [T1012]\n    mbc:\n      - Operating System::Registry::Query Registry Key [C0036.005]\n    examples:\n      - 493167E85E45363D09495D0841C30648:0x404930\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x402608\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegEnumKey\n        - api: advapi32.RegEnumKeyEx\n        - api: advapi32.RegQueryInfoKeyA\n        - api: ZwQueryKey\n        - api: ZwEnumerateKey\n        - api: NtQueryKey\n        - api: NtEnumerateKey\n        - api: RtlCheckRegistryKey\n        - api: SHEnumKeyEx\n        - api: SHQueryInfoKey\n        - api: SHRegEnumUSKey\n        - api: SHRegQueryInfoUSKey\n        - api: Microsoft.Win32.RegistryKey::GetSubKeyNames\n        - api: Microsoft.Win32.RegistryKey::OpenBaseKey\n        - api: Microsoft.Win32.RegistryKey::OpenRemoteBaseKey\n        - api: Microsoft.Win32.RegistryKey::OpenSubKey\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "query service status",
+                                               "description":  "host-interaction/service",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: query service status\n    namespace: host-interaction/service\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Service Discovery [T1007]\n    examples:\n      - 9DC209F66DA77858E362E624D0BE86B3:0x403C70\n  features:\n    - or:\n      - api: advapi32.QueryServiceStatusEx\n      - api: advapi32.QueryServiceStatus\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "start service",
+                                               "description":  "host-interaction/service/start",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: start service\n    namespace: host-interaction/service/start\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    att\u0026ck:\n      - Persistence::Create or Modify System Process::Windows Service [T1543.003]\n    examples:\n      - E544A4D616B60147D9774B48C2B65EF2:0x401FA0\n  features:\n    - and:\n      - optional:\n        - match: get service handle\n      - api: advapi32.StartService\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "enumerate services",
+                                               "description":  "host-interaction/service/list",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: enumerate services\n    namespace: host-interaction/service/list\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Service Discovery [T1007]\n    examples:\n      - Practical Malware Analysis Lab 05-01.dll_:0x1000B823\n  features:\n    - or:\n      - api: advapi32.EnumServicesStatus\n      - api: advapi32.EnumServicesStatusEx\n      - api: advapi32.EnumDependentServices\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "stop service",
+                                               "description":  "host-interaction/service/stop",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: stop service\n    namespace: host-interaction/service/stop\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    att\u0026ck:\n      - Persistence::Create or Modify System Process::Windows Service [T1543.003]\n      - Impact::Service Stop [T1489]\n    examples:\n      - E544A4D616B60147D9774B48C2B65EF2:0x402140\n  features:\n    - and:\n      - optional:\n        - match: get service handle\n      - or:\n        - basic block:\n          - and:\n            - number: 0x1 = SERVICE_CONTROL_STOP\n            - or:\n              - api: advapi32.ControlService\n              - api: advapi32.ControlServiceEx\n        - call:\n          - and:\n            - number: 0x1 = SERVICE_CONTROL_STOP\n            - or:\n              - api: advapi32.ControlService\n              - api: advapi32.ControlServiceEx\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "extract resource via kernel32 functions",
+                                               "description":  "executable/resource",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: extract resource via kernel32 functions\n    namespace: executable/resource\n    authors:\n      - william.ballenthin@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    examples:\n      - BF88E1BD4A3BDE10B419A622278F1FF7:0x401000\n      - Practical Malware Analysis Lab 01-04.exe_:0x4011FC\n      # ntdll\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x140001ABA\n  features:\n    - or:\n      - and:\n        - or:\n          - api: kernel32.LoadResource\n          - api: kernel32.LockResource\n          - api: LdrAccessResource\n        - optional:\n          - api: kernel32.GetModuleHandle\n          # may occur in parent function, see 0664B09A86EC2DF7DFE01A93E184A1FA23DF66EA82CAB39000944E418EC1F7B2\n          - or:\n            - api: kernel32.FindResource\n            - api: kernel32.FindResourceEx\n            - api: LdrFindResource_U\n            - api: LdrFindResourceEx_U\n          - api: kernel32.SizeofResource\n          - api: kernel32.FreeResource\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get geographical location",
+                                               "description":  "collection",
+                                               "authors":  [
+                                                               "moritz.raabe",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "# generated using capa explorer for IDA Pro\nrule:\n  meta:\n    name: get geographical location\n    namespace: collection\n    authors:\n      - moritz.raabe\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    att\u0026ck:\n      - Discovery::System Location Discovery [T1614]\n    examples:\n      - 9879D201DC5ACA863F357184CD1F170E:0x10001A99\n  features:\n    - or:\n      - api: GetLocaleInfo\n      - api: GetLocaleInfoEx\n      - api: kernel32.GetUserGeoID\n      - api: kernel32.GetGeoInfo\n      # strings part of requests or parsed from response\n      # \"geo\" and \"zip\" are too short\n      # \"region\" results in FPs mostly related to memory\n      - string: /geolocation/i\n      - string: /geo-location/i\n      - string: /^city/i\n      - string: /region_code/i\n      - string: /region_name/i\n      - string: /^country/i\n      - string: /country_code/i\n      - string: /countrycode/i\n      - string: /country_name/i\n      - string: /continent_code/i\n      - string: /continent_name/i\n      - string: /^latitude/i\n      - string: /^longitude/i\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "implement COM DLL",
+                                               "description":  "executable/pe",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: implement COM DLL\n    namespace: executable/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    references:\n      - https://learn.microsoft.com/en-us/windows/win32/api/combaseapi/nf-combaseapi-dllgetclassobject\n  features:\n    - and:\n      - export: DllGetClassObject\n      - optional:\n        - export: DllRegisterServer\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://learn.microsoft.com/en-us/windows/win32/api/combaseapi/nf-combaseapi-dllgetclassobject"
+                                                            }
+                                                        ]
+                                           }
+                                       ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "link function at runtime on Windows",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "link function at runtime on Windows"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1083",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get file system object information",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "get file system object information"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1027",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "encode data using XOR",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "encode data using XOR"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1083",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "check if file exists",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "check if file exists"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1012",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "query or enumerate registry value",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "query or enumerate registry value"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1112",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "delete registry value",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "delete registry value"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1012",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "query or enumerate registry key",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "query or enumerate registry key"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1007",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "query service status",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "query service status"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1543.003",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "start service",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "start service"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1007",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "enumerate services",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "enumerate services"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1543.003",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "stop service",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "stop service"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1489",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "stop service",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "stop service"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1614",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get geographical location",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "get geographical location"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "attack_techniques":  {
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "link function at runtime on Windows",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "link function at runtime on Windows"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1083":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get file system object information",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "get file system object information"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "check if file exists",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "check if file exists"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1027":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "encode data using XOR",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "encode data using XOR"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1012":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "query or enumerate registry value",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "query or enumerate registry value"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "query or enumerate registry key",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "query or enumerate registry key"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1112":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "delete registry value",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "delete registry value"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1007":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "query service status",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "query service status"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "enumerate services",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "enumerate services"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1543.003":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "start service",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "start service"
+                                                                              }
+                                                                          ]
+                                                             },
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "stop service",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "stop service"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1489":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "stop service",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "stop service"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1614":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get geographical location",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "get geographical location"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

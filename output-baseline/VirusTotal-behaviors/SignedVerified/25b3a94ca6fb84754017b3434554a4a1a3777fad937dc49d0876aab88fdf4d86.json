@@ -1,0 +1,409 @@
+{
+  "data": {
+    "signature_matches": [
+      {
+        "id": "0",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "encode data using XOR",
+        "description": "data-manipulation/encoding/xor",
+        "authors": [
+          "moritz.raabe@mandiant.com"
+        ],
+        "match_data": [
+          "nzxor",
+          "tight loop"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: encode data using XOR\n    namespace: data-manipulation/encoding/xor\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: unsupported  # requires characteristic, Not features\n    att&ck:\n      - Defense Evasion::Obfuscated Files or Information [T1027]\n    mbc:\n      - Defense Evasion::Obfuscated Files or Information::Encoding-Standard Algorithm [E1027.m02]\n      - Data::Encode Data::XOR [C0026.002]\n    examples:\n      - 2D3EDC218A90F03089CC01715A9F047F:0x403D7E\n  features:\n    - and:\n      - characteristic: tight loop\n      - characteristic: nzxor\n      - not:\n        - description: filter for potential false positives\n        - or:\n          - or:\n            - description: unsigned bitwise negation operation (~i)\n            - number: 0xFFFFFFFF = bitwise negation for unsigned 32 bits\n            - number: 0xFFFFFFFFFFFFFFFF = bitwise negation for unsigned 64 bits\n          - or:\n            - description: signed bitwise negation operation (~i)\n            - number: 0x0FFFFFFF = bitwise negation for signed 32 bits\n            - number: 0x0FFFFFFFFFFFFFFF = bitwise negation for signed 64 bits\n          - or:\n            - description: Magic constants used in the implementation of strings functions.\n            # such as `strlen` and `strcat` in the Windows standard library:\n            # (((i - 0x81010101) ^ ~i) & 0x81010100)\n            ## 32 bits\n            - number: 0x7EFEFEFF = optimized string constant for 32 bits\n            - number: 0x81010101 = -0x81010101 = 0x7EFEFEFF\n            - number: 0x81010100 = 0x81010100 = ~0x7EFEFEFF\n            ## 64 bits\n            - number: 0x7EFEFEFEFEFEFEFF = optimized string constant for 64 bits\n            - number: 0x8101010101010101 = -0x8101010101010101 = 0x7EFEFEFEFEFEFEFF\n            - number: 0x8101010101010100 = 0x8101010101010100 = ~0x7EFEFEFEFEFEFEFF\n"
+      },
+      {
+        "id": "2",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "complete processing asynchronous IO request",
+        "description": "host-interaction/driver : signals that driver has finished all processing for a given IRP (part of major function)",
+        "authors": [
+          "moritz.raabe@mandiant.com"
+        ],
+        "match_data": [
+          "api: IofCompleteRequest"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: complete processing asynchronous IO request\n    namespace: host-interaction/driver\n    authors:\n      - moritz.raabe@mandiant.com\n    description: signals that driver has finished all processing for a given IRP (part of major function)\n    scopes:\n      static: basic block\n      dynamic: span of calls\n    examples:\n      - Practical Malware Analysis Lab 10-03.sys_:0x10666\n  features:\n    - or:\n      - api: IoCompleteRequest\n      - api: IofCompleteRequest\n"
+      },
+      {
+        "id": "3",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "contain obfuscated stackstrings",
+        "description": "anti-analysis/obfuscation/string/stackstring",
+        "authors": [
+          "moritz.raabe@mandiant.com"
+        ],
+        "match_data": [
+          "stack string"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: contain obfuscated stackstrings\n    namespace: anti-analysis/obfuscation/string/stackstring\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: unsupported\n    att&ck:\n      - Defense Evasion::Obfuscated Files or Information::Indicator Removal from Tools [T1027.005]\n    mbc:\n      - Anti-Static Analysis::Executable Code Obfuscation::Argument Obfuscation [B0032.020]\n      - Anti-Static Analysis::Executable Code Obfuscation::Stack Strings [B0032.017]\n    examples:\n      - Practical Malware Analysis Lab 16-03.exe_:0x4013D0\n  features:\n    - characteristic: stack string\n"
+      },
+      {
+        "id": "4",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "create device object",
+        "description": "host-interaction/driver",
+        "authors": [
+          "@mr-tz"
+        ],
+        "match_data": [
+          "api: IoCreateDevice"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: create device object\n    namespace: host-interaction/driver\n    authors:\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: span of calls\n    examples:\n      - Practical Malware Analysis Lab 10-03.sys_:0x00010706\n  features:\n    - and:\n      - api: IoCreateDevice\n      - optional:\n        - description: sets up a symbolic link between a device object name and a user-visible name for the device\n        - api: IoCreateSymbolicLink\n"
+      },
+      {
+        "id": "5",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "query or enumerate registry value",
+        "description": "host-interaction/registry",
+        "authors": [
+          "william.ballenthin@mandiant.com",
+          "michael.hunhoff@mandiant.com",
+          "anushka.virgaonkar@mandiant.com"
+        ],
+        "match_data": [
+          "create or open registry key",
+          "api: ZwOpenKey",
+          "api: ZwQueryValueKey"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: query or enumerate registry value\n    namespace: host-interaction/registry\n    authors:\n      - william.ballenthin@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att&ck:\n      - Discovery::Query Registry [T1012]\n    mbc:\n      - Operating System::Registry::Query Registry Value [C0036.006]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13145B5A\n      - Practical Malware Analysis Lab 03-02.dll_:0x100047AD\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegGetValue\n        - api: advapi32.RegEnumValue\n        - api: advapi32.RegQueryValue\n        - api: advapi32.RegQueryValueEx\n        - api: advapi32.RegQueryMultipleValues\n        - api: ZwQueryValueKey\n        - api: ZwEnumerateValueKey\n        - api: NtQueryValueKey\n        - api: NtEnumerateValueKey\n        - api: RtlQueryRegistryValues\n        - api: SHGetValue\n        - api: SHEnumValue\n        - api: SHRegGetInt\n        - api: SHRegGetPath\n        - api: SHRegGetValue\n        - api: SHQueryValueEx\n        - api: SHRegGetUSValue\n        - api: SHOpenRegStream\n        - api: SHRegEnumUSValue\n        - api: SHOpenRegStream2\n        - api: SHRegQueryUSValue\n        - api: SHRegGetBoolUSValue\n        - api: SHRegGetValueFromHKCUHKLM\n        - api: SHRegGetBoolValueFromHKCUHKLM\n        - api: Microsoft.Win32.RegistryKey::GetValue\n        - api: Microsoft.Win32.RegistryKey::GetValueKind\n        - api: Microsoft.Win32.RegistryKey::GetValueNames\n        - api: Microsoft.Win32.Registry::GetValue\n"
+      },
+      {
+        "id": "7",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "resolve function by parsing PE exports",
+        "description": "load-code/pe",
+        "authors": [
+          "sara-rn"
+        ],
+        "match_data": [
+          "loop",
+          "mnemonic: movzx"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: resolve function by parsing PE exports\n    namespace: load-code/pe\n    authors:\n      - sara-rn\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic, offset, mnemonic features\n    examples:\n      - 73CE04892E5F39EC82B00C02FC04C70F:0x406BA1\n  features:\n    - and:\n      - os: windows\n      - or:\n        - characteristic: loop\n        - mnemonic: movzx\n      - and:\n        - offset: 0x3C = IMAGE_DOS_HEADER.PE.e_lfanew\n        - or:\n          - and:\n            - arch: i386\n            - offset: 0x78 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n          - and:\n            - arch: amd64\n            - offset: 0x88 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n        - 3 or more:\n          - offset: 0x14 = IMAGE_EXPORT_DIRECTORY.NumberOfFunctions\n          - offset: 0x24 = IMAGE_EXPORT_DIRECTORY.AddressOfNameOrdinals\n          - offset: 0x20 = IMAGE_EXPORT_DIRECTORY.AddressOfNames\n          - offset: 0x18 = IMAGE_EXPORT_DIRECTORY.NumberOfNames\n          - offset: 0x1C = IMAGE_EXPORT_DIRECTORY.AddressOfFunctions\n      - optional:\n        - or:\n          - api: LoadLibrary\n          - api: strcmp\n"
+      },
+      {
+        "id": "9",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "create thread",
+        "description": "host-interaction/thread/create",
+        "authors": [
+          "moritz.raabe@mandiant.com",
+          "michael.hunhoff@mandiant.com",
+          "joakim@intezer.com",
+          "anushka.virgaonkar@mandiant.com"
+        ],
+        "match_data": [
+          "api: PsCreateSystemThread"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: create thread\n    namespace: host-interaction/thread/create\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - joakim@intezer.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: span of calls\n    mbc:\n      - Process::Create Thread [C0038]\n    examples:\n      - 946A99F36A46D335DEC080D9A4371940:0x10001DA0\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x408020\n  features:\n    - or:\n      - and:\n        - os: windows\n        - or:\n          - api: kernel32.CreateThread\n          - api: _beginthread\n          - api: _beginthreadex\n          - api: PsCreateSystemThread\n          - api: SHCreateThread\n          - api: SHCreateThreadWithHandle\n          - api: kernel32.CreateRemoteThread\n          - api: kernel32.CreateRemoteThreadEx\n          - api: RtlCreateUserThread\n          - api: ntdll.NtCreateThread\n          - api: ntdll.NtCreateThreadEx\n          - api: ntdll.ZwCreateThread\n          - api: ntdll.ZwCreateThreadEx\n      - and:\n        - or:\n          - os: linux\n          - os: android\n        - api: pthread_create\n      - and:\n        - api: System.Threading.Thread::Start\n        - optional:\n          - api: System.Threading.Thread::ctor\n"
+      },
+      {
+        "id": "11",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "generate random numbers via WinAPI",
+        "description": "data-manipulation/prng",
+        "authors": [
+          "michael.hunhoff@mandiant.com",
+          "johnk3r"
+        ],
+        "match_data": [
+          "api: BCryptGenRandom"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: generate random numbers via WinAPI\n    namespace: data-manipulation/prng\n    authors:\n      - michael.hunhoff@mandiant.com\n      - johnk3r\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Cryptography::Generate Pseudo-random Sequence::Use API [C0021.003]\n    examples:\n      - ba947eb07d8c823949316a97364d060f:0x1400031E0\n      - 3ca359f5085bb96a7950d4735b089ffe:0x403A80\n      - e59ffeaf7acb0c326e452fa30bb71a36:0x40403E\n      - 1195d0d18be9362fb8dd9e1738404c9d:0x404E90\n  features:\n    - and:\n      - or:\n        - api: BCryptGenRandom\n        - api: CryptGenRandom\n      - optional:\n        - api: BCryptOpenAlgorithmProvider\n        - api: BCryptCloseAlgorithmProvider\n        - api: CryptAquireContext\n"
+      },
+      {
+        "id": "12",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "encrypt or decrypt data via BCrypt",
+        "description": "data-manipulation/encryption",
+        "authors": [
+          "michael.hunhoff@mandiant.com"
+        ],
+        "match_data": [
+          "api: BCryptGenerateSymmetricKey",
+          "api: BCryptEncrypt",
+          "api: BCryptDestroyKey"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: encrypt or decrypt data via BCrypt\n    namespace: data-manipulation/encryption\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att&ck:\n      - Defense Evasion::Obfuscated Files or Information [T1027]\n    mbc:\n      - Cryptography::Decrypt Data [C0031]\n      - Cryptography::Encrypt Data [C0027]\n  features:\n    - and:\n      - or:\n        - api: BCryptDecrypt\n        - api: BCryptEncrypt\n      - optional:\n        - api: BCryptOpenAlgorithmProvider\n        - api: BCryptCloseAlgorithmProvider\n        - api: BCryptImportKey\n        - api: BCryptImportKeyPair\n        - api: BCryptGenerateKeyPair\n        - api: BCryptGenerateSymmetricKey\n        - api: BCryptDestroyKey\n"
+      },
+      {
+        "id": "13",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "hash data via BCrypt",
+        "description": "data-manipulation/hashing",
+        "authors": [
+          "michael.hunhoff@mandiant.com"
+        ],
+        "match_data": [
+          "api: BCryptHashData",
+          "api: BCryptCreateHash",
+          "api: BCryptDestroyHash"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: hash data via BCrypt\n    namespace: data-manipulation/hashing\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att&ck:\n      - Defense Evasion::Obfuscated Files or Information [T1027]\n    mbc:\n      - Cryptography::Cryptographic Hash [C0029]\n  features:\n    - and:\n      - or:\n        - api: BCryptHash\n        - and:\n          - api: BCryptHashData\n          - optional:\n            - api: BCryptFinishHash\n            - api: BCryptDestroyHash\n            - api: BCryptCreateHash\n      - optional:\n        - api: BCryptOpenAlgorithmProvider\n        - api: BCryptCloseAlgorithmProvider\n"
+      },
+      {
+        "id": "15",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "terminate thread",
+        "description": "host-interaction/thread/terminate",
+        "authors": [
+          "moritz.raabe@mandiant.com",
+          "michael.hunhoff@mandiant.com",
+          "anushka.virgaonkar@mandiant.com"
+        ],
+        "match_data": [
+          "api: PsTerminateSystemThread"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: terminate thread\n    namespace: host-interaction/thread/terminate\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - Process::Terminate Thread [C0039]\n    examples:\n      - Practical Malware Analysis Lab 03-02.dll_:0x10003286\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x407E90\n  features:\n    - or:\n      - api: kernel32.TerminateThread\n      - api: PsTerminateSystemThread\n      - api: System.Threading.Thread.Abort\n      - api: pthread_terminate\n"
+      }
+    ],
+    "mbc": [
+      {
+        "id": "E1027.m02",
+        "objective": "Defense Evasion",
+        "behavior": "Obfuscated Files or Information",
+        "method": "Encoding-Standard Algorithm",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "0"
+          }
+        ]
+      },
+      {
+        "id": "C0026.002",
+        "objective": "Data",
+        "behavior": "Encode Data",
+        "method": "XOR",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "0"
+          }
+        ]
+      },
+      {
+        "id": "B0032.020",
+        "objective": "Anti-Static Analysis",
+        "behavior": "Executable Code Obfuscation",
+        "method": "Argument Obfuscation",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "3"
+          }
+        ]
+      },
+      {
+        "id": "B0032.017",
+        "objective": "Anti-Static Analysis",
+        "behavior": "Executable Code Obfuscation",
+        "method": "Stack Strings",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "3"
+          }
+        ]
+      },
+      {
+        "id": "C0036.006",
+        "objective": "Operating System",
+        "behavior": "Registry",
+        "method": "Query Registry Value",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "5"
+          }
+        ]
+      },
+      {
+        "id": "C0038",
+        "objective": "Process",
+        "behavior": "Create Thread",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "9"
+          }
+        ]
+      },
+      {
+        "id": "C0021.003",
+        "objective": "Cryptography",
+        "behavior": "Generate Pseudo-random Sequence",
+        "method": "Use API",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "11"
+          }
+        ]
+      },
+      {
+        "id": "C0031",
+        "objective": "Cryptography",
+        "behavior": "Decrypt Data",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "12"
+          }
+        ]
+      },
+      {
+        "id": "C0027",
+        "objective": "Cryptography",
+        "behavior": "Encrypt Data",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "12"
+          }
+        ]
+      },
+      {
+        "id": "C0029",
+        "objective": "Cryptography",
+        "behavior": "Cryptographic Hash",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "13"
+          }
+        ]
+      },
+      {
+        "id": "C0039",
+        "objective": "Process",
+        "behavior": "Terminate Thread",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "15"
+          }
+        ]
+      }
+    ],
+    "mitre_attack_techniques": [
+      {
+        "id": "T1027",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "encode data using XOR",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "0"
+          }
+        ]
+      },
+      {
+        "id": "T1027.005",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "contain obfuscated stackstrings",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "3"
+          }
+        ]
+      },
+      {
+        "id": "T1012",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "query or enumerate registry value",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "5"
+          }
+        ]
+      },
+      {
+        "id": "T1027",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "encrypt or decrypt data via BCrypt",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "12"
+          }
+        ]
+      },
+      {
+        "id": "T1027",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "hash data via BCrypt",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "13"
+          }
+        ]
+      }
+    ],
+    "attack_techniques": {
+      "T1027": [
+        {
+          "severity": "INFO",
+          "description": "encode data using XOR",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "0"
+            }
+          ]
+        },
+        {
+          "severity": "INFO",
+          "description": "encrypt or decrypt data via BCrypt",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "12"
+            }
+          ]
+        },
+        {
+          "severity": "INFO",
+          "description": "hash data via BCrypt",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "13"
+            }
+          ]
+        }
+      ],
+      "T1027.005": [
+        {
+          "severity": "INFO",
+          "description": "contain obfuscated stackstrings",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "3"
+            }
+          ]
+        }
+      ],
+      "T1012": [
+        {
+          "severity": "INFO",
+          "description": "query or enumerate registry value",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "5"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

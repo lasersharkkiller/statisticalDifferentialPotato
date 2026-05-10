@@ -1,0 +1,164 @@
+{
+    "data":  {
+                 "signature_matches":  [
+                                           {
+                                               "id":  "0",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "hash data with CRC32",
+                                               "description":  "data-manipulation/checksum/crc32",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "mnemonic: shr",
+                                                                  "bits in a byte",
+                                                                  "mnemonic: test"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: hash data with CRC32\n    namespace: data-manipulation/checksum/crc32\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires operand[1].number, characteristic, bytes, mnemonic features\n    mbc:\n      - Data::Checksum::CRC32 [C0032.001]\n    examples:\n      - 2D3EDC218A90F03089CC01715A9F047F:0x403CBD\n      - 7D28CB106CB54876B2A5C111724A07CD:0x402350  # RtlComputeCrc32\n      - 7EFF498DE13CC734262F87E6B3EF38AB:0x100084A6\n  features:\n    - or:\n      - and:\n        - number: 1 = bits in a byte\n        - instruction:\n          - description: is bit set?\n          - or:\n            - mnemonic: and\n            - mnemonic: test\n          - operand[1].number: 1\n        - instruction:\n          - mnemonic: shr\n          - number: 1\n        - characteristic: nzxor\n        - operand[1].number: 0xEDB88320\n      - and:\n        - number: 0x8320\n        - number: 0xEDB8\n        - characteristic: nzxor\n      - api: RtlComputeCrc32\n      - bytes: 00 00 00 00 96 30 07 77 2C 61 0E EE BA 51 09 99 19 C4 6D 07 8F F4 6A 70 35 A5 63 E9 A3 95 64 9E = crc32_tab\n"
+                                           },
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "resolve function by parsing PE exports",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "sara-rn"
+                                                           ],
+                                               "match_data":  [
+                                                                  "mnemonic: movzx",
+                                                                  "loop"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: resolve function by parsing PE exports\n    namespace: load-code/pe\n    authors:\n      - sara-rn\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic, offset, mnemonic features\n    examples:\n      - 73CE04892E5F39EC82B00C02FC04C70F:0x406BA1\n  features:\n    - and:\n      - os: windows\n      - or:\n        - characteristic: loop\n        - mnemonic: movzx\n      - and:\n        - offset: 0x3C = IMAGE_DOS_HEADER.PE.e_lfanew\n        - or:\n          - and:\n            - arch: i386\n            - offset: 0x78 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n          - and:\n            - arch: amd64\n            - offset: 0x88 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n        - 3 or more:\n          - offset: 0x14 = IMAGE_EXPORT_DIRECTORY.NumberOfFunctions\n          - offset: 0x24 = IMAGE_EXPORT_DIRECTORY.AddressOfNameOrdinals\n          - offset: 0x20 = IMAGE_EXPORT_DIRECTORY.AddressOfNames\n          - offset: 0x18 = IMAGE_EXPORT_DIRECTORY.NumberOfNames\n          - offset: 0x1C = IMAGE_EXPORT_DIRECTORY.AddressOfFunctions\n      - optional:\n        - or:\n          - api: LoadLibrary\n          - api: strcmp\n"
+                                           },
+                                           {
+                                               "id":  "static_pe_pdbpath",
+                                               "name":  "static_pe_pdbpath",
+                                               "description":  "The PE file contains a PDB path",
+                                               "match_data":  [
+                                                                  "nvm60x64.pdb"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "packer_unknown_pe_section_name",
+                                               "name":  "packer_unknown_pe_section_name",
+                                               "description":  "The binary contains an unknown PE section name indicative of packing",
+                                               "match_data":  [
+                                                                  "INIT"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_LOW"
+                                           }
+                                       ],
+                 "mbc":  [
+                             {
+                                 "id":  "C0032.001",
+                                 "objective":  "Data",
+                                 "behavior":  "Checksum",
+                                 "method":  "CRC32",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "0"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "OC0006"
+                             },
+                             {
+                                 "id":  "C0002"
+                             },
+                             {
+                                 "id":  "OB0001"
+                             },
+                             {
+                                 "id":  "OB0002"
+                             },
+                             {
+                                 "id":  "OB0006"
+                             },
+                             {
+                                 "id":  "F0001"
+                             },
+                             {
+                                 "id":  "C0005.001"
+                             }
+                         ],
+                 "tags":  [
+                              "OBFUSCATED"
+                          ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1071",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "The PE file contains a PDB path",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "static_pe_pdbpath"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1027",
+                                                     "severity":  "IMPACT_SEVERITY_LOW",
+                                                     "signature_description":  "The binary contains an unknown PE section name indicative of packing",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "packer_unknown_pe_section_name"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1027.002",
+                                                     "severity":  "IMPACT_SEVERITY_LOW",
+                                                     "signature_description":  "The binary contains an unknown PE section name indicative of packing",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "packer_unknown_pe_section_name"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "attack_techniques":  {
+                                           "T1071":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "The PE file contains a PDB path",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "static_pe_pdbpath"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1027":  [
+                                                         {
+                                                             "severity":  "LOW",
+                                                             "description":  "The binary contains an unknown PE section name indicative of packing",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "packer_unknown_pe_section_name"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1027.002":  [
+                                                             {
+                                                                 "severity":  "LOW",
+                                                                 "description":  "The binary contains an unknown PE section name indicative of packing",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "packer_unknown_pe_section_name"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ]
+                                       }
+             }
+}

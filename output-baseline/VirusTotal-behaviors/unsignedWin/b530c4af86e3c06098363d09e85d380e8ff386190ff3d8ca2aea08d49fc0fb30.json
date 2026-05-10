@@ -1,0 +1,1021 @@
+{
+    "data":  {
+                 "command_executions":  [
+                                            "%SAMPLEPATH%",
+                                            "\"%SAMPLEPATH%\\b530c4af86e3c06098363d09e85d380e8ff386190ff3d8ca2aea08d49fc0fb30.exe\" "
+                                        ],
+                 "modules_loaded":  [
+                                        "%SAMPLEPATH%\\b530c4af86e3c06098363d09e85d380e8ff386190ff3d8ca2aea08d49fc0fb30.exe"
+                                    ],
+                 "signature_matches":  [
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get session user name",
+                                               "description":  "host-interaction/session",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get session user name\n    namespace: host-interaction/session\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    att\u0026ck:\n      - Discovery::System Owner/User Discovery [T1033]\n      - Discovery::Account Discovery [T1087]\n    examples:\n      - Practical Malware Analysis Lab 14-01.exe_:0x401285\n  features:\n    - or:\n      - api: advapi32.GetUserName\n      - api: secur32.GetUserNameEx\n      - basic block:\n        - and:\n          # - match: get session information (see #463)\n          - api: wtsapi32.WTSQuerySessionInformation\n          - number: 5 = WTSUserName\n      - call:\n        - and:\n          - api: wtsapi32.WTSQuerySessionInformation\n          - number: 5 = WTSUserName\n      - api: System.Security.Principal.WindowsIdentity::GetCurrent\n      - property/read: System.Environment::UserName\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create directory",
+                                               "description":  "host-interaction/file-system/create",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create directory\n    namespace: host-interaction/file-system/create\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - File System::Create Directory [C0046]\n    examples:\n      - Practical Malware Analysis Lab 17-02.dll_:0x10008f62\n      - 692f7fd6d198e804d6af98eb9e390d61:0x6000003\n  features:\n    - or:\n      - api: kernel32.CreateDirectory\n      - api: kernel32.CreateDirectoryEx\n      - api: kernel32.CreateDirectoryTransacted\n      - api: NtCreateDirectoryObject\n      - api: ZwCreateDirectoryObject\n      - api: SHCreateDirectory\n      - api: SHCreateDirectoryEx\n      - api: mkdir\n      - api: _mkdir\n      - api: _wmkdir\n      - api: System.IO.Directory::CreateDirectory\n      - api: System.IO.DirectoryInfo::Create\n      - api: System.IO.DirectoryInfo::CreateSubdirectory\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "delete directory",
+                                               "description":  "host-interaction/file-system/delete",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: delete directory\n    namespace: host-interaction/file-system/delete\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - File System::Delete Directory [C0048]\n    examples:\n      - Practical Malware Analysis Lab 05-01.dll_:0x10009236\n      - AFB6EC3D721A5CB67863487B0E51A34C167F629CF701F8BC7A038C117B4DDA44:0x429AA0\n  features:\n    - or:\n      - api: RemoveDirectory\n      - api: RemoveDirectoryTransacted\n      - api: rmdir\n      - api: _rmdir\n      - api: _wrmdir\n      - api: System.IO.DirectoryInfo::Delete\n      - api: System.IO.Directory::Delete\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "parse PE header",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: parse PE header\n    namespace: load-code/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic, operand[1].offset features\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x403DD0\n  features:\n    - and:\n      - os: windows\n      - and:\n        - mnemonic: cmp\n        - or:\n          - number: 0x4550 = IMAGE_NT_SIGNATURE (PE)\n          - and:\n            - number: 0x50\n            - number: 0x45\n        - or:\n          - number: 0x5A4D = IMAGE_DOS_SIGNATURE (MZ)\n          - and:\n            - number: 0x4D\n            - number: 0x5A\n        - optional:\n          - and:\n            - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x30 = IMAGE_NT_HEADERS64.OptionalHeader.ImageBase\n          - basic block:\n            - and:\n              - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n              - 3 or more:\n                - operand[1].offset: 0x4 = IMAGE_NT_HEADERS.FileHeader.Machine\n                - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n                - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n                - operand[1].offset: 0x16 = IMAGE_NT_HEADERS.FileHeader.Characteristics\n                - operand[1].offset: 0x28 = IMAGE_NT_HEADERS.OptionalHeader.AddressOfEntryPoint  # for 32 and 64 bit\n                - or:\n                  - and:\n                    - arch: i386\n                    - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                  - and:\n                    - arch: amd64\n                    - operand[1].offset: 0x30 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n"
+                                           },
+                                           {
+                                               "id":  "network_http",
+                                               "name":  "network_http",
+                                               "description":  "Performs some HTTP requests",
+                                               "match_data":  [
+                                                                  "{\"url\": \"http://ocsp.digicert.com/MFEwTzBNMEswSTAJBgUrDgMCGgUABBQ50otx%2Fh0Ztl%2Bz8SiPI7wEWVxDlQQUTiJUIBiV5uNu5g%2F6%2BrkS7QYXjzkCEA77flR%2B3w%2FxBpruV2lte6A%3D\"}",
+                                                                  "{\"url\": \"http://ocsp.digicert.com/MFEwTzBNMEswSTAJBgUrDgMCGgUABBSAUQYBMq2awn1Rh6Doh%2FsBYgFV7gQUA95QNVbRTLtm8KPiGxvDl7I90VUCEAJ0LqoXyo4hxxe7H%2Fz9DKA%3D\"}",
+                                                                  "{\"url\": \"http://x1.c.lencr.org/\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_LOW"
+                                           },
+                                           {
+                                               "id":  "871",
+                                               "description":  "Sample execution stops while process was sleeping (likely an evasion)",
+                                               "match_data":  [
+                                                                  "Thread delayed"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "415",
+                                               "description":  "PE file has an executable .text section and no other executable section",
+                                               "match_data":  [
+                                                                  "Section: .text IMAGE_SCN_CNT_CODE, IMAGE_SCN_MEM_EXECUTE, IMAGE_SCN_MEM_READ"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "509",
+                                               "description":  "Reads software policies",
+                                               "match_data":  [
+                                                                  "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "#registry_keys_opened",
+                                                                "value":  "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "1654",
+                                               "description":  "Sample might require command line arguments",
+                                               "match_data":  [
+                                                                  "$INC{$module} = \"/loader/$info/$module\";",
+                                                                  "if ($key =~ m|^/loader/[^/]+/(.*)$|) {"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "653",
+                                               "description":  "Sample file is different than original file name gathered from version info",
+                                               "match_data":  [
+                                                                  "OriginalFilename $ vs software.exe"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "#memory_dumps",
+                                                                "value":  "software.exe, 00000000.00000002.1384314437.00007FF66130C000.00000008.00000001.01000000.00000003.sdmp"
+                                                            },
+                                                            {
+                                                                "ref":  "#memory_dumps",
+                                                                "value":  "software.exe, 00000004.00000002.1384313969.00007FF66130C000.00000008.00000001.01000000.00000003.sdmp"
+                                                            },
+                                                            {
+                                                                "ref":  "#memory_dumps",
+                                                                "value":  "software.exe, 00000007.00000000.1141389455.00007FF66130C000.00000008.00000001.01000000.00000003.sdmp"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "411",
+                                               "description":  "PE file contains a mix of data directories often seen in goodware",
+                                               "match_data":  [
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_IMPORT",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_RESOURCE",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_BASERELOC",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_DEBUG",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_IAT"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "715",
+                                               "description":  "Classification label",
+                                               "match_data":  [
+                                                                  "clean1.winEXE@6/0@0/0"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "626",
+                                               "description":  "Sample tries to load a library which is not present or installed on the analysis machine, adding the library might reveal more behavior",
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "229",
+                                               "description":  "Spawns processes",
+                                               "match_data":  [
+                                                                  "C:\\Users\\user\\Desktop\\software.exe \"C:\\Users\\user\\Desktop\\software.exe\" -install",
+                                                                  "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1",
+                                                                  "C:\\Users\\user\\Desktop\\software.exe \"C:\\Users\\user\\Desktop\\software.exe\" /install",
+                                                                  "C:\\Users\\user\\Desktop\\software.exe \"C:\\Users\\user\\Desktop\\software.exe\" /load"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "419",
+                                               "description":  "PE file has a high image base, often used for DLLs",
+                                               "match_data":  [
+                                                                  "Image base 0x140000000 \u003e 0x60000000"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "406",
+                                               "description":  "Contains modern PE file flags such as dynamic base (ASLR) or NX",
+                                               "match_data":  [
+                                                                  "HIGH_ENTROPY_VA, DYNAMIC_BASE, NX_COMPAT, TERMINAL_SERVER_AWARE"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "908",
+                                               "description":  "Sample may offer command line options, please run it with the \u0027Execute binary with arguments\u0027 cookbook (it\u0027s possible that the command line switches require additional characters like: \"-\", \"/\", \"--\")",
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "187",
+                                               "description":  "Tries to load missing DLLs",
+                                               "match_data":  [
+                                                                  "perl538.dll",
+                                                                  "vcruntime140.dll"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "95",
+                                               "description":  "Creates mutexes",
+                                               "match_data":  [
+                                                                  "\\Sessions\\1\\BaseNamedObjects\\Local\\SM0:8004:120:WilError_01",
+                                                                  "\\Sessions\\1\\BaseNamedObjects\\Local\\SM0:6900:120:WilError_01",
+                                                                  "\\Sessions\\1\\BaseNamedObjects\\Local\\SM0:7440:120:WilError_01"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "149",
+                                               "description":  "Program does not show much activity (idle)",
+                                               "match_data":  [
+                                                                  "no activity detected"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "416",
+                                               "description":  "PE file contains a valid data directory to section mapping",
+                                               "match_data":  [
+                                                                  "Data directory: IMAGE_DIRECTORY_ENTRY_IMPORT is in: .rdata",
+                                                                  "Data directory: IMAGE_DIRECTORY_ENTRY_RESOURCE is in: .rsrc",
+                                                                  "Data directory: IMAGE_DIRECTORY_ENTRY_BASERELOC is in: .reloc",
+                                                                  "Data directory: IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG is in: .rdata",
+                                                                  "Data directory: IMAGE_DIRECTORY_ENTRY_IAT is in: .rdata"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "412",
+                                               "description":  "PE file contains a debug data directory",
+                                               "match_data":  [
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_DEBUG"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           }
+                                       ],
+                 "verdict_confidence":  99,
+                 "files_opened":  [
+                                      "C:\\Users\\user\\Desktop\\software.exe",
+                                      "C:\\Windows\\Globalization\\Sorting\\sortdefault.nls",
+                                      "C:\\Windows\\SYSTEM32\\VCRUNTIME140.dll",
+                                      "C:\\Windows\\SYSTEM32\\ntmarta.dll",
+                                      "C:\\Windows\\SYSTEM32\\ole32.dll",
+                                      "C:\\Windows\\SYSTEM32\\wintypes.dll",
+                                      "C:\\Windows\\System32\\CoreMessaging.dll",
+                                      "C:\\Windows\\System32\\CoreUIComponents.dll",
+                                      "C:\\Windows\\System32\\TextInputFramework.dll",
+                                      "C:\\Windows\\System32\\en-US\\user32.dll.mui",
+                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_d3fbe61b7c93d9f0",
+                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_d3fbe61b7c93d9f0\\comctl32.DLL",
+                                      "C:\\Windows\\system32\\IMM32.DLL",
+                                      "C:\\Windows\\system32\\conhost.exe",
+                                      "C:\\Windows\\system32\\dwmapi.dll",
+                                      "C:\\Windows\\system32\\en-US\\conhost.exe.mui",
+                                      "C:\\Windows\\system32\\rpcss.dll",
+                                      "C:\\Windows\\system32\\uxtheme.dll",
+                                      "C:\\Windows\\system32\\uxtheme.dll.Config"
+                                  ],
+                 "mbc":  [
+                             {
+                                 "id":  "C0046",
+                                 "objective":  "File System",
+                                 "behavior":  "Create Directory",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "create directory"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0048",
+                                 "objective":  "File System",
+                                 "behavior":  "Delete Directory",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "delete directory"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "OC0006"
+                             },
+                             {
+                                 "id":  "C0002"
+                             }
+                         ],
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "2580",
+                                            "name":  "%SAMPLEPATH%",
+                                            "time_offset":  1
+                                        },
+                                        {
+                                            "process_id":  "2204",
+                                            "name":  "%windir%\\System32\\svchost.exe -k WerSvcGroup"
+                                        },
+                                        {
+                                            "process_id":  "2648",
+                                            "name":  "%CONHOST% \"-11326327551726787293-771427236-640990634726537335-1956042940826114166-1056667698"
+                                        },
+                                        {
+                                            "process_id":  "2800",
+                                            "name":  "wmiadap.exe /F /T /R"
+                                        },
+                                        {
+                                            "process_id":  "2844",
+                                            "name":  "%windir%\\system32\\wbem\\wmiprvse.exe"
+                                        },
+                                        {
+                                            "process_id":  "3828",
+                                            "name":  "%WINDIR%\\explorer.exe",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "3144",
+                                                                 "name":  "%SAMPLEPATH%\\b530c4af86e3c06098363d09e85d380e8ff386190ff3d8ca2aea08d49fc0fb30.exe"
+                                                             }
+                                                         ]
+                                        },
+                                        {
+                                            "process_id":  "7404",
+                                            "name":  "\"C:\\Users\\user\\Desktop\\software.exe\" -install",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "7440",
+                                                                 "name":  "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1",
+                                                                 "files_opened":  [
+                                                                                      "C:\\Users\\user\\Desktop\\software.exe",
+                                                                                      "C:\\Windows\\Globalization\\Sorting\\sortdefault.nls",
+                                                                                      "C:\\Windows\\SYSTEM32\\ntmarta.dll",
+                                                                                      "C:\\Windows\\SYSTEM32\\ole32.dll",
+                                                                                      "C:\\Windows\\SYSTEM32\\wintypes.dll",
+                                                                                      "C:\\Windows\\System32\\CoreMessaging.dll",
+                                                                                      "C:\\Windows\\System32\\CoreUIComponents.dll",
+                                                                                      "C:\\Windows\\System32\\TextInputFramework.dll",
+                                                                                      "C:\\Windows\\System32\\en-US\\user32.dll.mui",
+                                                                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_d3fbe61b7c93d9f0",
+                                                                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_d3fbe61b7c93d9f0\\comctl32.DLL",
+                                                                                      "C:\\Windows\\system32\\IMM32.DLL",
+                                                                                      "C:\\Windows\\system32\\conhost.exe",
+                                                                                      "C:\\Windows\\system32\\dwmapi.dll",
+                                                                                      "C:\\Windows\\system32\\en-US\\conhost.exe.mui",
+                                                                                      "C:\\Windows\\system32\\rpcss.dll",
+                                                                                      "C:\\Windows\\system32\\uxtheme.dll",
+                                                                                      "C:\\Windows\\system32\\uxtheme.dll.Config"
+                                                                                  ]
+                                                             }
+                                                         ],
+                                            "files_opened":  [
+                                                                 "C:\\Windows\\SYSTEM32\\VCRUNTIME140.dll"
+                                                             ],
+                                            "files_written":  [
+                                                                  "\\Device\\ConDrv\\\\Connect"
+                                                              ]
+                                        },
+                                        {
+                                            "process_id":  "7996",
+                                            "name":  "\"C:\\Users\\user\\Desktop\\software.exe\" /install",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "8004",
+                                                                 "name":  "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1"
+                                                             }
+                                                         ],
+                                            "files_written":  [
+                                                                  "\\Device\\ConDrv\\\\Connect"
+                                                              ]
+                                        },
+                                        {
+                                            "process_id":  "268",
+                                            "name":  "\"C:\\Users\\user\\Desktop\\software.exe\" /load",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "6900",
+                                                                 "name":  "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1"
+                                                             }
+                                                         ],
+                                            "files_written":  [
+                                                                  "\\Device\\ConDrv\\\\Connect"
+                                                              ]
+                                        }
+                                    ],
+                 "tags":  [
+                              "IDLE"
+                          ],
+                 "registry_keys_opened":  [
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Segment Heap",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager"
+                                          ],
+                 "verdicts":  [
+                                  "UNKNOWN_VERDICT",
+                                  "CLEAN"
+                              ],
+                 "dns_lookups":  [
+                                     {
+                                         "hostname":  "www.microsoft.com",
+                                         "resolved_ips":  [
+                                                              "23.216.81.152"
+                                                          ]
+                                     },
+                                     {
+                                         "hostname":  "res.public.onecdn.static.microsoft",
+                                         "resolved_ips":  [
+                                                              "152.195.19.97",
+                                                              "13.107.246.70",
+                                                              "23.192.210.9"
+                                                          ]
+                                     }
+                                 ],
+                 "files_written":  [
+                                       "\\Device\\ConDrv\\\\Connect"
+                                   ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1033",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get session user name",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "get session user name"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1087",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get session user name",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "get session user name"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "parse PE header",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "parse PE header"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1071",
+                                                     "signature_description":  "Adversaries may communicate using application layer protocols to avoid detection/network filtering by blending in with existing traffic."
+                                                 },
+                                                 {
+                                                     "id":  "T1059",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Sample may offer command line options, please run it with the command line option cookbook (it\u0027s possible that the command line switches require additional characters like)",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "908"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1059",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Sample might require command line arguments, analyze it with the command line cookbook",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "1654"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1574.002",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Tries to load missing DLLs",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "187"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Reads software policies",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "509"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "files_deleted":  [
+                                       "C:\\Windows\\System32\\wbem\\Performance\\WmiApRpl.h",
+                                       "C:\\Windows\\System32\\wbem\\Performance\\WmiApRpl.ini"
+                                   ],
+                 "memory_dumps":  [
+                                      {
+                                          "file_name":  "00000007.00000002.1384213702.000000BE191FD000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "12288",
+                                          "base_address":  "816465301504",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "268"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000000.1129555571.00007FF661300000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140696169218048",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "7404"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000002.1384228867.000002397C9F0000.00000004.00000020.00040000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "2445927186432",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7996"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000002.1384218598.000000DA0C4FC000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "16384",
+                                          "base_address":  "936509423616",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7996"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000000.1135544683.00007FF66130B000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140696169263104",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "7996"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1384266558.00007FF661300000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140696169218048",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7404"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000000.1141351356.00007FF661304000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "24576",
+                                          "base_address":  "140696169234432",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "268"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000000.1135525187.00007FF661304000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "24576",
+                                          "base_address":  "140696169234432",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "7996"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000000.1135502662.00007FF661301000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "12288",
+                                          "base_address":  "140696169222144",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "7996"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1384224892.000000B1BB9FF000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "763357032448",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7404"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000000.1141389455.00007FF66130C000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "12288",
+                                          "base_address":  "140696169267200",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "refs":  [
+                                                       {
+                                                           "ref":  "#signature_matches",
+                                                           "value":  "653"
+                                                       }
+                                                   ],
+                                          "process_id":  "268"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000000.1135483269.00007FF661300000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140696169218048",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "7996"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1384242932.000001D3E3EC0000.00000004.00000020.00040000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "2009573621760",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7404"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1384276666.00007FF661301000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "12288",
+                                          "base_address":  "140696169222144",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "268"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1384314437.00007FF66130C000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "12288",
+                                          "base_address":  "140696169267200",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "refs":  [
+                                                       {
+                                                           "ref":  "#signature_matches",
+                                                           "value":  "653"
+                                                       }
+                                                   ],
+                                          "process_id":  "7404"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1384214726.000000B1BB8FD000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "12288",
+                                          "base_address":  "763355975680",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7404"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000000.1129563979.00007FF661301000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "12288",
+                                          "base_address":  "140696169222144",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "7404"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000000.1141331662.00007FF661301000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "12288",
+                                          "base_address":  "140696169222144",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "268"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000002.1384260571.00007FF661300000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140696169218048",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7996"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000000.1129576139.00007FF661304000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "24576",
+                                          "base_address":  "140696169234432",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "7404"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000002.1384283067.00007FF661304000.00000004.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140696169234432",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7996"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1384243209.0000025668520000.00000004.00000020.00040000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "2570140647424",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "268"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000002.1384313969.00007FF66130C000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "12288",
+                                          "base_address":  "140696169267200",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "refs":  [
+                                                       {
+                                                           "ref":  "#signature_matches",
+                                                           "value":  "653"
+                                                       }
+                                                   ],
+                                          "process_id":  "7996"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1384308092.00007FF66130B000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140696169263104",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "268"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000000.1129622511.00007FF66130C000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "12288",
+                                          "base_address":  "140696169267200",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "7404"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1384253585.000001D3E4120000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "28672",
+                                          "base_address":  "2009576112128",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7404"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1384304685.00007FF66130B000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140696169263104",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7404"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1384253588.0000025668630000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "28672",
+                                          "base_address":  "2570141761536",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "268"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000000.1135568714.00007FF66130C000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "12288",
+                                          "base_address":  "140696169267200",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "7996"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000000.1141299584.00007FF661300000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140696169218048",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "268"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1384266316.00007FF661300000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140696169218048",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "268"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1384284381.00007FF661304000.00000004.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140696169234432",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7404"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000000.1129601124.00007FF66130B000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140696169263104",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "7404"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1384286801.00007FF661304000.00000004.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140696169234432",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "268"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000002.1384248732.000002397CB20000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "28672",
+                                          "base_address":  "2445928431616",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7996"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1384225130.000000BE194FF000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "816468455424",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "268"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000002.1384303354.00007FF66130B000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140696169263104",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7996"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000002.1384292735.00007FF661305000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "20480",
+                                          "base_address":  "140696169238528",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7996"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000000.1141364776.00007FF66130B000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140696169263104",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "268"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000002.1384273267.00007FF661301000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "12288",
+                                          "base_address":  "140696169222144",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7996"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1384318829.00007FF66130C000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "12288",
+                                          "base_address":  "140696169267200",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "268"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1384275150.00007FF661301000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "12288",
+                                          "base_address":  "140696169222144",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7404"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1384297047.00007FF661305000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "20480",
+                                          "base_address":  "140696169238528",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "268"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1384293484.00007FF661305000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "20480",
+                                          "base_address":  "140696169238528",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7404"
+                                      }
+                                  ],
+                 "processes_terminated":  [
+                                              "%SAMPLEPATH%",
+                                              "%windir%\\System32\\svchost.exe -k WerSvcGroup",
+                                              "%CONHOST% \"-11326327551726787293-771427236-640990634726537335-1956042940826114166-1056667698",
+                                              "wmiadap.exe /F /T /R"
+                                          ],
+                 "processes_created":  [
+                                           "%SAMPLEPATH%\\b530c4af86e3c06098363d09e85d380e8ff386190ff3d8ca2aea08d49fc0fb30.exe",
+                                           "\"C:\\Users\\user\\Desktop\\software.exe\" -install",
+                                           "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1",
+                                           "\"C:\\Users\\user\\Desktop\\software.exe\" /install",
+                                           "\"C:\\Users\\user\\Desktop\\software.exe\" /load"
+                                       ],
+                 "ip_traffic":  [
+                                    {
+                                        "destination_ip":  "173.194.193.94",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "192.168.0.5",
+                                        "destination_port":  137,
+                                        "transport_layer_protocol":  "UDP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.216.81.152",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "20.99.186.246",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "152.195.19.97",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "a83f:8110:4170:706c:6963:6174:696f:6e50",
+                                        "destination_port":  53,
+                                        "transport_layer_protocol":  "UDP"
+                                    },
+                                    {
+                                        "destination_ip":  "192.168.0.102",
+                                        "destination_port":  137,
+                                        "transport_layer_protocol":  "UDP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.192.210.9",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "69.164.41.0",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "192.168.0.40",
+                                        "destination_port":  137,
+                                        "transport_layer_protocol":  "UDP"
+                                    }
+                                ],
+                 "attack_techniques":  {
+                                           "T1033":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get session user name",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "get session user name"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1087":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get session user name",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "get session user name"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "parse PE header",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "parse PE header"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1071":  [
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "Adversaries may communicate using application layer protocols to avoid detection/network filtering by blending in with existing traffic."
+                                                         }
+                                                     ],
+                                           "T1059":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Sample may offer command line options, please run it with the command line option cookbook (it\u0027s possible that the command line switches require additional characters like)",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "908"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Sample might require command line arguments, analyze it with the command line cookbook",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "1654"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1574.002":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "Tries to load missing DLLs",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "187"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1082":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Reads software policies",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "509"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

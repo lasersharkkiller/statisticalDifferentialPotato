@@ -1,0 +1,1411 @@
+{
+    "data":  {
+                 "signature_matches":  [
+                                           {
+                                               "id":  "0",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create process on Windows",
+                                               "description":  "host-interaction/process/create",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: CreateProcess"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create process on Windows\n    namespace: host-interaction/process/create\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - Process::Create Process [C0017]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x406DB0\n      - Practical Malware Analysis Lab 01-04.exe_:0x4011FC\n      - 692f7fd6d198e804d6af98eb9e390d61:0x6000003\n  features:\n    - or:\n      - api: kernel32.WinExec\n      - api: kernel32.CreateProcess\n      - api: shell32.ShellExecute\n      - api: shell32.ShellExecuteEx\n      - api: advapi32.CreateProcessAsUser\n      - api: advapi32.CreateProcessWithLogon\n      - api: advapi32.CreateProcessWithToken\n      - api: kernel32.CreateProcessInternal\n      - api: ntdll.NtCreateUserProcess\n      - api: ntdll.NtCreateProcess\n      - api: ntdll.NtCreateProcessEx\n      - api: ntdll.ZwCreateProcess\n      - api: ZwCreateProcessEx\n      - api: ntdll.ZwCreateUserProcess\n      - api: ntdll.RtlCreateUserProcess\n      - api: System.Diagnostics.Process::Start\n"
+                                           },
+                                           {
+                                               "id":  "1",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "enumerate network shares",
+                                               "description":  "host-interaction/network",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: NetShareEnum",
+                                                                  "tight loop",
+                                                                  "contain loop"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: enumerate network shares\n    namespace: host-interaction/network\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::Network Share Discovery [T1135]\n  features:\n    - and:\n      - or:\n        - api: netapi32.NetShareEnum\n        - api: mpr.WNetEnumResource\n      - match: contain loop\n"
+                                           },
+                                           {
+                                               "id":  "2",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "write file on Windows",
+                                               "description":  "host-interaction/file-system/write",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: WriteFile",
+                                                                  "FILE_WRITE_DATA"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: write file on Windows\n    namespace: host-interaction/file-system/write\n    authors:\n      - william.ballenthin@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - File System::Writes File [C0052]\n    examples:\n      - Practical Malware Analysis Lab 01-04.exe_:0x4011FC\n      # ntdll\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x1400025C4\n  features:\n    - or:\n      - and:\n        - os: windows\n        - optional:\n          - basic block:\n            - or:\n              - number: 0x40000000 = GENERIC_WRITE\n              - number: 0x2 = FILE_WRITE_DATA\n              - match: create or open file\n          - call:\n            - or:\n              - number: 0x40000000 = GENERIC_WRITE\n              - number: 0x2 = FILE_WRITE_DATA\n              - match: create or open file\n        - or:\n          - api: kernel32.WriteFile\n          - api: kernel32.WriteFileEx\n          - api: NtWriteFile\n          - api: ZwWriteFile\n          - api: _fwrite\n          - api: fwrite\n      - api: System.IO.File::WriteAllBytes\n      - api: System.IO.File::WriteAllBytesAsync\n      - api: System.IO.File::WriteAllLines\n      - api: System.IO.File::WriteAllLinesAsync\n      - api: System.IO.File::WriteAllText\n      - api: System.IO.File::WriteAllTextAsync\n      - api: System.IO.File::AppendAllLines\n      - api: System.IO.File::AppendAllLinesAsync\n      - api: System.IO.File::AppendAllText\n      - api: System.IO.File::AppendAllTextAsync\n      - api: System.IO.File::AppendText\n      - api: System.IO.FileInfo::AppendText\n"
+                                           },
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "enumerate PE sections",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "@Ana06",
+                                                               "@mr-tz"
+                                                           ],
+                                               "match_data":  [
+                                                                  "mnemonic: movzx"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: enumerate PE sections\n    namespace: load-code/pe\n    authors:\n      - \"@Ana06\"\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: unsupported  # requires offset, operand[1].offset, characteristic, mnemonic, basicblock features\n    mbc:\n      - Discovery::Code Discovery::Enumerate PE Sections [B0046.001]\n    references:\n      - https://0x00sec.org/t/reflective-dll-injection/3080\n      - https://www.ired.team/offensive-security/code-injection-process-injection/reflective-dll-injection\n    examples:\n      - E4C33AC3638EEF68311F8AC0D72483C7:0x401510\n  features:\n    - and:\n      - os: windows\n      # there should be some complexity to functions like this\n      - count(basic blocks): 3 or more\n      - optional:\n        - offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n      - instruction:\n        - or:\n          - mnemonic: mov\n          - mnemonic: movzx\n        - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n      - basic block:\n        - or:\n          - and:\n            - description: IMAGE_FIRST_SECTION(nt_header)\n            - instruction:\n              - or:\n                - mnemonic: add\n                - mnemonic: mov\n                - mnemonic: movzx\n              - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n            - operand[1].offset: 0x18 = FileHeader.SizeOfOptionalHeader\n          - and:\n            - description: (DWORD)dll_raw + dos_header-\u003ee_lfanew + sizeof(IMAGE_NT_HEADERS) + sizeof(IMAGE_SECTION_HEADER) * i\n            - number: 0x28 = sizeof(IMAGE_SECTION_HEADER)\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0xF8 = sizeof(IMAGE_NT_HEADERS32)\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x108 = sizeof(IMAGE_NT_HEADERS64)\n      - 2 or more:\n        - operand[1].offset: 0xC = IMAGE_SECTION_HEADER.VirtualAddress\n        - operand[1].offset: 0x14 = IMAGE_SECTION_HEADER.PointerToRawData\n        - operand[1].offset: 0x10 = IMAGE_SECTION_HEADER.SizeOfRawData\n        # there\u0027s also offset 0x8 = IMAGE_SECTION_HEADER.Misc.PhysicalAddress, but it\u0027s likely too common\n      - not:\n        # non-zeroing XOR was observed in FPs\n        - characteristic: nzxor\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://0x00sec.org/t/reflective-dll-injection/3080"
+                                                            },
+                                                            {
+                                                                "ref":  "https://www.ired.team/offensive-security/code-injection-process-injection/reflective-dll-injection"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "4",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "query or enumerate registry value",
+                                               "description":  "host-interaction/registry",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: RegQueryValueEx",
+                                                                  "api: RegOpenKeyEx",
+                                                                  "api: RegOpenKey"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: query or enumerate registry value\n    namespace: host-interaction/registry\n    authors:\n      - william.ballenthin@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::Query Registry [T1012]\n    mbc:\n      - Operating System::Registry::Query Registry Value [C0036.006]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13145B5A\n      - Practical Malware Analysis Lab 03-02.dll_:0x100047AD\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegGetValue\n        - api: advapi32.RegEnumValue\n        - api: advapi32.RegQueryValue\n        - api: advapi32.RegQueryValueEx\n        - api: advapi32.RegQueryMultipleValues\n        - api: ZwQueryValueKey\n        - api: ZwEnumerateValueKey\n        - api: NtQueryValueKey\n        - api: NtEnumerateValueKey\n        - api: RtlQueryRegistryValues\n        - api: SHGetValue\n        - api: SHEnumValue\n        - api: SHRegGetInt\n        - api: SHRegGetPath\n        - api: SHRegGetValue\n        - api: SHQueryValueEx\n        - api: SHRegGetUSValue\n        - api: SHOpenRegStream\n        - api: SHRegEnumUSValue\n        - api: SHOpenRegStream2\n        - api: SHRegQueryUSValue\n        - api: SHRegGetBoolUSValue\n        - api: SHRegGetValueFromHKCUHKLM\n        - api: SHRegGetBoolValueFromHKCUHKLM\n        - api: Microsoft.Win32.RegistryKey::GetValue\n        - api: Microsoft.Win32.RegistryKey::GetValueKind\n        - api: Microsoft.Win32.RegistryKey::GetValueNames\n        - api: Microsoft.Win32.Registry::GetValue\n"
+                                           },
+                                           {
+                                               "id":  "5",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "parse PE header",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "IMAGE_NT_SIGNATURE (PE)",
+                                                                  "IMAGE_DOS_SIGNATURE (MZ)",
+                                                                  "mnemonic: cmp"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: parse PE header\n    namespace: load-code/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic, operand[1].offset features\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x403DD0\n  features:\n    - and:\n      - os: windows\n      - and:\n        - mnemonic: cmp\n        - or:\n          - number: 0x4550 = IMAGE_NT_SIGNATURE (PE)\n          - and:\n            - number: 0x50\n            - number: 0x45\n        - or:\n          - number: 0x5A4D = IMAGE_DOS_SIGNATURE (MZ)\n          - and:\n            - number: 0x4D\n            - number: 0x5A\n        - optional:\n          - and:\n            - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x30 = IMAGE_NT_HEADERS64.OptionalHeader.ImageBase\n          - basic block:\n            - and:\n              - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n              - 3 or more:\n                - operand[1].offset: 0x4 = IMAGE_NT_HEADERS.FileHeader.Machine\n                - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n                - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n                - operand[1].offset: 0x16 = IMAGE_NT_HEADERS.FileHeader.Characteristics\n                - operand[1].offset: 0x28 = IMAGE_NT_HEADERS.OptionalHeader.AddressOfEntryPoint  # for 32 and 64 bit\n                - or:\n                  - and:\n                    - arch: i386\n                    - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                  - and:\n                    - arch: amd64\n                    - operand[1].offset: 0x30 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n"
+                                           },
+                                           {
+                                               "id":  "6",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "accept command line arguments",
+                                               "description":  "host-interaction/cli",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetCommandLine"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: accept command line arguments\n    namespace: host-interaction/cli\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Execution::Command and Scripting Interpreter [T1059]\n    mbc:\n      - Execution::Command and Scripting Interpreter [E1059]\n    examples:\n      - e5369ac309f1be6d77afeeb3edab0ed8:0x402760\n  features:\n    - or:\n      - api: GetCommandLine\n      - api: CommandLineToArgv\n      - api: System.Environment::GetCommandLineArgs\n"
+                                           },
+                                           {
+                                               "id":  "7",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get disk information",
+                                               "description":  "host-interaction/hardware/storage",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetDriveType"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get disk information\n    namespace: host-interaction/hardware/storage\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Information Discovery [T1082]\n    mbc:\n      - Discovery::System Information Discovery [E1082]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x4052A0\n      - 972B219F18379907A045431303F4DA7D:0x41064E\n  features:\n    - or:\n      - api: kernel32.GetDriveType\n      - api: kernel32.GetLogicalDrives\n      - api: kernel32.GetVolumeInformation\n      - api: kernel32.GetVolumeNameForVolumeMountPoint\n      - api: kernel32.GetVolumePathNamesForVolumeName\n      - api: kernel32.GetLogicalDriveStrings\n      - api: kernel32.QueryDosDevice\n      - property/read: System.IO.DriveInfo::VolumeLabel\n      - property/read: System.IO.DriveInfo::DriveType\n      - property/read: System.IO.DriveInfo::DriveFormat\n      - property/read: System.IO.DriveInfo::Name\n"
+                                           },
+                                           {
+                                               "id":  "8",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "terminate process",
+                                               "description":  "host-interaction/process/terminate",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: exit"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: terminate process\n    namespace: host-interaction/process/terminate\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Process::Terminate Process [C0018]\n    examples:\n      - C91887D861D9BD4A5872249B641BC9F9:0x401A77\n      - 9B7CCAA2AE6A5B96E3110EBCBC4311F6:0x10010307\n  features:\n    - or:\n      - api: System.Diagnostics.Process::Kill\n      - api: System.Diagnostics.Process::WaitForExit\n      - api: System.Diagnostics.Process::WaitForExitAsync\n      - api: System.Environment::Exit\n      - api: System.Windows.Forms.Application::Exit\n      - api: exit\n      - api: Exit\n      - and:\n        - os: linux\n        - api: exit_group\n      - and:\n        - optional:\n          - match: open process\n        - or:\n          - api: kernel32.TerminateProcess\n          - api: ntdll.NtTerminateProcess\n          - api: kernel32.ExitProcess\n"
+                                           },
+                                           {
+                                               "id":  "9",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "modify access privileges",
+                                               "description":  "host-interaction/process/modify",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: AdjustTokenPrivileges"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: modify access privileges\n    namespace: host-interaction/process/modify\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: instruction\n      dynamic: call\n    att\u0026ck:\n      - Privilege Escalation::Access Token Manipulation [T1134]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x403BE0\n  features:\n    - and:\n      - api: advapi32.AdjustTokenPrivileges\n"
+                                           },
+                                           {
+                                               "id":  "10",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get common file path",
+                                               "description":  "host-interaction/file-system",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetSystemDirectory"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get common file path\n    namespace: host-interaction/file-system\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    examples:\n      - Practical Malware Analysis Lab 03-02.dll_:0x10003415\n      - 972B219F18379907A045431303F4DA7D:0x404887\n  features:\n    - or:\n      - api: kernel32.GetTempPath\n      - api: kernel32.GetTempFileName\n      - api: kernel32.GetSystemDirectory\n      - api: kernel32.GetWindowsDirectory\n      - api: kernel32.GetSystemWow64Directory\n      - api: GetAllUsersProfileDirectory\n      - api: GetAppContainerFolderPath\n      - api: GetCurrentDirectory\n      - api: GetDefaultUserProfileDirectory\n      - api: GetProfilesDirectory\n      - api: GetUserProfileDirectory\n      - api: SHGetFolderPathAndSubDir\n      - api: shell32.SHGetFolderPath\n      - api: shell32.SHGetFolderLocation\n      - api: shell32.SHGetKnownFolderPath\n      - api: shell32.SHGetSpecialFolderPath\n      - api: shell32.SHGetSpecialFolderLocation\n      - api: System.IO.Directory::GetCurrentDirectory\n      - api: System.Environment::GetFolderPath\n      - property/read: System.Environment::SystemDirectory\n      - property/read: System.Environment::CurrentDirectory\n"
+                                           },
+                                           {
+                                               "id":  "12",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "list domain servers",
+                                               "description":  "host-interaction/domain",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: NetServerEnum"
+                                                              ],
+                                               "rule_src":  "# generated using capa explorer for IDA Pro\nrule:\n  meta:\n    name: list domain servers\n    namespace: host-interaction/domain\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Network Configuration Discovery::Internet Connection Discovery [T1016.001]\n  features:\n    - or:\n      - api: netapi32.NetServerEnum\n"
+                                           },
+                                           {
+                                               "id":  "13",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "set registry value",
+                                               "description":  "host-interaction/registry/create",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "create or open registry key",
+                                                                  "api: RegCreateKeyEx",
+                                                                  "api: RegSetValueEx"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: set registry value\n    namespace: host-interaction/registry/create\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Operating System::Registry::Set Registry Key [C0036.001]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13147AF0\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x40433E\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x40415E\n      - 98c37c3c23bbfb362dac7754c6ba48e75cf24d73bc963a4cdfca557b9e016909:0x40294D\n  features:\n    - or:\n      - and:\n        - optional:\n          - match: create or open registry key\n        - or:\n          - api: advapi32.RegSetValue\n          - api: advapi32.RegSetValueEx\n          - api: advapi32.RegSetKeyValue\n          - api: ZwSetValueKey\n          - api: NtSetValueKey\n          - api: RtlWriteRegistryValue\n          - api: SHSetValue\n          - api: SHRegSetPath\n          - api: SHRegSetValue\n          - api: SHRegSetUSValue\n          - api: SHRegWriteUSValue\n          - api: Microsoft.Win32.RegistryKey::SetValue\n          - api: Microsoft.Win32.Registry::SetValue\n      - and:\n        - match: host-interaction/process/create\n        - string: \"/add/i\"\n        - or:\n          - string: \"/reg(|.exe)/i\"\n          - string: \"/hklm/i\"\n          - string: \"/HKEY_LOCAL_MACHINE/i\"\n          - string: \"/hkcu/i\"\n          - string: \"/HKEY_CURRENT_USER/i\"\n"
+                                           },
+                                           {
+                                               "id":  "stealth_network",
+                                               "name":  "stealth_network",
+                                               "description":  "Network activity detected but not expressed in monitor API logs",
+                                               "match_data":  [
+                                                                  "{\"ip\": \"72.167.58.252\"}",
+                                                                  "{\"ip\": \"20.3.187.198\"}",
+                                                                  "{\"ip\": \"172.202.163.200\"}",
+                                                                  "{\"ip\": \"20.59.87.225\"}",
+                                                                  "{\"ip\": \"40.126.27.66\"}",
+                                                                  "{\"ip\": \"23.44.16.247\"}",
+                                                                  "{\"ip\": \"52.167.17.97\"}",
+                                                                  "{\"ip\": \"138.48.2.106\"}",
+                                                                  "{\"ip\": \"199.232.210.172\"}",
+                                                                  "{\"ip\": \"150.171.28.12\"}",
+                                                                  "{\"ip\": \"5.79.71.205\"}",
+                                                                  "{\"ip\": \"23.198.74.242\"}",
+                                                                  "{\"ip\": \"34.120.208.123\"}",
+                                                                  "{\"ip\": \"8.8.8.8\"}",
+                                                                  "{\"domain\": \"incoming.telemetry.mozilla.org\"}",
+                                                                  "{\"domain\": \"telemetry-incoming.r53-2.services.mozilla.com\"}",
+                                                                  "{\"domain\": \"ocsp.digicert.com\"}",
+                                                                  "{\"domain\": \"e3913.cd.akamaiedge.net\"}",
+                                                                  "{\"domain\": \"dns.msftncsi.com\"}",
+                                                                  "{\"domain\": \"wpad.hostonly\"}",
+                                                                  "{\"domain\": \"api.msn.com\"}",
+                                                                  "{\"domain\": \"ctldl.windowsupdate.com\"}",
+                                                                  "{\"domain\": \"settings-win.data.microsoft.com\"}",
+                                                                  "{\"domain\": \"cdn.onenote.net\"}",
+                                                                  "{\"domain\": \"login.live.com\"}",
+                                                                  "{\"domain\": \"slscr.update.microsoft.com\"}",
+                                                                  "{\"domain\": \"fe3cr.delivery.mp.microsoft.com\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "queries_locale_api",
+                                               "name":  "queries_locale_api",
+                                               "description":  "Queries the computer locale (possible geofencing)",
+                                               "match_data":  [
+                                                                  "{\"type\": \"call\", \"pid\": 6436, \"cid\": 29}",
+                                                                  "{\"type\": \"call\", \"pid\": 6112, \"cid\": 42}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "static_pe_pdbpath",
+                                               "name":  "static_pe_pdbpath",
+                                               "description":  "The PE file contains a PDB path",
+                                               "match_data":  [
+                                                                  "{\"pdbpath\": \"net.pdb\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "language_check_registry",
+                                               "name":  "language_check_registry",
+                                               "description":  "Checks system language via registry key (possible geofencing)",
+                                               "match_data":  [
+                                                                  "{\"regkey\": \"HKEY_LOCAL_MACHINE\\\\SYSTEM\\\\ControlSet001\\\\Control\\\\Nls\\\\CustomLocale\\\\en-US\"}",
+                                                                  "{\"regkey\": \"HKEY_LOCAL_MACHINE\\\\SYSTEM\\\\ControlSet001\\\\Control\\\\Nls\\\\ExtendedLocale\\\\en-US\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "network_cnc_http",
+                                               "name":  "network_cnc_http",
+                                               "description":  "HTTP traffic contains suspicious features which may be indicative of malware related traffic",
+                                               "match_data":  [
+                                                                  "{\"post_no_referer\": \"HTTP traffic contains a POST request with no referer header\"}",
+                                                                  "{\"suspicious_request\": \"http://ocsp.digicert.com/\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_LOW"
+                                           },
+                                           {
+                                               "id":  "network_http",
+                                               "name":  "network_http",
+                                               "description":  "Performs some HTTP requests",
+                                               "match_data":  [
+                                                                  "{\"url\": \"http://ocsp.digicert.com/\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_LOW"
+                                           },
+                                           {
+                                               "id":  "packer_unknown_pe_section_name",
+                                               "name":  "packer_unknown_pe_section_name",
+                                               "description":  "The binary contains an unknown PE section name indicative of packing",
+                                               "match_data":  [
+                                                                  "{\"unknown section\": {\"name\": \".didat\", \"raw_address\": \"0x0000b000\", \"virtual_address\": \"0x00018000\", \"virtual_size\": \"0x00000010\", \"size_of_data\": \"0x00000200\", \"characteristics\": \"IMAGE_SCN_CNT_INITI"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_LOW"
+                                           },
+                                           {
+                                               "id":  "accesses_netlogon_regkey",
+                                               "name":  "accesses_netlogon_regkey",
+                                               "description":  "Access the NetLogon registry key, potentially used for discovery or tampering",
+                                               "match_data":  [
+                                                                  "{\"regkey\": \"HKEY_LOCAL_MACHINE\\\\SYSTEM\\\\CurrentControlSet\\\\Services\\\\Netlogon\\\\Parameters\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_LOW"
+                                           },
+                                           {
+                                               "id":  "procmem_yara",
+                                               "name":  "procmem_yara",
+                                               "description":  "Yara detections observed in process dumps, payloads or dropped files",
+                                               "match_data":  [
+                                                                  "{\"Hit\": \"PID 6436 triggered the Yara rule \u0027shellcode_get_eip\u0027 with data \u0027[\u0027{ E8 00 00 00 00 58 }\u0027]\u0027\"}",
+                                                                  "{\"Hit\": \"PID 6112 triggered the Yara rule \u0027shellcode_get_eip\u0027 with data \u0027[\u0027{ E8 00 00 00 00 58 }\u0027]\u0027\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_MEDIUM"
+                                           },
+                                           {
+                                               "id":  "static_pe_anomaly",
+                                               "name":  "static_pe_anomaly",
+                                               "description":  "Anomalous binary characteristics",
+                                               "match_data":  [
+                                                                  "{\"anomaly\": \"Entrypoint of binary is located outside of any mapped sections\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_MEDIUM"
+                                           },
+                                           {
+                                               "id":  "pe_compile_timestomping",
+                                               "name":  "pe_compile_timestomping",
+                                               "description":  "Binary compilation timestomping detected",
+                                               "match_data":  [
+                                                                  "{\"anomaly\": \"Compilation timestamp is in the future\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_MEDIUM"
+                                           },
+                                           {
+                                               "id":  "9028",
+                                               "description":  "Uses 32bit PE files",
+                                               "match_data":  [
+                                                                  "EXECUTABLE_IMAGE, 32BIT_MACHINE"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "415",
+                                               "description":  "PE file has an executable .text section and no other executable section",
+                                               "match_data":  [
+                                                                  "Section: .text IMAGE_SCN_CNT_CODE, IMAGE_SCN_MEM_EXECUTE, IMAGE_SCN_MEM_READ"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "509",
+                                               "description":  "Reads software policies",
+                                               "match_data":  [
+                                                                  "HKEY_CURRENT_USER\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "#registry_keys_opened",
+                                                                "value":  "HKEY_CURRENT_USER\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "653",
+                                               "description":  "Sample file is different than original file name gathered from version info",
+                                               "match_data":  [
+                                                                  "OriginalFilenamenet.exej% vs software.exe"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "#memory_dumps",
+                                                                "value":  "software.exe, 00000001.00000002.1179335519.0000000001079000.00000002.00000001.01000000.00000003.sdmp"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "411",
+                                               "description":  "PE file contains a mix of data directories often seen in goodware",
+                                               "match_data":  [
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_IMPORT",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_RESOURCE",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_BASERELOC",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_DEBUG",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_IAT"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "715",
+                                               "description":  "Classification label",
+                                               "match_data":  [
+                                                                  "clean3.winEXE@2/0@0/0"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "626",
+                                               "description":  "Sample tries to load a library which is not present or installed on the analysis machine, adding the library might reveal more behavior",
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "229",
+                                               "description":  "Spawns processes",
+                                               "match_data":  [
+                                                                  "C:\\Users\\user\\Desktop\\software.exe \"C:\\Users\\user\\Desktop\\software.exe\"",
+                                                                  "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "406",
+                                               "description":  "Contains modern PE file flags such as dynamic base (ASLR) or NX",
+                                               "match_data":  [
+                                                                  "DYNAMIC_BASE, NX_COMPAT, GUARD_CF, TERMINAL_SERVER_AWARE"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "187",
+                                               "description":  "Tries to load missing DLLs",
+                                               "match_data":  [
+                                                                  "mpr.dll",
+                                                                  "wkscli.dll",
+                                                                  "netutils.dll",
+                                                                  "samcli.dll",
+                                                                  "srvcli.dll",
+                                                                  "iphlpapi.dll",
+                                                                  "bcrypt.dll"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "95",
+                                               "description":  "Creates mutexes",
+                                               "match_data":  [
+                                                                  "\\Sessions\\1\\BaseNamedObjects\\Local\\SM0:8044:120:WilError_01"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "149",
+                                               "description":  "Program does not show much activity (idle)",
+                                               "match_data":  [
+                                                                  "no activity detected"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "203",
+                                               "description":  "Binary contains paths to debug symbols",
+                                               "match_data":  [
+                                                                  "net.pdbUGP source: software.exe",
+                                                                  "net.pdb source: software.exe"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "1462688494",
+                                               "description":  "Sigma detected: Potential Defense Evasion Via Binary Rename",
+                                               "match_data":  [
+                                                                  "Data: CommandLine: \"C:\\Users\\user\\Desktop\\software.exe\", Company: Microsoft Corporation, CurrentDirectory: C:\\Users\\user\\Desktop\\, Description: Net Command, FileVersion: 10.0.26100.1 (WinBuild.160101."
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "199",
+                                               "description":  "PE file contains sections with non-standard names",
+                                               "match_data":  [
+                                                                  "section name: .didat"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "412",
+                                               "description":  "PE file contains a debug data directory",
+                                               "match_data":  [
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_DEBUG"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "234",
+                                               "description":  "Binary contains a suspicious time stamp",
+                                               "match_data":  [
+                                                                  "0x98D7AA17 [Wed Apr  5 01:23:35 2051 UTC]"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           }
+                                       ],
+                 "verdicts":  [
+                                  "CLEAN"
+                              ],
+                 "processes_created":  [
+                                           "\"C:\\Users\\\u003cUSER\u003e\\Desktop\\executable.exe\"",
+                                           "C:\\Windows\\system32\\net1",
+                                           "%SAMPLEPATH%\\da8cb47db919bf104fac9a8f5bacff76ad0426130eefc77db665f1bd5e061994.exe",
+                                           "C:\\Windows\\System32\\UI0Detect.exe",
+                                           "C:\\Program Files\\Google3760_660140472\\bin\\updater.exe",
+                                           "\"C:\\Users\\user\\Desktop\\software.exe\"",
+                                           "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1"
+                                       ],
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "6436",
+                                            "name":  "\"C:\\Users\\\u003cUSER\u003e\\Desktop\\executable.exe\"",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "6112",
+                                                                 "name":  "C:\\Windows\\system32\\net1"
+                                                             }
+                                                         ]
+                                        },
+                                        {
+                                            "process_id":  "3080",
+                                            "name":  "%WINDIR%\\explorer.exe",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "4004",
+                                                                 "name":  "%SAMPLEPATH%\\da8cb47db919bf104fac9a8f5bacff76ad0426130eefc77db665f1bd5e061994.exe"
+                                                             }
+                                                         ]
+                                        },
+                                        {
+                                            "process_id":  "536",
+                                            "name":  "C:\\Windows\\System32\\services.exe",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "2960",
+                                                                 "name":  "C:\\Windows\\System32\\UI0Detect.exe"
+                                                             }
+                                                         ]
+                                        },
+                                        {
+                                            "process_id":  "3760",
+                                            "name":  "C:\\Program Files (x86)\\Google\\Update\\Install\\{19C8ABEE-BB1B-4641-86CF-9105D5DC2C30}\\UpdaterSetup.exe",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "1916",
+                                                                 "name":  "C:\\Program Files\\Google3760_660140472\\bin\\updater.exe"
+                                                             }
+                                                         ]
+                                        },
+                                        {
+                                            "process_id":  "7936",
+                                            "name":  "\"C:\\Users\\user\\Desktop\\software.exe\"",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "8044",
+                                                                 "name":  "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1",
+                                                                 "files_opened":  [
+                                                                                      "C:\\Users\\user\\Desktop\\software.exe",
+                                                                                      "C:\\Windows\\Globalization\\Sorting\\sortdefault.nls",
+                                                                                      "C:\\Windows\\SYSTEM32\\ntmarta.dll",
+                                                                                      "C:\\Windows\\SYSTEM32\\ole32.dll",
+                                                                                      "C:\\Windows\\SYSTEM32\\wintypes.dll",
+                                                                                      "C:\\Windows\\System32\\CoreMessaging.dll",
+                                                                                      "C:\\Windows\\System32\\CoreUIComponents.dll",
+                                                                                      "C:\\Windows\\System32\\TextInputFramework.dll",
+                                                                                      "C:\\Windows\\System32\\en-US\\user32.dll.mui",
+                                                                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_d3fbe61b7c93d9f0",
+                                                                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_d3fbe61b7c93d9f0\\comctl32.DLL",
+                                                                                      "C:\\Windows\\system32\\IMM32.DLL",
+                                                                                      "C:\\Windows\\system32\\conhost.exe",
+                                                                                      "C:\\Windows\\system32\\dwmapi.dll",
+                                                                                      "C:\\Windows\\system32\\en-US\\conhost.exe.mui",
+                                                                                      "C:\\Windows\\system32\\rpcss.dll",
+                                                                                      "C:\\Windows\\system32\\uxtheme.dll",
+                                                                                      "C:\\Windows\\system32\\uxtheme.dll.Config"
+                                                                                  ]
+                                                             }
+                                                         ],
+                                            "files_opened":  [
+                                                                 "C:\\Windows\\SysWOW64\\IPHLPAPI.DLL",
+                                                                 "C:\\Windows\\SysWOW64\\MPR.dll",
+                                                                 "C:\\Windows\\SysWOW64\\bcrypt.dll",
+                                                                 "C:\\Windows\\SysWOW64\\netutils.dll",
+                                                                 "C:\\Windows\\SysWOW64\\samcli.dll",
+                                                                 "C:\\Windows\\SysWOW64\\srvcli.dll",
+                                                                 "C:\\Windows\\SysWOW64\\wkscli.dll"
+                                                             ],
+                                            "files_written":  [
+                                                                  "\\Device\\ConDrv\\\\Connect"
+                                                              ]
+                                        }
+                                    ],
+                 "dns_lookups":  [
+                                     {
+                                         "hostname":  "telemetry-incoming.r53-2.services.mozilla.com"
+                                     },
+                                     {
+                                         "hostname":  "res.public.onecdn.static.microsoft",
+                                         "resolved_ips":  [
+                                                              "104.98.118.138",
+                                                              "104.98.118.160",
+                                                              "104.98.118.171",
+                                                              "104.98.118.163",
+                                                              "104.98.118.146",
+                                                              "104.98.118.177",
+                                                              "104.98.118.168",
+                                                              "104.98.118.161",
+                                                              "104.98.118.145"
+                                                          ]
+                                     },
+                                     {
+                                         "hostname":  "www.microsoft.com",
+                                         "resolved_ips":  [
+                                                              "23.55.140.42"
+                                                          ]
+                                     },
+                                     {
+                                         "hostname":  "edge.ds-c7110-microsoft.global.dns.qwilted-cds.cqloud.com",
+                                         "resolved_ips":  [
+                                                              "217.20.50.22",
+                                                              "217.20.50.37",
+                                                              "217.20.50.41",
+                                                              "84.201.220.21",
+                                                              "84.201.220.23",
+                                                              "84.201.220.37",
+                                                              "84.201.220.19",
+                                                              "217.20.50.21"
+                                                          ]
+                                     }
+                                 ],
+                 "processes_injected":  [
+                                            "C:\\Program Files\\Google3760_660140472\\bin\\updater.exe"
+                                        ],
+                 "files_written":  [
+                                       "\\Device\\ConDrv\\\\Connect"
+                                   ],
+                 "registry_keys_opened":  [
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\Setup",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Services\\LanmanWorkstation\\Parameters\\RpcCacheTimeout",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Services\\Netlogon\\Parameters\\DCLocatorLdapConnectionCacheEnabled",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Session Manager\\ResourcePolicies",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\Setup\\SystemSetupInProgress",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Netlogon\\Parameters",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize\\DisableUmpdBufferSizeCheck",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize\\DisableMetaFiles",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Segment Heap",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Wow64\\x86"
+                                          ],
+                 "sigma_analysis_results":  [
+                                                {
+                                                    "match_context":  [
+                                                                          {
+                                                                              "values":  {
+                                                                                             "Hashes":  "MD5=1B46D50F34EE1B9EA33063A02F2C7A4F,SHA256=DA8CB47DB919BF104FAC9A8F5BACFF76AD0426130EEFC77DB665F1BD5E061994,IMPHASH=559D4014B9861D37E317DED7FD6BC691",
+                                                                                             "CurrentDirectory":  "C:\\Users\\george\\Desktop\\",
+                                                                                             "OriginalFileName":  "net.exe",
+                                                                                             "Product":  "Microsoft\\xae Windows\\xae Operating System",
+                                                                                             "Description":  "Net Command",
+                                                                                             "EventID":  "1",
+                                                                                             "ParentCommandLine":  "C:\\Windows\\Explorer.EXE",
+                                                                                             "CommandLine":  "\"C:\\Users\\george\\Desktop\\software.exe\"",
+                                                                                             "FileVersion":  "10.0.26100.1 (WinBuild.160101.0800)",
+                                                                                             "ParentImage":  "C:\\Windows\\explorer.exe",
+                                                                                             "IntegrityLevel":  "High",
+                                                                                             "Image":  "C:\\Users\\george\\Desktop\\software.exe",
+                                                                                             "Company":  "Microsoft Corporation"
+                                                                                         }
+                                                                          }
+                                                                      ],
+                                                    "rule_level":  "medium",
+                                                    "rule_id":  "686a5b6d5e098e507256a7207e9e4a237bb378c824f67f13ee0402525833b257",
+                                                    "rule_source":  "Sigma Integrated Rule Set (GitHub)",
+                                                    "rule_title":  "Potential Defense Evasion Via Binary Rename",
+                                                    "rule_description":  "Detects the execution of a renamed binary often used by attackers or malware leveraging new Sysmon OriginalFileName datapoint.",
+                                                    "rule_author":  "Matthew Green @mgreen27, Ecco, James Pemberton @4A616D6573, oscd.community, Andreas Hunkeler (@Karneades)"
+                                                }
+                                            ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1135",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "enumerate network shares",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "1"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1012",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "query or enumerate registry value",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "4"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "parse PE header",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "5"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1059",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "accept command line arguments",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "6"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get disk information",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "7"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1134",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "modify access privileges",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "9"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1083",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get common file path",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "10"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1016.001",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "list domain servers",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "12"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "signature_description":  "An adversary may attempt to get detailed information about the operating system and hardware, including version, patches, hotfixes, service packs, and architecture."
+                                                 },
+                                                 {
+                                                     "id":  "T1012",
+                                                     "signature_description":  "Adversaries may interact with the Windows Registry to gather information about the system, configuration, and installed software."
+                                                 },
+                                                 {
+                                                     "id":  "T1071",
+                                                     "signature_description":  "Adversaries may communicate using application layer protocols to avoid detection/network filtering by blending in with existing traffic."
+                                                 },
+                                                 {
+                                                     "id":  "T1070.006",
+                                                     "signature_description":  "Adversaries may modify file time attributes to hide new or changes to existing files."
+                                                 },
+                                                 {
+                                                     "id":  "T1070",
+                                                     "signature_description":  "Adversaries may delete or modify artifacts generated within systems to remove evidence of their presence or hinder defenses."
+                                                 },
+                                                 {
+                                                     "id":  "T1027",
+                                                     "signature_description":  "Adversaries may attempt to make an executable or file difficult to discover or analyze by encrypting, encoding, or otherwise obfuscating its contents on the system or in transit."
+                                                 },
+                                                 {
+                                                     "id":  "T1027.002",
+                                                     "signature_description":  "Adversaries may perform software packing or virtual machine software protection to conceal their code."
+                                                 },
+                                                 {
+                                                     "id":  "T1574.002",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Tries to load missing DLLs",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "187"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1070.006",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Binary contains a suspicious time stamp",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "234"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Reads software policies",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "509"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "mbc":  [
+                             {
+                                 "id":  "C0017",
+                                 "objective":  "Process",
+                                 "behavior":  "Create Process",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "0"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0052",
+                                 "objective":  "File System",
+                                 "behavior":  "Writes File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "2"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0046.001",
+                                 "objective":  "Discovery",
+                                 "behavior":  "Code Discovery",
+                                 "method":  "Enumerate PE Sections",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "3"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.006",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Query Registry Value",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "4"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1059",
+                                 "objective":  "Execution",
+                                 "behavior":  "Command and Scripting Interpreter",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "6"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1082",
+                                 "objective":  "Discovery",
+                                 "behavior":  "System Information Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "7"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0018",
+                                 "objective":  "Process",
+                                 "behavior":  "Terminate Process",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "8"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1083",
+                                 "objective":  "Discovery",
+                                 "behavior":  "File and Directory Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "10"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.001",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Set Registry Key",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "13"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "OC0006"
+                             },
+                             {
+                                 "id":  "C0002"
+                             },
+                             {
+                                 "id":  "OB0004"
+                             },
+                             {
+                                 "id":  "B0033"
+                             },
+                             {
+                                 "id":  "OB0001"
+                             },
+                             {
+                                 "id":  "OB0002"
+                             },
+                             {
+                                 "id":  "OB0006"
+                             },
+                             {
+                                 "id":  "F0001"
+                             },
+                             {
+                                 "id":  "F0005"
+                             },
+                             {
+                                 "id":  "F0005.004"
+                             },
+                             {
+                                 "id":  "OB0007"
+                             },
+                             {
+                                 "id":  "E1082"
+                             },
+                             {
+                                 "id":  "OC0008"
+                             },
+                             {
+                                 "id":  "C0036"
+                             },
+                             {
+                                 "id":  "C0036.003"
+                             }
+                         ],
+                 "files_opened":  [
+                                      "\\crashpad_1916_QZDKCGOKAKQLYLVV",
+                                      "C:\\Users\\user\\Desktop\\software.exe",
+                                      "C:\\Windows\\Globalization\\Sorting\\sortdefault.nls",
+                                      "C:\\Windows\\SYSTEM32\\ntmarta.dll",
+                                      "C:\\Windows\\SYSTEM32\\ole32.dll",
+                                      "C:\\Windows\\SYSTEM32\\wintypes.dll",
+                                      "C:\\Windows\\SysWOW64\\IPHLPAPI.DLL",
+                                      "C:\\Windows\\SysWOW64\\MPR.dll",
+                                      "C:\\Windows\\SysWOW64\\bcrypt.dll",
+                                      "C:\\Windows\\SysWOW64\\netutils.dll",
+                                      "C:\\Windows\\SysWOW64\\samcli.dll",
+                                      "C:\\Windows\\SysWOW64\\srvcli.dll",
+                                      "C:\\Windows\\SysWOW64\\wkscli.dll",
+                                      "C:\\Windows\\System32\\CoreMessaging.dll",
+                                      "C:\\Windows\\System32\\CoreUIComponents.dll",
+                                      "C:\\Windows\\System32\\TextInputFramework.dll",
+                                      "C:\\Windows\\System32\\en-US\\user32.dll.mui",
+                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_d3fbe61b7c93d9f0",
+                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_d3fbe61b7c93d9f0\\comctl32.DLL",
+                                      "C:\\Windows\\system32\\IMM32.DLL",
+                                      "C:\\Windows\\system32\\conhost.exe",
+                                      "C:\\Windows\\system32\\dwmapi.dll",
+                                      "C:\\Windows\\system32\\en-US\\conhost.exe.mui",
+                                      "C:\\Windows\\system32\\rpcss.dll",
+                                      "C:\\Windows\\system32\\uxtheme.dll",
+                                      "C:\\Windows\\system32\\uxtheme.dll.Config"
+                                  ],
+                 "verdict_confidence":  97,
+                 "tags":  [
+                              "OBFUSCATED",
+                              "IDLE",
+                              "DETECT_DEBUG_ENVIRONMENT"
+                          ],
+                 "modules_loaded":  [
+                                        "%SAMPLEPATH%\\da8cb47db919bf104fac9a8f5bacff76ad0426130eefc77db665f1bd5e061994.exe"
+                                    ],
+                 "memory_dumps":  [
+                                      {
+                                          "file_name":  "6436.dmp",
+                                          "process":  "C:\\Users\\Bruno\\Desktop\\executable.exe",
+                                          "size":  "36560896",
+                                          "base_address":  "6356992"
+                                      },
+                                      {
+                                          "file_name":  "6112.dmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\net1.exe",
+                                          "size":  "25886720",
+                                          "base_address":  "1048576"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1179335519.0000000001077000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "17264640",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7936"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1179348683.00000000035C0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "24576",
+                                          "base_address":  "56360960",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7936"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1179335519.0000000001079000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "8192",
+                                          "base_address":  "17272832",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "refs":  [
+                                                       {
+                                                           "ref":  "#signature_matches",
+                                                           "value":  "653"
+                                                       }
+                                                   ],
+                                          "process_id":  "7936"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1179318543.0000000001061000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "36864",
+                                          "base_address":  "17174528",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7936"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000000.937317235.000000000106B000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "17215488",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "7936"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000000.937323557.0000000001076000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "8192",
+                                          "base_address":  "17260544",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "7936"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1179324342.000000000106B000.00000004.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "17215488",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7936"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1179291150.0000000000E30000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "14876672",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7936"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1179354848.0000000003748000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "16384",
+                                          "base_address":  "57966592",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7936"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1179324342.0000000001076000.00000004.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "17260544",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7936"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1179312216.0000000001060000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "17170432",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7936"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000000.937306062.0000000001060000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "17170432",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "7936"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1179284307.0000000000E20000.00000004.00000020.00040000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "4096",
+                                          "base_address":  "14811136",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7936"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000000.937310899.0000000001061000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "36864",
+                                          "base_address":  "17174528",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "7936"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1179354848.0000000003740000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "24576",
+                                          "base_address":  "57933824",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7936"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000000.937328322.0000000001079000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "8192",
+                                          "base_address":  "17272832",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "7936"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1179305316.0000000000F2D000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "12288",
+                                          "base_address":  "15912960",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7936"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1179298035.0000000000EAD000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\software.exe",
+                                          "size":  "12288",
+                                          "base_address":  "15388672",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "7936"
+                                      }
+                                  ],
+                 "ip_traffic":  [
+                                    {
+                                        "destination_ip":  "192.168.0.7",
+                                        "destination_port":  137,
+                                        "transport_layer_protocol":  "UDP"
+                                    },
+                                    {
+                                        "destination_ip":  "20.69.140.28",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.196.145.221",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "104.98.118.138",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.55.140.42",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.215.176.104",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    }
+                                ],
+                 "command_executions":  [
+                                            "C:\\Windows\\system32\\net1",
+                                            "\"%SAMPLEPATH%\\da8cb47db919bf104fac9a8f5bacff76ad0426130eefc77db665f1bd5e061994.exe\" ",
+                                            "C:\\Windows\\system32\\UI0Detect.exe",
+                                            "\"C:\\Program Files\\Google3760_660140472\\bin\\updater.exe\" --update --system --enable-logging --vmodule=*/chrome/updater/*=2 /sessionid {7EAD376A-DB75-4972-9B91-0BCFC91544DD}"
+                                        ],
+                 "processes_terminated":  [
+                                              "C:\\Windows\\System32\\UI0Detect.exe",
+                                              "C:\\Program Files\\Google3760_660140472\\bin\\updater.exe"
+                                          ],
+                 "files_dropped":  [
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\138.0.7156.0"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\138.0.7156.0\\Crashpad"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\138.0.7156.0\\Crashpad\\reports"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\138.0.7156.0\\Crashpad\\attachments"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\138.0.7156.0\\Crashpad\\metadata"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files\\Google1916_1502996078"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\138.0.7156.0\\uninstall.cmd"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\138.0.7156.0\\updater.exe"
+                                       }
+                                   ],
+                 "attack_techniques":  {
+                                           "T1135":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "enumerate network shares",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "1"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1012":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "query or enumerate registry value",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "4"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "Adversaries may interact with the Windows Registry to gather information about the system, configuration, and installed software."
+                                                         }
+                                                     ],
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "parse PE header",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "5"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1059":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "accept command line arguments",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "6"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1082":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get disk information",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "7"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "An adversary may attempt to get detailed information about the operating system and hardware, including version, patches, hotfixes, service packs, and architecture."
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Reads software policies",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "509"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1134":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "modify access privileges",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "9"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1083":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get common file path",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "10"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1016.001":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "list domain servers",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "12"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1071":  [
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "Adversaries may communicate using application layer protocols to avoid detection/network filtering by blending in with existing traffic."
+                                                         }
+                                                     ],
+                                           "T1070.006":  [
+                                                             {
+                                                                 "severity":  "UNKNOWN",
+                                                                 "description":  "Adversaries may modify file time attributes to hide new or changes to existing files."
+                                                             },
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "Binary contains a suspicious time stamp",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "234"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1070":  [
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "Adversaries may delete or modify artifacts generated within systems to remove evidence of their presence or hinder defenses."
+                                                         }
+                                                     ],
+                                           "T1027":  [
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "Adversaries may attempt to make an executable or file difficult to discover or analyze by encrypting, encoding, or otherwise obfuscating its contents on the system or in transit."
+                                                         }
+                                                     ],
+                                           "T1027.002":  [
+                                                             {
+                                                                 "severity":  "UNKNOWN",
+                                                                 "description":  "Adversaries may perform software packing or virtual machine software protection to conceal their code."
+                                                             }
+                                                         ],
+                                           "T1574.002":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "Tries to load missing DLLs",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "187"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ]
+                                       }
+             }
+}

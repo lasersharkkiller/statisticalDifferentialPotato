@@ -1,0 +1,990 @@
+{
+    "data":  {
+                 "signature_matches":  [
+                                           {
+                                               "id":  "2",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "parse PE header",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "IMAGE_NT_SIGNATURE (PE)",
+                                                                  "IMAGE_DOS_SIGNATURE (MZ)",
+                                                                  "mnemonic: cmp"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: parse PE header\n    namespace: load-code/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic, operand[1].offset features\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x403DD0\n  features:\n    - and:\n      - os: windows\n      - and:\n        - mnemonic: cmp\n        - or:\n          - number: 0x4550 = IMAGE_NT_SIGNATURE (PE)\n          - and:\n            - number: 0x50\n            - number: 0x45\n        - or:\n          - number: 0x5A4D = IMAGE_DOS_SIGNATURE (MZ)\n          - and:\n            - number: 0x4D\n            - number: 0x5A\n        - optional:\n          - and:\n            - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x30 = IMAGE_NT_HEADERS64.OptionalHeader.ImageBase\n          - basic block:\n            - and:\n              - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n              - 3 or more:\n                - operand[1].offset: 0x4 = IMAGE_NT_HEADERS.FileHeader.Machine\n                - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n                - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n                - operand[1].offset: 0x16 = IMAGE_NT_HEADERS.FileHeader.Characteristics\n                - operand[1].offset: 0x28 = IMAGE_NT_HEADERS.OptionalHeader.AddressOfEntryPoint  # for 32 and 64 bit\n                - or:\n                  - and:\n                    - arch: i386\n                    - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                  - and:\n                    - arch: amd64\n                    - operand[1].offset: 0x30 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n"
+                                           },
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check for time delay via GetTickCount",
+                                               "description":  "anti-analysis/anti-debugging/debugger-detection",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "mnemonic: sub",
+                                                                  "mnemonic: cmp"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check for time delay via GetTickCount\n    namespace: anti-analysis/anti-debugging/debugger-detection\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic features\n    mbc:\n      - Anti-Behavioral Analysis::Debugger Detection::Timing/Delay Check GetTickCount [B0001.032]\n    examples:\n      - Practical Malware Analysis Lab 16-03.exe_:0x4013d0\n  features:\n    - and:\n      - count(api(kernel32.GetTickCount)): 2 or more\n      - basic block:\n        - and:\n          - mnemonic: sub\n          - mnemonic: cmp\n"
+                                           },
+                                           {
+                                               "id":  "4",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "terminate process",
+                                               "description":  "host-interaction/process/terminate",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "mehunhoff@google.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: exit"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: terminate process\n    namespace: host-interaction/process/terminate\n    authors:\n      - moritz.raabe@mandiant.com\n      - mehunhoff@google.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Process::Terminate Process [C0018]\n    examples:\n      - C91887D861D9BD4A5872249B641BC9F9:0x401A77\n      - 9B7CCAA2AE6A5B96E3110EBCBC4311F6:0x10010307\n  features:\n    - or:\n      - api: System.Diagnostics.Process::Kill\n      - api: System.Diagnostics.Process::WaitForExit\n      - api: System.Diagnostics.Process::WaitForExitAsync\n      - api: System.Environment::Exit\n      - api: System.Windows.Forms.Application::Exit\n      - api: exit\n      - api: Exit\n      - api: RstrtMgr.RmShutdown\n      - and:\n        - os: linux\n        - api: exit_group\n      - and:\n        - optional:\n          - match: open process\n        - or:\n          - api: kernel32.TerminateProcess\n          - api: ntdll.NtTerminateProcess\n          - api: kernel32.ExitProcess\n          - api: ZwTerminateProcess\n"
+                                           },
+                                           {
+                                               "id":  "5",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "query or enumerate registry value",
+                                               "description":  "host-interaction/registry",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: RegQueryValueEx"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: query or enumerate registry value\n    namespace: host-interaction/registry\n    authors:\n      - william.ballenthin@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::Query Registry [T1012]\n    mbc:\n      - Operating System::Registry::Query Registry Value [C0036.006]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13145B5A\n      - Practical Malware Analysis Lab 03-02.dll_:0x100047AD\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegGetValue\n        - api: advapi32.RegEnumValue\n        - api: advapi32.RegQueryValue\n        - api: advapi32.RegQueryValueEx\n        - api: advapi32.RegQueryMultipleValues\n        - api: ZwQueryValueKey\n        - api: ZwEnumerateValueKey\n        - api: NtQueryValueKey\n        - api: NtEnumerateValueKey\n        - api: RtlQueryRegistryValues\n        - api: SHGetValue\n        - api: SHEnumValue\n        - api: SHRegGetInt\n        - api: SHRegGetPath\n        - api: SHRegGetValue\n        - api: SHQueryValueEx\n        - api: SHRegGetUSValue\n        - api: SHOpenRegStream\n        - api: SHRegEnumUSValue\n        - api: SHOpenRegStream2\n        - api: SHRegQueryUSValue\n        - api: SHRegGetBoolUSValue\n        - api: SHRegGetValueFromHKCUHKLM\n        - api: SHRegGetBoolValueFromHKCUHKLM\n        - api: Microsoft.Win32.RegistryKey::GetValue\n        - api: Microsoft.Win32.RegistryKey::GetValueKind\n        - api: Microsoft.Win32.RegistryKey::GetValueNames\n        - api: Microsoft.Win32.Registry::GetValue\n"
+                                           },
+                                           {
+                                               "id":  "static_pe_pdbpath",
+                                               "name":  "static_pe_pdbpath",
+                                               "description":  "The PE file contains a PDB path",
+                                               "match_data":  [
+                                                                  "BthUdTask.pdb"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "antidebug_setunhandledexceptionfilter",
+                                               "name":  "antidebug_setunhandledexceptionfilter",
+                                               "description":  "SetUnhandledExceptionFilter detected (possible anti-debug)",
+                                               "match_data":  [
+                                                                  "Process software.exe"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "packer_unknown_pe_section_name",
+                                               "name":  "packer_unknown_pe_section_name",
+                                               "description":  "The binary contains an unknown PE section name indicative of packing",
+                                               "match_data":  [
+                                                                  "fothk",
+                                                                  ".didat"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_LOW"
+                                           },
+                                           {
+                                               "id":  "pe_compile_timestomping",
+                                               "name":  "pe_compile_timestomping",
+                                               "description":  "Binary compilation timestomping detected",
+                                               "match_data":  [
+                                                                  "Compilation timestamp is in the future"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_MEDIUM"
+                                           },
+                                           {
+                                               "id":  "509",
+                                               "description":  "Reads software policies",
+                                               "match_data":  [
+                                                                  "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "#registry_keys_opened",
+                                                                "value":  "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "206",
+                                               "description":  "Performs DNS lookups",
+                                               "severity":  "IMPACT_SEVERITY_INFO",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "#dns_lookups",
+                                                                "value":  "DNS query: dns.google"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "411",
+                                               "description":  "PE file contains a mix of data directories often seen in goodware",
+                                               "match_data":  [
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_IMPORT",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_RESOURCE",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_BASERELOC",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_DEBUG",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_IAT"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "715",
+                                               "description":  "Classification label",
+                                               "match_data":  [
+                                                                  "clean1.winEXE@2/0@6/0"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "626",
+                                               "description":  "Sample tries to load a library which is not present or installed on the analysis machine, adding the library might reveal more behavior",
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "229",
+                                               "description":  "Spawns processes",
+                                               "match_data":  [
+                                                                  "C:\\Users\\user\\Desktop\\bthudtask.exe \"C:\\Users\\user\\Desktop\\bthudtask.exe\"",
+                                                                  "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "419",
+                                               "description":  "PE file has a high image base, often used for DLLs",
+                                               "match_data":  [
+                                                                  "Image base 0x140000000 \u003e 0x60000000"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "406",
+                                               "description":  "Contains modern PE file flags such as dynamic base (ASLR) or NX",
+                                               "match_data":  [
+                                                                  "HIGH_ENTROPY_VA, DYNAMIC_BASE, NX_COMPAT, GUARD_CF, TERMINAL_SERVER_AWARE"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "187",
+                                               "description":  "Tries to load missing DLLs",
+                                               "match_data":  [
+                                                                  "newdev.dll",
+                                                                  "devobj.dll",
+                                                                  "cfgmgr32.dll",
+                                                                  "wofutil.dll",
+                                                                  "devrtl.dll"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "95",
+                                               "description":  "Creates mutexes",
+                                               "match_data":  [
+                                                                  "\\Sessions\\1\\BaseNamedObjects\\Local\\SM0:6960:120:WilError_03"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "416",
+                                               "description":  "PE file contains a valid data directory to section mapping",
+                                               "match_data":  [
+                                                                  "Data directory: IMAGE_DIRECTORY_ENTRY_IMPORT is in: .rdata",
+                                                                  "Data directory: IMAGE_DIRECTORY_ENTRY_RESOURCE is in: .rsrc",
+                                                                  "Data directory: IMAGE_DIRECTORY_ENTRY_BASERELOC is in: .reloc",
+                                                                  "Data directory: IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG is in: .rdata",
+                                                                  "Data directory: IMAGE_DIRECTORY_ENTRY_IAT is in: .rdata"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "203",
+                                               "description":  "Binary contains paths to debug symbols",
+                                               "match_data":  [
+                                                                  "BthUdTask.pdbGCTL source: bthudtask.exe",
+                                                                  "BthUdTask.pdb source: bthudtask.exe"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "199",
+                                               "description":  "PE file contains sections with non-standard names",
+                                               "match_data":  [
+                                                                  "section name: fothk",
+                                                                  "section name: .didat"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "412",
+                                               "description":  "PE file contains a debug data directory",
+                                               "match_data":  [
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_DEBUG"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "234",
+                                               "description":  "Binary contains a suspicious time stamp",
+                                               "match_data":  [
+                                                                  "0xCB12CFF1 [Fri Dec 17 23:02:09 2077 UTC]"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "653",
+                                               "description":  "Sample file is different than original file name gathered from version info",
+                                               "match_data":  [
+                                                                  "OriginalFilenameBthUdTask.exej% vs file.exe"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "#memory_dumps",
+                                                                "value":  "file.exe, 00000001.00000002.3329811052.00007FF709D99000.00000002.00000001.01000000.00000003.sdmp"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "229",
+                                               "description":  "Spawns processes",
+                                               "match_data":  [
+                                                                  "C:\\Users\\user\\Desktop\\file.exe \"C:\\Users\\user\\Desktop\\file.exe\"",
+                                                                  "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "95",
+                                               "description":  "Creates mutexes",
+                                               "match_data":  [
+                                                                  "\\Sessions\\1\\BaseNamedObjects\\Local\\SM0:6316:120:WilError_03"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "203",
+                                               "description":  "Binary contains paths to debug symbols",
+                                               "match_data":  [
+                                                                  "BthUdTask.pdbGCTL source: file.exe",
+                                                                  "BthUdTask.pdb source: file.exe"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           }
+                                       ],
+                 "registry_keys_opened":  [
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\Setup\\SystemSetupInProgress",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize\\DisableMetaFiles",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize\\DisableUmpdBufferSizeCheck",
+                                              "HKEY_LOCAL_MACHINE\\System\\Setup",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Ole",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\AppModel\\Lookaside\\user",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\SideBySide",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\AppModel\\Lookaside\\machine",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\OLE",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Segment Heap",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\OLE\\Tracing",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\MUI\\Settings",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Ole\\FeatureDevelopmentProperties",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\LanguageOverlay\\OverlayPackages\\en-US"
+                                          ],
+                 "dns_lookups":  [
+                                     {
+                                         "hostname":  "dns.google",
+                                         "resolved_ips":  [
+                                                              "8.8.8.8",
+                                                              "8.8.4.4"
+                                                          ]
+                                     }
+                                 ],
+                 "verdict_confidence":  99,
+                 "processes_created":  [
+                                           "\"C:\\Users\\\u003cUSER\u003e\\Desktop\\software.exe\"",
+                                           "\"C:\\Users\\user\\Desktop\\bthudtask.exe\"",
+                                           "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1",
+                                           "\"C:\\Users\\user\\Desktop\\file.exe\""
+                                       ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "parse PE header",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "2"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1012",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "query or enumerate registry value",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "5"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1071",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "The PE file contains a PDB path",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "static_pe_pdbpath"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1070.006",
+                                                     "severity":  "IMPACT_SEVERITY_MEDIUM",
+                                                     "signature_description":  "Binary compilation timestomping detected",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "pe_compile_timestomping"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1070",
+                                                     "severity":  "IMPACT_SEVERITY_MEDIUM",
+                                                     "signature_description":  "Binary compilation timestomping detected",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "pe_compile_timestomping"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1027",
+                                                     "severity":  "IMPACT_SEVERITY_LOW",
+                                                     "signature_description":  "The binary contains an unknown PE section name indicative of packing",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "packer_unknown_pe_section_name"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1027.002",
+                                                     "severity":  "IMPACT_SEVERITY_LOW",
+                                                     "signature_description":  "The binary contains an unknown PE section name indicative of packing",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "packer_unknown_pe_section_name"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1070.006",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Binary contains a suspicious time stamp",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "234"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "processes_terminated":  [
+                                              "C:\\Users\\user\\Desktop\\bthudtask.exe",
+                                              "C:\\Windows\\System32\\conhost.exe",
+                                              "C:\\Users\\user\\Desktop\\file.exe"
+                                          ],
+                 "verdicts":  [
+                                  "CLEAN"
+                              ],
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "4960",
+                                            "name":  "\"C:\\Users\\\u003cUSER\u003e\\Desktop\\software.exe\""
+                                        },
+                                        {
+                                            "process_id":  "6980",
+                                            "name":  "\"C:\\Users\\user\\Desktop\\bthudtask.exe\"",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "6960",
+                                                                 "name":  "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1",
+                                                                 "files_opened":  [
+                                                                                      "C:\\Users\\user\\Desktop\\bthudtask.exe",
+                                                                                      "C:\\Users\\user\\SystemResources\\bthudtask.exe.mun",
+                                                                                      "C:\\Windows\\Globalization\\Sorting\\sortdefault.nls",
+                                                                                      "C:\\Windows\\SYSTEM32\\CoreMessaging.dll",
+                                                                                      "C:\\Windows\\SYSTEM32\\CoreUIComponents.dll",
+                                                                                      "C:\\Windows\\SYSTEM32\\TextShaping.dll",
+                                                                                      "C:\\Windows\\SYSTEM32\\dwmapi.dll",
+                                                                                      "C:\\Windows\\SYSTEM32\\kernel.appcore.dll",
+                                                                                      "C:\\Windows\\SYSTEM32\\ole32.dll",
+                                                                                      "C:\\Windows\\SYSTEM32\\textinputframework.dll",
+                                                                                      "C:\\Windows\\SYSTEM32\\windows.staterepositorycore.dll",
+                                                                                      "C:\\Windows\\SYSTEM32\\wintypes.dll",
+                                                                                      "C:\\Windows\\System32\\conhost.exe",
+                                                                                      "C:\\Windows\\System32\\en-US\\KERNELBASE.dll.mui",
+                                                                                      "C:\\Windows\\System32\\en-US\\user32.dll.mui",
+                                                                                      "C:\\Windows\\SystemResources\\user32.dll.mun",
+                                                                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.22621.2361_none_2712ced57382f843",
+                                                                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.22621.2361_none_2712ced57382f843\\comctl32.DLL",
+                                                                                      "C:\\Windows\\system32\\CRYPTBASE.DLL",
+                                                                                      "C:\\Windows\\system32\\IMM32.DLL",
+                                                                                      "C:\\Windows\\system32\\conhost.exe",
+                                                                                      "C:\\Windows\\system32\\en-US\\conhost.exe.mui",
+                                                                                      "C:\\Windows\\system32\\rpcss.dll",
+                                                                                      "C:\\Windows\\system32\\uxtheme.dll",
+                                                                                      "C:\\Windows\\system32\\uxtheme.dll.Config"
+                                                                                  ]
+                                                             }
+                                                         ],
+                                            "files_opened":  [
+                                                                 "C:\\Windows\\SYSTEM32\\DEVOBJ.dll",
+                                                                 "C:\\Windows\\SYSTEM32\\DEVRTL.dll",
+                                                                 "C:\\Windows\\SYSTEM32\\WOFUTIL.dll",
+                                                                 "C:\\Windows\\SYSTEM32\\cfgmgr32.dll",
+                                                                 "C:\\Windows\\SYSTEM32\\en-US\\newdev.dll.mui",
+                                                                 "C:\\Windows\\SYSTEM32\\newdev.dll"
+                                                             ],
+                                            "files_written":  [
+                                                                  "\\Device\\ConDrv\\\\Connect"
+                                                              ]
+                                        }
+                                    ],
+                 "files_written":  [
+                                       "\\Device\\ConDrv\\\\Connect"
+                                   ],
+                 "memory_dumps":  [
+                                      {
+                                          "file_name":  "4960.dmp",
+                                          "process":  "C:\\Users\\Bruno\\Desktop\\software.exe",
+                                          "size":  "54198272",
+                                          "base_address":  "2147352576"
+                                      },
+                                      {
+                                          "file_name":  "00000002.00000002.3440935530.000001ADCF120000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\bthudtask.exe",
+                                          "size":  "4096",
+                                          "base_address":  "1846015033344",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6980"
+                                      },
+                                      {
+                                          "file_name":  "00000002.00000002.3463875551.00007FF7D1804000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\bthudtask.exe",
+                                          "size":  "8192",
+                                          "base_address":  "140702348492800",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6980"
+                                      },
+                                      {
+                                          "file_name":  "00000002.00000002.3432290293.000001ADCEEE0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\bthudtask.exe",
+                                          "size":  "8192",
+                                          "base_address":  "1846012674048",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6980"
+                                      },
+                                      {
+                                          "file_name":  "00000002.00000002.3432240742.000001ADCEE20000.00000004.00000020.00040000.00000004.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\bthudtask.exe",
+                                          "size":  "4096",
+                                          "base_address":  "1846011887616",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6980"
+                                      },
+                                      {
+                                          "file_name":  "00000002.00000002.3464455855.00007FF7D1807000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\bthudtask.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140702348505088",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6980"
+                                      },
+                                      {
+                                          "file_name":  "00000002.00000000.3304574961.00007FF7D1800000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\bthudtask.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140702348476416",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "6980"
+                                      },
+                                      {
+                                          "file_name":  "00000002.00000000.3304783429.00007FF7D1809000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\bthudtask.exe",
+                                          "size":  "28672",
+                                          "base_address":  "140702348513280",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "6980"
+                                      },
+                                      {
+                                          "file_name":  "00000002.00000000.3304630008.00007FF7D1801000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\bthudtask.exe",
+                                          "size":  "8192",
+                                          "base_address":  "140702348480512",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "6980"
+                                      },
+                                      {
+                                          "file_name":  "00000002.00000002.3452184694.00007FF7D1800000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\bthudtask.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140702348476416",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6980"
+                                      },
+                                      {
+                                          "file_name":  "00000002.00000002.3432335797.000001ADCEF30000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\bthudtask.exe",
+                                          "size":  "12288",
+                                          "base_address":  "1846013001728",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6980"
+                                      },
+                                      {
+                                          "file_name":  "00000002.00000002.3458415409.00007FF7D1801000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\bthudtask.exe",
+                                          "size":  "8192",
+                                          "base_address":  "140702348480512",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6980"
+                                      },
+                                      {
+                                          "file_name":  "00000002.00000000.3304746072.00007FF7D1807000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\bthudtask.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140702348505088",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "6980"
+                                      },
+                                      {
+                                          "file_name":  "00000002.00000002.3464455855.00007FF7D1809000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\bthudtask.exe",
+                                          "size":  "28672",
+                                          "base_address":  "140702348513280",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6980"
+                                      },
+                                      {
+                                          "file_name":  "00000002.00000002.3444477466.000001ADCF2D4000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\bthudtask.exe",
+                                          "size":  "16384",
+                                          "base_address":  "1846016819200",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6980"
+                                      },
+                                      {
+                                          "file_name":  "00000002.00000000.3304690574.00007FF7D1804000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\bthudtask.exe",
+                                          "size":  "8192",
+                                          "base_address":  "140702348492800",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "6980"
+                                      },
+                                      {
+                                          "file_name":  "00000002.00000002.3432335797.000001ADCEF34000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\bthudtask.exe",
+                                          "size":  "94208",
+                                          "base_address":  "1846013018112",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6980"
+                                      },
+                                      {
+                                          "file_name":  "00000002.00000002.3431796305.00000087289FE000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\bthudtask.exe",
+                                          "size":  "8192",
+                                          "base_address":  "580502151168",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6980"
+                                      },
+                                      {
+                                          "file_name":  "00000002.00000002.3444477466.000001ADCF2D0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\bthudtask.exe",
+                                          "size":  "12288",
+                                          "base_address":  "1846016802816",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6980"
+                                      },
+                                      {
+                                          "file_name":  "00000002.00000002.3431534661.000000872897D000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\bthudtask.exe",
+                                          "size":  "12288",
+                                          "base_address":  "580501622784",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6980"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.3322806063.00000224D6F90000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\file.exe",
+                                          "size":  "12288",
+                                          "base_address":  "2357248720896",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "5672"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000000.3156224555.00007FF709D91000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\file.exe",
+                                          "size":  "8192",
+                                          "base_address":  "140698998870016",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "5672"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000000.3157408392.00007FF709D94000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\file.exe",
+                                          "size":  "8192",
+                                          "base_address":  "140698998882304",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "5672"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.3325163845.00000224D70C0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\file.exe",
+                                          "size":  "4096",
+                                          "base_address":  "2357249966080",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "5672"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.3304621618.0000005492EFD000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\file.exe",
+                                          "size":  "12288",
+                                          "base_address":  "363242442752",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "5672"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.3327452177.00007FF709D90000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\file.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140698998865920",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "5672"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.3329811052.00007FF709D97000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\file.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140698998894592",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "5672"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000000.3155784554.00007FF709D90000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\file.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140698998865920",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "5672"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.3305850329.0000005492F7E000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\file.exe",
+                                          "size":  "8192",
+                                          "base_address":  "363242971136",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "5672"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.3311676988.00000224D6DC0000.00000004.00000020.00040000.00000004.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\file.exe",
+                                          "size":  "4096",
+                                          "base_address":  "2357246820352",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "5672"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.3325706100.00000224D7290000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\file.exe",
+                                          "size":  "12288",
+                                          "base_address":  "2357251866624",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "5672"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.3329811052.00007FF709D99000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\file.exe",
+                                          "size":  "28672",
+                                          "base_address":  "140698998902784",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "refs":  [
+                                                       {
+                                                           "ref":  "#signature_matches",
+                                                           "value":  "653"
+                                                       }
+                                                   ],
+                                          "process_id":  "5672"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000000.3157792588.00007FF709D97000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\file.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140698998894592",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "5672"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.3325706100.00000224D7294000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\file.exe",
+                                          "size":  "16384",
+                                          "base_address":  "2357251883008",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "5672"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000000.3157850548.00007FF709D99000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\file.exe",
+                                          "size":  "28672",
+                                          "base_address":  "140698998902784",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "5672"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.3322806063.00000224D6F94000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\file.exe",
+                                          "size":  "94208",
+                                          "base_address":  "2357248737280",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "5672"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.3329232160.00007FF709D94000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\file.exe",
+                                          "size":  "8192",
+                                          "base_address":  "140698998882304",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "5672"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.3328787811.00007FF709D91000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\file.exe",
+                                          "size":  "8192",
+                                          "base_address":  "140698998870016",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "5672"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.3318907983.00000224D6E80000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\file.exe",
+                                          "size":  "8192",
+                                          "base_address":  "2357247606784",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "5672"
+                                      }
+                                  ],
+                 "mbc":  [
+                             {
+                                 "id":  "B0001.032",
+                                 "objective":  "Anti-Behavioral Analysis",
+                                 "behavior":  "Debugger Detection",
+                                 "method":  "Timing/Delay Check GetTickCount",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "3"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0018",
+                                 "objective":  "Process",
+                                 "behavior":  "Terminate Process",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "4"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.006",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Query Registry Value",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "5"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "OC0006"
+                             },
+                             {
+                                 "id":  "C0005.001"
+                             },
+                             {
+                                 "id":  "C0002"
+                             },
+                             {
+                                 "id":  "OB0001"
+                             },
+                             {
+                                 "id":  "OB0002"
+                             },
+                             {
+                                 "id":  "OB0006"
+                             },
+                             {
+                                 "id":  "F0001"
+                             },
+                             {
+                                 "id":  "F0005"
+                             },
+                             {
+                                 "id":  "F0005.004"
+                             }
+                         ],
+                 "files_opened":  [
+                                      "C:\\Users\\user\\Desktop\\bthudtask.exe",
+                                      "C:\\Users\\user\\SystemResources\\bthudtask.exe.mun",
+                                      "C:\\Windows\\Globalization\\Sorting\\sortdefault.nls",
+                                      "C:\\Windows\\SYSTEM32\\CoreMessaging.dll",
+                                      "C:\\Windows\\SYSTEM32\\CoreUIComponents.dll",
+                                      "C:\\Windows\\SYSTEM32\\DEVOBJ.dll",
+                                      "C:\\Windows\\SYSTEM32\\DEVRTL.dll",
+                                      "C:\\Windows\\SYSTEM32\\TextShaping.dll",
+                                      "C:\\Windows\\SYSTEM32\\WOFUTIL.dll",
+                                      "C:\\Windows\\SYSTEM32\\cfgmgr32.dll",
+                                      "C:\\Windows\\SYSTEM32\\dwmapi.dll",
+                                      "C:\\Windows\\SYSTEM32\\en-US\\newdev.dll.mui",
+                                      "C:\\Windows\\SYSTEM32\\kernel.appcore.dll",
+                                      "C:\\Windows\\SYSTEM32\\newdev.dll",
+                                      "C:\\Windows\\SYSTEM32\\ole32.dll",
+                                      "C:\\Windows\\SYSTEM32\\textinputframework.dll",
+                                      "C:\\Windows\\SYSTEM32\\windows.staterepositorycore.dll",
+                                      "C:\\Windows\\SYSTEM32\\wintypes.dll",
+                                      "C:\\Windows\\System32\\conhost.exe",
+                                      "C:\\Windows\\System32\\en-US\\KERNELBASE.dll.mui",
+                                      "C:\\Windows\\System32\\en-US\\user32.dll.mui",
+                                      "C:\\Windows\\SystemResources\\user32.dll.mun",
+                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.22621.2361_none_2712ced57382f843",
+                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.22621.2361_none_2712ced57382f843\\comctl32.DLL",
+                                      "C:\\Windows\\system32\\CRYPTBASE.DLL",
+                                      "C:\\Windows\\system32\\IMM32.DLL",
+                                      "C:\\Windows\\system32\\conhost.exe",
+                                      "C:\\Windows\\system32\\en-US\\conhost.exe.mui",
+                                      "C:\\Windows\\system32\\rpcss.dll",
+                                      "C:\\Windows\\system32\\uxtheme.dll",
+                                      "C:\\Windows\\system32\\uxtheme.dll.Config",
+                                      "C:\\Users\\user\\Desktop\\file.exe",
+                                      "C:\\Users\\user\\SystemResources\\file.exe.mun"
+                                  ],
+                 "tags":  [
+                              "OBFUSCATED"
+                          ],
+                 "attack_techniques":  {
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "parse PE header",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "2"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1012":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "query or enumerate registry value",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "5"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1071":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "The PE file contains a PDB path",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "static_pe_pdbpath"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1070.006":  [
+                                                             {
+                                                                 "severity":  "MEDIUM",
+                                                                 "description":  "Binary compilation timestomping detected",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "pe_compile_timestomping"
+                                                                              }
+                                                                          ]
+                                                             },
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "Binary contains a suspicious time stamp",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "234"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1070":  [
+                                                         {
+                                                             "severity":  "MEDIUM",
+                                                             "description":  "Binary compilation timestomping detected",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "pe_compile_timestomping"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1027":  [
+                                                         {
+                                                             "severity":  "LOW",
+                                                             "description":  "The binary contains an unknown PE section name indicative of packing",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "packer_unknown_pe_section_name"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1027.002":  [
+                                                             {
+                                                                 "severity":  "LOW",
+                                                                 "description":  "The binary contains an unknown PE section name indicative of packing",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "packer_unknown_pe_section_name"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ]
+                                       }
+             }
+}

@@ -1,0 +1,999 @@
+{
+    "data":  {
+                 "signature_matches":  [
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "allocate or change RWX memory",
+                                               "description":  "host-interaction/process/inject",
+                                               "authors":  [
+                                                               "@mr-tz"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: allocate or change RWX memory\n    namespace: host-interaction/process/inject\n    authors:\n      - \"@mr-tz\"\n    scopes:\n      static: basic block\n      dynamic: thread\n    mbc:\n      - Memory::Allocate Memory [C0007]\n    examples:\n      - Practical Malware Analysis Lab 03-03.exe_:0x4010EA\n      # ntdll\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x140001ABA\n  features:\n    - and:\n      - or:\n        - match: allocate memory\n        - match: change memory protection\n      - or:\n        - number: 0x40 = PAGE_EXECUTE_READWRITE\n        # lea     r9d, [rcx+40h]  ; flProtect\n        # call    cs:VirtualAlloc\n        - instruction:\n          - mnemonic: lea\n          - offset: 0x40 = PAGE_EXECUTE_READWRITE\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create thread",
+                                               "description":  "host-interaction/thread/create",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "joakim@intezer.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create thread\n    namespace: host-interaction/thread/create\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - joakim@intezer.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: thread\n    mbc:\n      - Process::Create Thread [C0038]\n    examples:\n      - 946A99F36A46D335DEC080D9A4371940:0x10001DA0\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x408020\n  features:\n    - or:\n      - and:\n        - os: windows\n        - or:\n          - api: kernel32.CreateThread\n          - api: _beginthread\n          - api: _beginthreadex\n          - api: PsCreateSystemThread\n          - api: SHCreateThread\n          - api: SHCreateThreadWithHandle\n          - api: kernel32.CreateRemoteThread\n          - api: kernel32.CreateRemoteThreadEx\n          - api: RtlCreateUserThread\n          - api: ntdll.NtCreateThread\n          - api: ntdll.NtCreateThreadEx\n          - api: ntdll.ZwCreateThread\n          - api: ntdll.ZwCreateThreadEx\n      - and:\n        - or:\n          - os: linux\n          - os: android\n        - api: pthread_create\n      - and:\n        - api: System.Threading.Thread::Start\n        - optional:\n          - api: System.Threading.Thread::ctor\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "parse PE header",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: parse PE header\n    namespace: load-code/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic, operand[1].offset features\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x403DD0\n  features:\n    - and:\n      - os: windows\n      - and:\n        - mnemonic: cmp\n        - or:\n          - number: 0x4550 = IMAGE_NT_SIGNATURE (PE)\n          - and:\n            - number: 0x50\n            - number: 0x45\n        - or:\n          - number: 0x5A4D = IMAGE_DOS_SIGNATURE (MZ)\n          - and:\n            - number: 0x4D\n            - number: 0x5A\n        - optional:\n          - and:\n            - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x30 = IMAGE_NT_HEADERS64.OptionalHeader.ImageBase\n          - basic block:\n            - and:\n              - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n              - 3 or more:\n                - operand[1].offset: 0x4 = IMAGE_NT_HEADERS.FileHeader.Machine\n                - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n                - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n                - operand[1].offset: 0x16 = IMAGE_NT_HEADERS.FileHeader.Characteristics\n                - operand[1].offset: 0x28 = IMAGE_NT_HEADERS.OptionalHeader.AddressOfEntryPoint  # for 32 and 64 bit\n                - or:\n                  - and:\n                    - arch: i386\n                    - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                  - and:\n                    - arch: amd64\n                    - operand[1].offset: 0x30 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "spawn thread to RWX shellcode",
+                                               "description":  "load-code/shellcode",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: spawn thread to RWX shellcode\n    namespace: load-code/shellcode\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    mbc:\n      - Memory::Allocate Memory [C0007]\n      - Process::Create Thread [C0038]\n    examples:\n      - Practical Malware Analysis Lab 19-02.exe_:0x401230\n  features:\n    - and:\n      - match: allocate or change RWX memory\n      - match: create thread\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "write file on Windows",
+                                               "description":  "host-interaction/file-system/write",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: write file on Windows\n    namespace: host-interaction/file-system/write\n    authors:\n      - william.ballenthin@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - File System::Writes File [C0052]\n    examples:\n      - Practical Malware Analysis Lab 01-04.exe_:0x4011FC\n      # ntdll\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x1400025C4\n  features:\n    - or:\n      - and:\n        - os: windows\n        - optional:\n          - basic block:\n            - or:\n              - number: 0x40000000 = GENERIC_WRITE\n              - number: 0x2 = FILE_WRITE_DATA\n              - match: create or open file\n          - call:\n            - or:\n              - number: 0x40000000 = GENERIC_WRITE\n              - number: 0x2 = FILE_WRITE_DATA\n              - match: create or open file\n        - or:\n          - api: kernel32.WriteFile\n          - api: kernel32.WriteFileEx\n          - api: NtWriteFile\n          - api: ZwWriteFile\n          - api: _fwrite\n          - api: fwrite\n      - api: System.IO.File::WriteAllBytes\n      - api: System.IO.File::WriteAllBytesAsync\n      - api: System.IO.File::WriteAllLines\n      - api: System.IO.File::WriteAllLinesAsync\n      - api: System.IO.File::WriteAllText\n      - api: System.IO.File::WriteAllTextAsync\n      - api: System.IO.File::AppendAllLines\n      - api: System.IO.File::AppendAllLinesAsync\n      - api: System.IO.File::AppendAllText\n      - api: System.IO.File::AppendAllTextAsync\n      - api: System.IO.File::AppendText\n      - api: System.IO.FileInfo::AppendText\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create pipe",
+                                               "description":  "communication/named-pipe/create",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create pipe\n    namespace: communication/named-pipe/create\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Communication::Interprocess Communication::Create Pipe [C0003.001]\n    examples:\n      - Practical Malware Analysis Lab 03-02.dll_:0x10003a13\n  features:\n    - or:\n      - api: kernel32.CreatePipe\n      - api: kernel32.CreateNamedPipe\n      - api: System.IO.Pipes.AnonymousPipeClientStream::ctor\n      - api: System.IO.Pipes.NamedPipeClientStream::ctor\n      - api: System.IO.Pipes.AnonymousPipeServerStream::ctor\n      - api: System.IO.Pipes.AnonymousPipeServerStreamAcl::Create\n      - api: System.IO.Pipes.NamedPipeServerStream::ctor\n      - api: System.IO.Pipes.NamedPipeServerStreamAcl::Create\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "connect pipe",
+                                               "description":  "communication/named-pipe/connect",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: connect pipe\n    namespace: communication/named-pipe/connect\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Communication::Interprocess Communication::Connect Pipe [C0003.002]\n    examples:\n      # Windows msdt.exe\n      - 152d4c9f63efb332ccb134c6953c0104:0x42e400\n  features:\n    - or:\n      - api: kernel32.ConnectNamedPipe\n      - api: kernel32.CallNamedPipe\n        description: connect, read, write from pipe in single operation\n      - api: System.IO.Pipes.NamedPipeClientStream::Connect\n      - api: System.IO.Pipes.NamedPipeClientStream::ConnectAsync\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "write pipe",
+                                               "description":  "communication/named-pipe/write",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: write pipe\n    namespace: communication/named-pipe/write\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    mbc:\n      - Communication::Interprocess Communication::Write Pipe [C0003.004]\n    examples:\n      - C91887D861D9BD4A5872249B641BC9F9:0x401A77\n  features:\n    - or:\n      - and:\n        - or:\n          - match: create pipe\n          - match: connect pipe\n        - api: kernel32.WriteFile\n      - api: kernel32.TransactNamedPipe\n        description: writes and reads pipe in single operation\n      - api: kernel32.CallNamedPipe\n        description: connects, writes, and reads pipe in single operation\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "read file on Windows",
+                                               "description":  "host-interaction/file-system/read",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: read file on Windows\n    namespace: host-interaction/file-system/read\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    mbc:\n      - File System::Read File [C0051]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x1314567B\n  features:\n    - or:\n      - and:\n        - os: windows\n        - optional:\n          - and:\n            - number: 0x80000000 = GENERIC_READ\n            - match: create or open file\n        - or:\n          - api: kernel32.ReadFile\n          - api: ReadFileEx\n          - api: NtReadFile\n          - api: ZwReadFile\n          - api: LZRead\n          - api: _read\n          - api: fread\n      - api: System.IO.File::ReadAllBytes\n      - api: System.IO.File::ReadAllBytesAsync\n      - api: System.IO.File::ReadAllLines\n      - api: System.IO.File::ReadAllLinesAsync\n      - api: System.IO.File::ReadAllText\n      - api: System.IO.File::ReadAllTextAsync\n      - api: System.IO.File::ReadLines\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "terminate process",
+                                               "description":  "host-interaction/process/terminate",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: terminate process\n    namespace: host-interaction/process/terminate\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: thread\n    mbc:\n      - Process::Terminate Process [C0018]\n    examples:\n      - C91887D861D9BD4A5872249B641BC9F9:0x401A77\n      - 9B7CCAA2AE6A5B96E3110EBCBC4311F6:0x10010307\n  features:\n    - or:\n      - api: System.Diagnostics.Process::Kill\n      - api: System.Diagnostics.Process::WaitForExit\n      - api: System.Diagnostics.Process::WaitForExitAsync\n      - api: System.Environment::Exit\n      - api: System.Windows.Forms.Application::Exit\n      - api: exit\n      - api: Exit\n      - and:\n        - optional:\n          - match: open process\n        - or:\n          - api: kernel32.TerminateProcess\n          - api: ntdll.NtTerminateProcess\n          - api: kernel32.ExitProcess\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get thread local storage value",
+                                               "description":  "host-interaction/process",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get thread local storage value\n    namespace: host-interaction/process\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n  features:\n    - and:\n      - api: kernel32.TlsGetValue\n"
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "enumerate PE sections",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "@Ana06",
+                                                               "@mr-tz"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: enumerate PE sections\n    namespace: load-code/pe\n    authors:\n      - \"@Ana06\"\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: unsupported  # requires offset, operand[1].offset, characteristic, mnemonic, basicblock features\n    mbc:\n      - Discovery::Code Discovery::Enumerate PE Sections [B0046.001]\n    references:\n      - https://0x00sec.org/t/reflective-dll-injection/3080\n      - https://www.ired.team/offensive-security/code-injection-process-injection/reflective-dll-injection\n    examples:\n      - E4C33AC3638EEF68311F8AC0D72483C7:0x401510\n  features:\n    - and:\n      - os: windows\n      # there should be some complexity to functions like this\n      - count(basic blocks): 3 or more\n      - optional:\n        - offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n      - instruction:\n        - or:\n          - mnemonic: mov\n          - mnemonic: movzx\n        - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n      - basic block:\n        - or:\n          - and:\n            - description: IMAGE_FIRST_SECTION(nt_header)\n            - instruction:\n              - or:\n                - mnemonic: add\n                - mnemonic: mov\n                - mnemonic: movzx\n              - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n            - operand[1].offset: 0x18 = FileHeader.SizeOfOptionalHeader\n          - and:\n            - description: (DWORD)dll_raw + dos_header-\u003ee_lfanew + sizeof(IMAGE_NT_HEADERS) + sizeof(IMAGE_SECTION_HEADER) * i\n            - number: 0x28 = sizeof(IMAGE_SECTION_HEADER)\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0xF8 = sizeof(IMAGE_NT_HEADERS32)\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x108 = sizeof(IMAGE_NT_HEADERS64)\n      - 2 or more:\n        - operand[1].offset: 0xC = IMAGE_SECTION_HEADER.VirtualAddress\n        - operand[1].offset: 0x14 = IMAGE_SECTION_HEADER.PointerToRawData\n        - operand[1].offset: 0x10 = IMAGE_SECTION_HEADER.SizeOfRawData\n        # there\u0027s also offset 0x8 = IMAGE_SECTION_HEADER.Misc.PhysicalAddress, but it\u0027s likely too common\n      - not:\n        # non-zeroing XOR was observed in FPs\n        - characteristic: nzxor\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://0x00sec.org/t/reflective-dll-injection/3080"
+                                                            },
+                                                            {
+                                                                "ref":  "https://www.ired.team/offensive-security/code-injection-process-injection/reflective-dll-injection"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "contain a thread local storage (.tls) section",
+                                               "description":  "executable/pe/section/tls",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: contain a thread local storage (.tls) section\n    namespace: executable/pe/section/tls\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    examples:\n      - Practical Malware Analysis Lab 16-02.exe_\n  features:\n    - section: .tls\n"
+                                           },
+                                           {
+                                               "id":  "vti_match_0",
+                                               "name":  "Delays execution",
+                                               "description":  "(Process #1) beacon.exe has a thread which sleeps more than 5 minutes.",
+                                               "severity":  "IMPACT_SEVERITY_LOW",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "8bcd638706d2dc6e6c1b86473b2d2000b185c5137468aee2538e4414671be56a"
+                                                            },
+                                                            {
+                                                                "ref":  "#process_tree",
+                                                                "value":  "\"C:\\Users\\RDhJ0CNFevzX\\Desktop\\beacon.exe\" "
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "vti_match_42",
+                                               "name":  "Resolves API functions dynamically",
+                                               "description":  "(Process #1) beacon.exe resolves 207 API functions by name.",
+                                               "severity":  "IMPACT_SEVERITY_INFO",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "8bcd638706d2dc6e6c1b86473b2d2000b185c5137468aee2538e4414671be56a"
+                                                            },
+                                                            {
+                                                                "ref":  "#process_tree",
+                                                                "value":  "\"C:\\Users\\RDhJ0CNFevzX\\Desktop\\beacon.exe\" "
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "vti_match_43",
+                                               "name":  "Cobalt Strike configuration was extracted",
+                                               "description":  "A configuration for Cobalt Strike was extracted from artifacts of the dynamic analysis.",
+                                               "severity":  "IMPACT_SEVERITY_HIGH",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "#process_tree",
+                                                                "value":  "\"C:\\Users\\RDhJ0CNFevzX\\Desktop\\beacon.exe\" "
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "vti_match_44",
+                                               "name":  "Malicious file detected via reputation",
+                                               "description":  "The sample itself is a known malicious file.",
+                                               "severity":  "IMPACT_SEVERITY_HIGH",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "8bcd638706d2dc6e6c1b86473b2d2000b185c5137468aee2538e4414671be56a"
+                                                            },
+                                                            {
+                                                                "ref":  "#process_tree",
+                                                                "value":  "\"C:\\Users\\RDhJ0CNFevzX\\Desktop\\beacon.exe\" "
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "vti_match_1",
+                                               "name":  "Tries to connect using an uncommon port",
+                                               "description":  "Tries to connect to TCP port 60127 at 106.53.83.169.",
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "vti_match_28",
+                                               "format":  "SIG_FORMAT_YARA",
+                                               "name":  "Malicious content matched by YARA rules",
+                                               "description":  "YARA detected \"CobaltStrike\" from ruleset \"Hacktools\" in memory dump data from (process #1) beacon.exe.",
+                                               "severity":  "IMPACT_SEVERITY_HIGH",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "8bcd638706d2dc6e6c1b86473b2d2000b185c5137468aee2538e4414671be56a"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "3c052e0d730587f99579573addd4ff679711195ef22e9cf0ee0faf616ad64cf1"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "1784681dfa5e3ed90aac852940816011d2e5898e2391cb850fe694c827b894a1"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "a2cadd609fe7e3f1641c086f780c1ce863a9c9d89b69740b11b565c179993dde"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "c75f6c97374fb105f4fc902398c45486f2fe96a80f43a58927964d5fab086034"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "9e263d9e7d60da7782f95f70fc9f15708e7e99c33227d4f0de4d26faab2047a2"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "7af7f4df561a03e8fb4fc66f4b9b9ae6f6a4ed8de505db7943501cd1619531a1"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "4c9caf849ffb1c11a0c2729d538da0095952aff451f5b42b02c68d4c150abde0"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "8a65c2e5d1e87f53c5fdd6bff92474dc149ac1bde85908877b4e5df264577382"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "de27dd4e2dd7bc5b4e89eb5a6900ab6a8abd5463a64c1d9ab9477780cb50db9c"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "a4671f430ee67bcf0d73134c0a9597de01ec612b75fae41882b8db6c8188c09c"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "aeb7d0c2f1f094b6ba8cd7910034fc938c7e864f599ad4e309cd7c7ca8d5398e"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "25a87a5aeebddfcab239787c5f386a56d0e869f1ce427354d97a25f974c05309"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "7853605f84eeb8a43bf3d9d714f8ac1b6952778590b9170a933d343aa80ac97d"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "9f9e18e6e868861c07c5a0c13886f264753c3c6e4efa571bf8bdc77e13da1a74"
+                                                            },
+                                                            {
+                                                                "ref":  "#process_tree",
+                                                                "value":  "\"C:\\Users\\RDhJ0CNFevzX\\Desktop\\beacon.exe\" "
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "vti_match_2",
+                                               "format":  "SIG_FORMAT_YARA",
+                                               "name":  "Suspicious content matched by YARA rules",
+                                               "description":  "YARA detected \"ReflectiveLoader\" from ruleset \"Generic\" in memory dump data from (process #1) beacon.exe.",
+                                               "severity":  "IMPACT_SEVERITY_MEDIUM",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "8bcd638706d2dc6e6c1b86473b2d2000b185c5137468aee2538e4414671be56a"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "3c052e0d730587f99579573addd4ff679711195ef22e9cf0ee0faf616ad64cf1"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "1784681dfa5e3ed90aac852940816011d2e5898e2391cb850fe694c827b894a1"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "a2cadd609fe7e3f1641c086f780c1ce863a9c9d89b69740b11b565c179993dde"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "c75f6c97374fb105f4fc902398c45486f2fe96a80f43a58927964d5fab086034"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "9e263d9e7d60da7782f95f70fc9f15708e7e99c33227d4f0de4d26faab2047a2"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "7af7f4df561a03e8fb4fc66f4b9b9ae6f6a4ed8de505db7943501cd1619531a1"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "4c9caf849ffb1c11a0c2729d538da0095952aff451f5b42b02c68d4c150abde0"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "8a65c2e5d1e87f53c5fdd6bff92474dc149ac1bde85908877b4e5df264577382"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "de27dd4e2dd7bc5b4e89eb5a6900ab6a8abd5463a64c1d9ab9477780cb50db9c"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "a4671f430ee67bcf0d73134c0a9597de01ec612b75fae41882b8db6c8188c09c"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "aeb7d0c2f1f094b6ba8cd7910034fc938c7e864f599ad4e309cd7c7ca8d5398e"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "25a87a5aeebddfcab239787c5f386a56d0e869f1ce427354d97a25f974c05309"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "7853605f84eeb8a43bf3d9d714f8ac1b6952778590b9170a933d343aa80ac97d"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "9f9e18e6e868861c07c5a0c13886f264753c3c6e4efa571bf8bdc77e13da1a74"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "a31ea75d84975877e419e53cb104f15f0e0a391e69d8ce14cf66511c82a29602"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "edfcb5346ca1a3bd19b3f274d8dbbb3f45e68efd5358b33117077de7237f7684"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "023afa4794008a6782db9f830055e51c9614b54833e45f780e20b0faf5ee8051"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "fbd2ba874f1fea82429b2da03d0c5748adb21559157e77b971743f089f07db44"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "1204c5516fa8eec9622bfce5ca270b1a920a80e6dfee8822e59b7a443f789aa0"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "6513fa06957d3ae68f61c61f11f7b3972352cf6fbaa9086e8388bfad0a05ea77"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "18d3d9facbd7ed6c05d1bbd6fb3aff16f81382149bac46ef7fafc68b70be16c5"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "482183f4a98c4a88cc58bb261611d71101b71cbb249c623d13ffbe66f3d19990"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "40f1fb1a50bd25ee7519203c5a53a46b5d4f1fcc46bb5bf14dc4700a4995e24b"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "22aa510e62c56efc49b073aa701c89f8c54acb607d3a25bfc2f6662ee7bb7180"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "1c2ae3eefae189bf746b39f7a96e7410c25ed71a407f1afdcb2887422b53b9f9"
+                                                            },
+                                                            {
+                                                                "ref":  "#files_dropped",
+                                                                "value":  "0990fb78bf985dc711c37cc6cface62e2229c0b71477a7f6a51b3d0229d40b1a"
+                                                            },
+                                                            {
+                                                                "ref":  "#process_tree",
+                                                                "value":  "\"C:\\Users\\RDhJ0CNFevzX\\Desktop\\beacon.exe\" "
+                                                            }
+                                                        ]
+                                           }
+                                       ],
+                 "ip_traffic":  [
+                                    {
+                                        "destination_ip":  "106.53.83.169",
+                                        "destination_port":  60127,
+                                        "transport_layer_protocol":  "TCP"
+                                    }
+                                ],
+                 "modules_loaded":  [
+                                        "wininet",
+                                        "WININET",
+                                        "ole32",
+                                        "IPHLPAPI",
+                                        "ADVAPI32",
+                                        "dhcpcsvc",
+                                        "WS2_32",
+                                        "CRYPTSP",
+                                        "OLEAUT32",
+                                        "RpcRtRemote",
+                                        "DNSAPI",
+                                        "comctl32",
+                                        "npmproxy",
+                                        "profapi",
+                                        "ws2_32",
+                                        "API-MS-Win-Security-LSALookup-L1-1-0",
+                                        "mswsock",
+                                        "rpcrt4",
+                                        "winhttp",
+                                        "CRYPTBASE",
+                                        "fwpuclnt",
+                                        "wship6",
+                                        "oleaut32",
+                                        "netprofm",
+                                        "kernel32",
+                                        "rasadhlp",
+                                        "urlmon",
+                                        "Secur32",
+                                        "api-ms-win-downlevel-ole32-l1-1-0",
+                                        "rsaenh",
+                                        "api-ms-win-downlevel-advapi32-l2-1-0",
+                                        "SspiCli",
+                                        "dhcpcsvc6",
+                                        "CLBCatQ",
+                                        "api-ms-win-downlevel-shlwapi-l2-1-0",
+                                        "SHELL32",
+                                        "KERNEL32",
+                                        "wshtcpip",
+                                        "RPCRT4"
+                                    ],
+                 "dns_lookups":  [
+                                     {
+                                         "hostname":  "crt.sectigo.com",
+                                         "resolved_ips":  [
+                                                              "104.18.38.233"
+                                                          ]
+                                     }
+                                 ],
+                 "files_opened":  [
+                                      "\\device\\namedpipe\\msse-8799-server",
+                                      "\\\\?\\pipe\\MSSE-3678-server",
+                                      "\\Device\\NamedPipe\\MSSE-3678-server"
+                                  ],
+                 "memory_pattern_domains":  [
+                                                "106.53.83.169:60127"
+                                            ],
+                 "ids_alerts":  [
+                                    {
+                                        "rule_msg":  "POLICY-OTHER HTTP request by IPv4 address attempt",
+                                        "rule_category":  "policy-violation",
+                                        "rule_id":  "1:50447",
+                                        "alert_severity":  "high",
+                                        "rule_source":  "Snort registered user ruleset",
+                                        "rule_url":  "https://www.snort.org/downloads/#rule-downloads",
+                                        "rule_references":  [
+                                                                "https://www.w3.org/Protocols/rfc2616/rfc2616-sec15.html"
+                                                            ],
+                                        "rule_raw":  "alert tcp any any -\u003e any $HTTP_PORTS ( msg:\"POLICY-OTHER HTTP request by IPv4 address attempt\"; flow:to_server,established; http_header; content:\"Host:\",fast_pattern,nocase; pcre:\"/^Host\\x3a\\s*(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\\s*:?\\s*\\d*\\s*$/ims\"; service:http; reference:url,www.w3.org/Protocols/rfc2616/rfc2616-sec15.html; classtype:policy-violation; sid:50447; rev:1; )"
+                                    },
+                                    {
+                                        "rule_msg":  "SERVER-OTHER NetBIOS name request probe attempt",
+                                        "rule_category":  "attempted-recon",
+                                        "rule_id":  "1:51127",
+                                        "alert_severity":  "medium",
+                                        "rule_source":  "Snort registered user ruleset",
+                                        "rule_url":  "https://www.snort.org/downloads/#rule-downloads",
+                                        "rule_raw":  "alert udp $EXTERNAL_NET any -\u003e $HOME_NET 137 ( msg:\"SERVER-OTHER NetBIOS name request probe attempt\"; flow:to_server; content:\"|00 00 00 01 00 00 00 00 00 00|\",depth 12,offset 2; content:\"|00 21 00 01|\",distance 0; detection_filter:track by_src,count 5,seconds 2; metadata:policy max-detect-ips drop; service:netbios-ns; classtype:attempted-recon; sid:51127; rev:3; )"
+                                    }
+                                ],
+                 "memory_pattern_ips":  [
+                                            "106.53.83.169"
+                                        ],
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "4816",
+                                            "name":  "\"C:\\Users\\RDhJ0CNFevzX\\Desktop\\beacon.exe\" "
+                                        },
+                                        {
+                                            "process_id":  "2460",
+                                            "name":  "686fec3711da9221cb9654034a83318e.exe",
+                                            "time_offset":  18442
+                                        }
+                                    ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "parse PE header",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "parse PE header"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1065",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Tries to connect to TCP port 60127 at 106.53.83.169.",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "vti_match_1"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1045",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "(Process #1) beacon.exe resolves 207 API functions by name.",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "vti_match_42"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "signature_description":  "The process attempted to dynamically load a malicious function"
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "signature_description":  "The process tried to load dynamically one or more functions."
+                                                 },
+                                                 {
+                                                     "id":  "T1045",
+                                                     "signature_description":  "Manalize Local SandBox Packer Harvesting"
+                                                 },
+                                                 {
+                                                     "id":  "T1071",
+                                                     "signature_description":  "Detected one or more anomalous HTTP requests"
+                                                 },
+                                                 {
+                                                     "id":  "T1071",
+                                                     "signature_description":  "Detected HTTP requests to some non white-listed domains"
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "signature_description":  "Queries for the computername"
+                                                 },
+                                                 {
+                                                     "id":  "T1112",
+                                                     "signature_description":  "Detected an attempt to write registry keys related to the proxy settings"
+                                                 },
+                                                 {
+                                                     "id":  "T1185",
+                                                     "signature_description":  "Detected an attempt to write registry keys related to the proxy settings"
+                                                 },
+                                                 {
+                                                     "id":  "T1063",
+                                                     "signature_description":  "It Tries to detect injection methods"
+                                                 }
+                                             ],
+                 "memory_pattern_urls":  [
+                                             "http://106.53.83.169:60127/updates.rss",
+                                             "http://106.53.83.169/updates.rss"
+                                         ],
+                 "verdicts":  [
+                                  "MALWARE"
+                              ],
+                 "verdict_labels":  [
+                                        "CobaltStrike"
+                                    ],
+                 "files_dropped":  [
+                                       {
+                                           "path":  "c:\\users\\rdhj0cnfevzx\\appdata\\local\\microsoft\\windows\\inetcache\\counters.dat",
+                                           "sha256":  "c2d814a34b184b7cdf10e4e7a4311ff15db99326d6dd8d328b53bf9e19ccf858"
+                                       },
+                                       {
+                                           "sha256":  "3c052e0d730587f99579573addd4ff679711195ef22e9cf0ee0faf616ad64cf1",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "1784681dfa5e3ed90aac852940816011d2e5898e2391cb850fe694c827b894a1",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "a2cadd609fe7e3f1641c086f780c1ce863a9c9d89b69740b11b565c179993dde",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "c75f6c97374fb105f4fc902398c45486f2fe96a80f43a58927964d5fab086034",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "9e263d9e7d60da7782f95f70fc9f15708e7e99c33227d4f0de4d26faab2047a2",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "7af7f4df561a03e8fb4fc66f4b9b9ae6f6a4ed8de505db7943501cd1619531a1",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "4c9caf849ffb1c11a0c2729d538da0095952aff451f5b42b02c68d4c150abde0",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "8a65c2e5d1e87f53c5fdd6bff92474dc149ac1bde85908877b4e5df264577382",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "de27dd4e2dd7bc5b4e89eb5a6900ab6a8abd5463a64c1d9ab9477780cb50db9c",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "a4671f430ee67bcf0d73134c0a9597de01ec612b75fae41882b8db6c8188c09c",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "aeb7d0c2f1f094b6ba8cd7910034fc938c7e864f599ad4e309cd7c7ca8d5398e",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "25a87a5aeebddfcab239787c5f386a56d0e869f1ce427354d97a25f974c05309",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "7853605f84eeb8a43bf3d9d714f8ac1b6952778590b9170a933d343aa80ac97d",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "9f9e18e6e868861c07c5a0c13886f264753c3c6e4efa571bf8bdc77e13da1a74",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "a31ea75d84975877e419e53cb104f15f0e0a391e69d8ce14cf66511c82a29602",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "edfcb5346ca1a3bd19b3f274d8dbbb3f45e68efd5358b33117077de7237f7684",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "023afa4794008a6782db9f830055e51c9614b54833e45f780e20b0faf5ee8051",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "fbd2ba874f1fea82429b2da03d0c5748adb21559157e77b971743f089f07db44",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "1204c5516fa8eec9622bfce5ca270b1a920a80e6dfee8822e59b7a443f789aa0",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "6513fa06957d3ae68f61c61f11f7b3972352cf6fbaa9086e8388bfad0a05ea77",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "18d3d9facbd7ed6c05d1bbd6fb3aff16f81382149bac46ef7fafc68b70be16c5",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "482183f4a98c4a88cc58bb261611d71101b71cbb249c623d13ffbe66f3d19990",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "40f1fb1a50bd25ee7519203c5a53a46b5d4f1fcc46bb5bf14dc4700a4995e24b",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "22aa510e62c56efc49b073aa701c89f8c54acb607d3a25bfc2f6662ee7bb7180",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "1c2ae3eefae189bf746b39f7a96e7410c25ed71a407f1afdcb2887422b53b9f9",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "sha256":  "0990fb78bf985dc711c37cc6cface62e2229c0b71477a7f6a51b3d0229d40b1a",
+                                           "type":  "PE_EXE"
+                                       },
+                                       {
+                                           "path":  "/msdownload/update/v3/static/trustedr/en/authrootstl.cab",
+                                           "sha256":  "b33efcb95235b98b48508e019afa4b7655e80cf071defabd8b2123fc8b29307f",
+                                           "type":  "CAB",
+                                           "download_url":  "ctldl.windowsupdate.comhttp://ctldl.windowsupdate.com/msdownload/update/v3/static/trustedr/en/authrootstl.cab?3d990c966a02c35e"
+                                       }
+                                   ],
+                 "http_conversations":  [
+                                            {
+                                                "url":  "http://106.53.83.169:60127/http://106.53.83.169:60127/updates.rss",
+                                                "request_method":  "GET"
+                                            },
+                                            {
+                                                "url":  "http://106.53.83.169:60127/updates.rss",
+                                                "request_method":  "GET"
+                                            },
+                                            {
+                                                "url":  "http://crt.sectigo.com/SectigoPublicCodeSigningCAR36.crt",
+                                                "request_method":  "GET",
+                                                "request_headers":  {
+                                                                        "User-Agent":  "Microsoft-CryptoAPI/6.1",
+                                                                        "Host":  "crt.sectigo.com"
+                                                                    },
+                                                "response_headers":  {
+                                                                         "Content-Length":  "1566",
+                                                                         "Content-Type":  "application/pkix-cert"
+                                                                     },
+                                                "response_status_code":  200
+                                            },
+                                            {
+                                                "url":  "http://www.microsoft.com/pki/certs/MicCodSigPCA_08-31-2010.crt",
+                                                "request_method":  "GET",
+                                                "request_headers":  {
+                                                                        "User-Agent":  "Microsoft-CryptoAPI/6.1",
+                                                                        "Host":  "www.microsoft.com"
+                                                                    },
+                                                "response_headers":  {
+                                                                         "Content-Length":  "1472",
+                                                                         "Content-Type":  "application/octet-stream"
+                                                                     },
+                                                "response_status_code":  200
+                                            },
+                                            {
+                                                "url":  "http://crt.sectigo.com/SectigoPublicCodeSigningRootR46.p7c",
+                                                "request_method":  "GET",
+                                                "request_headers":  {
+                                                                        "User-Agent":  "Microsoft-CryptoAPI/6.1",
+                                                                        "Host":  "crt.sectigo.com"
+                                                                    },
+                                                "response_headers":  {
+                                                                         "Content-Length":  "4515",
+                                                                         "Content-Type":  "application/pkcs7-mime"
+                                                                     },
+                                                "response_status_code":  200
+                                            },
+                                            {
+                                                "url":  "http://www.microsoft.com/pki/certs/MicrosoftTimeStampPCA.crt",
+                                                "request_method":  "GET",
+                                                "request_headers":  {
+                                                                        "User-Agent":  "Microsoft-CryptoAPI/6.1",
+                                                                        "Host":  "www.microsoft.com"
+                                                                    },
+                                                "response_headers":  {
+                                                                         "Content-Length":  "1547",
+                                                                         "Content-Type":  "application/octet-stream"
+                                                                     },
+                                                "response_status_code":  200
+                                            }
+                                        ],
+                 "calls_highlighted":  [
+                                           "kernel32.Wow64SetThreadContext",
+                                           "advapi32.CreateProcessAsUserA",
+                                           "kernel32.ConnectNamedPipe",
+                                           "wininet.InternetConnectA",
+                                           "kernel32.TerminateProcess",
+                                           "kernel32.CreateNamedPipeA",
+                                           "wininet.InternetReadFile",
+                                           "kernel32.WriteFile",
+                                           "kernel32.WriteProcessMemory",
+                                           "kernel32.GetSystemTimeAsFileTime",
+                                           "kernel32.GetCurrentThreadId",
+                                           "wininet.HttpSendRequestA",
+                                           "kernel32.LoadLibraryExW",
+                                           "kernel32.IsDebuggerPresent",
+                                           "kernel32.ReadProcessMemory",
+                                           "kernel32.CreateProcessA",
+                                           "kernel32.ReadFile",
+                                           "kernel32.FreeLibrary",
+                                           "kernel32.CreatePipe",
+                                           "kernel32.WriteConsoleW",
+                                           "kernel32.ExitProcess",
+                                           "kernel32.FindFirstFileA",
+                                           "kernel32.SetThreadContext",
+                                           "kernel32.VirtualAllocEx"
+                                       ],
+                 "mbc":  [
+                             {
+                                 "id":  "C0007",
+                                 "objective":  "Memory",
+                                 "behavior":  "Allocate Memory",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "allocate or change RWX memory"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0038",
+                                 "objective":  "Process",
+                                 "behavior":  "Create Thread",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "create thread"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0007",
+                                 "objective":  "Memory",
+                                 "behavior":  "Allocate Memory",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "spawn thread to RWX shellcode"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0038",
+                                 "objective":  "Process",
+                                 "behavior":  "Create Thread",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "spawn thread to RWX shellcode"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0052",
+                                 "objective":  "File System",
+                                 "behavior":  "Writes File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "write file on Windows"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0003.001",
+                                 "objective":  "Communication",
+                                 "behavior":  "Interprocess Communication",
+                                 "method":  "Create Pipe",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "create pipe"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0003.002",
+                                 "objective":  "Communication",
+                                 "behavior":  "Interprocess Communication",
+                                 "method":  "Connect Pipe",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "connect pipe"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0003.004",
+                                 "objective":  "Communication",
+                                 "behavior":  "Interprocess Communication",
+                                 "method":  "Write Pipe",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "write pipe"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0051",
+                                 "objective":  "File System",
+                                 "behavior":  "Read File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "read file on Windows"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0018",
+                                 "objective":  "Process",
+                                 "behavior":  "Terminate Process",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "terminate process"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0046.001",
+                                 "objective":  "Discovery",
+                                 "behavior":  "Code Discovery",
+                                 "method":  "Enumerate PE Sections",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "enumerate PE sections"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "attack_techniques":  {
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "parse PE header",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "parse PE header"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "The process attempted to dynamically load a malicious function"
+                                                         },
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "The process tried to load dynamically one or more functions."
+                                                         }
+                                                     ],
+                                           "T1065":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Tries to connect to TCP port 60127 at 106.53.83.169.",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "vti_match_1"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1045":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "(Process #1) beacon.exe resolves 207 API functions by name.",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "vti_match_42"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "Manalize Local SandBox Packer Harvesting"
+                                                         }
+                                                     ],
+                                           "T1071":  [
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "Detected one or more anomalous HTTP requests"
+                                                         },
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "Detected HTTP requests to some non white-listed domains"
+                                                         }
+                                                     ],
+                                           "T1082":  [
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "Queries for the computername"
+                                                         }
+                                                     ],
+                                           "T1112":  [
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "Detected an attempt to write registry keys related to the proxy settings"
+                                                         }
+                                                     ],
+                                           "T1185":  [
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "Detected an attempt to write registry keys related to the proxy settings"
+                                                         }
+                                                     ],
+                                           "T1063":  [
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "It Tries to detect injection methods"
+                                                         }
+                                                     ]
+                                       }
+             }
+}

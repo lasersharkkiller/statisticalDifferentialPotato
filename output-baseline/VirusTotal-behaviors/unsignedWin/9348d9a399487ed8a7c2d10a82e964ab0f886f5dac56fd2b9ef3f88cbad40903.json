@@ -1,0 +1,702 @@
+{
+    "data":  {
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "link function at runtime on Windows",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "0"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "parse PE header",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "2"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1071",
+                                                     "signature_description":  "Adversaries may communicate using application layer protocols to avoid detection/network filtering by blending in with existing traffic."
+                                                 },
+                                                 {
+                                                     "id":  "T1574.002",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Tries to load missing DLLs",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "187"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Reads software policies",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "509"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "processes_created":  [
+                                           "\"C:\\Users\\\u003cUSER\u003e\\Desktop\\fixmapi.exe\"",
+                                           "%SAMPLEPATH%\\fixmapi.exe",
+                                           "%SAMPLEPATH%\\9348d9a399487ed8a7c2d10a82e964ab0f886f5dac56fd2b9ef3f88cbad40903.exe",
+                                           "C:\\Windows\\System32\\UI0Detect.exe",
+                                           "C:\\Program Files\\Google3792_1660804976\\bin\\updater.exe",
+                                           "\"C:\\Users\\user\\Desktop\\fixmapi.exe\""
+                                       ],
+                 "signature_matches":  [
+                                           {
+                                               "id":  "0",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "link function at runtime on Windows",
+                                               "description":  "linking/runtime-linking",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetProcAddress"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: link function at runtime on Windows\n    namespace: linking/runtime-linking\n    authors:\n      - moritz.raabe@mandiant.com\n      - mehunhoff@google.com\n    scopes:\n      static: instruction\n      dynamic: call\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x404130\n      - Practical Malware Analysis Lab 01-04.exe_:0x401350\n  features:\n    - and:\n      - os: windows\n      - or:\n        - api: kernel32.GetProcAddress\n        - api: ntdll.LdrGetProcedureAddress\n        - api: ntdll.LdrGetProcedureAddressEx\n        - api: ntdll.LdrGetProcedureAddressForCaller\n        - api: MmGetSystemRoutineAddress\n"
+                                           },
+                                           {
+                                               "id":  "2",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "parse PE header",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "IMAGE_NT_SIGNATURE (PE)",
+                                                                  "IMAGE_DOS_SIGNATURE (MZ)",
+                                                                  "mnemonic: cmp"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: parse PE header\n    namespace: load-code/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic, operand[1].offset features\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x403DD0\n  features:\n    - and:\n      - os: windows\n      - and:\n        - mnemonic: cmp\n        - or:\n          - number: 0x4550 = IMAGE_NT_SIGNATURE (PE)\n          - and:\n            - number: 0x50\n            - number: 0x45\n        - or:\n          - number: 0x5A4D = IMAGE_DOS_SIGNATURE (MZ)\n          - and:\n            - number: 0x4D\n            - number: 0x5A\n        - optional:\n          - and:\n            - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x30 = IMAGE_NT_HEADERS64.OptionalHeader.ImageBase\n          - basic block:\n            - and:\n              - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n              - 3 or more:\n                - operand[1].offset: 0x4 = IMAGE_NT_HEADERS.FileHeader.Machine\n                - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n                - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n                - operand[1].offset: 0x16 = IMAGE_NT_HEADERS.FileHeader.Characteristics\n                - operand[1].offset: 0x28 = IMAGE_NT_HEADERS.OptionalHeader.AddressOfEntryPoint  # for 32 and 64 bit\n                - or:\n                  - and:\n                    - arch: i386\n                    - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                  - and:\n                    - arch: amd64\n                    - operand[1].offset: 0x30 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n"
+                                           },
+                                           {
+                                               "id":  "stealth_network",
+                                               "name":  "stealth_network",
+                                               "description":  "Network activity detected but not expressed in monitor API logs",
+                                               "match_data":  [
+                                                                  "{\"ip\": \"23.75.209.56\"}",
+                                                                  "{\"ip\": \"52.165.165.26\"}",
+                                                                  "{\"ip\": \"13.85.23.206\"}",
+                                                                  "{\"ip\": \"40.83.240.146\"}",
+                                                                  "{\"ip\": \"20.190.151.134\"}",
+                                                                  "{\"ip\": \"23.39.19.41\"}",
+                                                                  "{\"ip\": \"204.79.197.203\"}",
+                                                                  "{\"ip\": \"199.232.214.172\"}",
+                                                                  "{\"ip\": \"52.185.211.133\"}",
+                                                                  "{\"ip\": \"168.61.215.74\"}",
+                                                                  "{\"domain\": \"slscr.update.microsoft.com\"}",
+                                                                  "{\"domain\": \"glb.sls.prod.dcat.dsp.trafficmanager.net\"}",
+                                                                  "{\"domain\": \"settings-win.data.microsoft.com\"}",
+                                                                  "{\"domain\": \"settings-prod-scus-1.southcentralus.cloudapp.azure.com\"}",
+                                                                  "{\"domain\": \"s-part-0042.t-0009.fb-t-msedge.net\"}",
+                                                                  "{\"domain\": \"dns.msftncsi.com\"}",
+                                                                  "{\"domain\": \"wpad.hostonly\"}",
+                                                                  "{\"domain\": \"ctldl.windowsupdate.com\"}",
+                                                                  "{\"domain\": \"api.msn.com\"}",
+                                                                  "{\"domain\": \"cdn.onenote.net\"}",
+                                                                  "{\"domain\": \"login.live.com\"}",
+                                                                  "{\"domain\": \"fe3cr.delivery.mp.microsoft.com\"}",
+                                                                  "{\"domain\": \"x1.c.lencr.org\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "antidebug_setunhandledexceptionfilter",
+                                               "name":  "antidebug_setunhandledexceptionfilter",
+                                               "description":  "SetUnhandledExceptionFilter detected (possible anti-debug)",
+                                               "match_data":  [
+                                                                  "{\"type\": \"call\", \"pid\": 1988, \"cid\": 3}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "network_http",
+                                               "name":  "network_http",
+                                               "description":  "Performs some HTTP requests",
+                                               "match_data":  [
+                                                                  "{\"url\": \"http://x1.c.lencr.org/\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_LOW"
+                                           },
+                                           {
+                                               "id":  "procmem_yara",
+                                               "name":  "procmem_yara",
+                                               "description":  "Yara detections observed in process dumps, payloads or dropped files",
+                                               "match_data":  [
+                                                                  "{\"Hit\": \"PID 1988 triggered the Yara rule \u0027shellcode_get_eip\u0027 with data \u0027[\u0027{ E8 00 00 00 00 59 }\u0027]\u0027\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_MEDIUM"
+                                           },
+                                           {
+                                               "id":  "187",
+                                               "description":  "Tries to load missing DLLs",
+                                               "match_data":  [
+                                                                  "mapistub.dll",
+                                                                  "mapi32.dll"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "509",
+                                               "description":  "Reads software policies",
+                                               "match_data":  [
+                                                                  "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "#registry_keys_opened",
+                                                                "value":  "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "149",
+                                               "description":  "Program does not show much activity (idle)",
+                                               "match_data":  [
+                                                                  "no activity detected"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "416",
+                                               "description":  "PE file contains a valid data directory to section mapping",
+                                               "match_data":  [
+                                                                  "Data directory: IMAGE_DIRECTORY_ENTRY_IMPORT is in: .rdata",
+                                                                  "Data directory: IMAGE_DIRECTORY_ENTRY_RESOURCE is in: .rsrc",
+                                                                  "Data directory: IMAGE_DIRECTORY_ENTRY_BASERELOC is in: .reloc",
+                                                                  "Data directory: IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG is in: .rdata",
+                                                                  "Data directory: IMAGE_DIRECTORY_ENTRY_IAT is in: .rdata"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "203",
+                                               "description":  "Binary contains paths to debug symbols",
+                                               "match_data":  [
+                                                                  "fixmapi.pdb source: fixmapi.exe",
+                                                                  "fixmapi.pdbGCTL source: fixmapi.exe"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "411",
+                                               "description":  "PE file contains a mix of data directories often seen in goodware",
+                                               "match_data":  [
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_IMPORT",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_RESOURCE",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_BASERELOC",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_DEBUG",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_IAT"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "715",
+                                               "description":  "Classification label",
+                                               "match_data":  [
+                                                                  "clean1.winEXE@1/0@0/0"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "626",
+                                               "description":  "Sample tries to load a library which is not present or installed on the analysis machine, adding the library might reveal more behavior",
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "199",
+                                               "description":  "PE file contains sections with non-standard names",
+                                               "match_data":  [
+                                                                  "section name: fothk"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "412",
+                                               "description":  "PE file contains a debug data directory",
+                                               "match_data":  [
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_DEBUG"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "419",
+                                               "description":  "PE file has a high image base, often used for DLLs",
+                                               "match_data":  [
+                                                                  "Image base 0x140000000 \u003e 0x60000000"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "406",
+                                               "description":  "Contains modern PE file flags such as dynamic base (ASLR) or NX",
+                                               "match_data":  [
+                                                                  "HIGH_ENTROPY_VA, DYNAMIC_BASE, NX_COMPAT, GUARD_CF, TERMINAL_SERVER_AWARE"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           }
+                                       ],
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "1988",
+                                            "name":  "\"C:\\Users\\\u003cUSER\u003e\\Desktop\\fixmapi.exe\"",
+                                            "files_written":  [
+                                                                  "C:\\Windows\\System32\\mapi32.dll"
+                                                              ]
+                                        },
+                                        {
+                                            "process_id":  "2788",
+                                            "name":  "%WINDIR%\\explorer.exe",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "3752",
+                                                                 "name":  "%SAMPLEPATH%\\fixmapi.exe"
+                                                             }
+                                                         ]
+                                        },
+                                        {
+                                            "process_id":  "6460",
+                                            "name":  "\"C:\\Users\\user\\Desktop\\fixmapi.exe\"",
+                                            "files_opened":  [
+                                                                 "C:\\Users\\user\\Desktop\\en-US\\fixmapi.exe.mui",
+                                                                 "C:\\Users\\user\\Desktop\\en\\fixmapi.exe.mui",
+                                                                 "C:\\Windows\\SYSTEM32\\mapistub.dll",
+                                                                 "C:\\Windows\\system32\\IMM32.DLL",
+                                                                 "C:\\Windows\\system32\\mapi32.dll",
+                                                                 "C:\\Windows\\system32\\mapistub.dll",
+                                                                 "C:\\Windows\\system32\\oleaut32.dll"
+                                                             ]
+                                        }
+                                    ],
+                 "ip_traffic":  [
+                                    {
+                                        "destination_ip":  "192.168.0.40",
+                                        "destination_port":  137,
+                                        "transport_layer_protocol":  "UDP"
+                                    },
+                                    {
+                                        "destination_ip":  "20.99.186.246",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "152.195.19.97",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.216.81.152",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.213.175.170",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.196.145.221",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "20.99.185.48",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "a83f:8110:584a:b5b1:17cb:1ec8:0:0",
+                                        "destination_port":  53,
+                                        "transport_layer_protocol":  "UDP"
+                                    },
+                                    {
+                                        "destination_ip":  "192.168.0.41",
+                                        "destination_port":  137,
+                                        "transport_layer_protocol":  "UDP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.55.140.42",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    }
+                                ],
+                 "files_deleted":  [
+                                       "C:\\Windows\\System32\\wbem\\Performance\\WmiApRpl.h",
+                                       "C:\\Windows\\System32\\wbem\\Performance\\WmiApRpl.ini"
+                                   ],
+                 "modules_loaded":  [
+                                        "%SAMPLEPATH%\\9348d9a399487ed8a7c2d10a82e964ab0f886f5dac56fd2b9ef3f88cbad40903.exe"
+                                    ],
+                 "mbc":  [
+                             {
+                                 "id":  "OC0006"
+                             },
+                             {
+                                 "id":  "C0002"
+                             }
+                         ],
+                 "files_opened":  [
+                                      "\\crashpad_1820_PWJGJSNGEWEFEFPZ",
+                                      "C:\\Users\\user\\Desktop\\en-US\\fixmapi.exe.mui",
+                                      "C:\\Users\\user\\Desktop\\en\\fixmapi.exe.mui",
+                                      "C:\\Windows\\SYSTEM32\\mapistub.dll",
+                                      "C:\\Windows\\system32\\IMM32.DLL",
+                                      "C:\\Windows\\system32\\mapi32.dll",
+                                      "C:\\Windows\\system32\\mapistub.dll",
+                                      "C:\\Windows\\system32\\oleaut32.dll"
+                                  ],
+                 "tags":  [
+                              "IDLE",
+                              "DETECT_DEBUG_ENVIRONMENT"
+                          ],
+                 "files_dropped":  [
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\138.0.7194.0"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\138.0.7194.0\\Crashpad"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\138.0.7194.0\\Crashpad\\reports"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\138.0.7194.0\\Crashpad\\attachments"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\138.0.7194.0\\Crashpad\\metadata"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files\\Google1820_2009445082"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\138.0.7194.0\\uninstall.cmd"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\138.0.7194.0\\updater.exe"
+                                       }
+                                   ],
+                 "processes_terminated":  [
+                                              "%SAMPLEPATH%\\fixmapi.exe",
+                                              "%SAMPLEPATH%\\9348d9a399487ed8a7c2d10a82e964ab0f886f5dac56fd2b9ef3f88cbad40903.exe",
+                                              "C:\\Windows\\System32\\UI0Detect.exe",
+                                              "C:\\Program Files\\Google3792_1660804976\\bin\\updater.exe",
+                                              "C:\\Users\\user\\Desktop\\fixmapi.exe"
+                                          ],
+                 "memory_dumps":  [
+                                      {
+                                          "file_name":  "1988.dmp",
+                                          "process":  "C:\\Users\\Bruno\\Desktop\\fixmapi.exe",
+                                          "size":  "53551104",
+                                          "base_address":  "2147352576"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000000.1079889794.00007FF7B8039000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\fixmapi.exe",
+                                          "size":  "12288",
+                                          "base_address":  "140701920890880",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "6460"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1080263736.000001931A690000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\fixmapi.exe",
+                                          "size":  "4096",
+                                          "base_address":  "1731314909184",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6460"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1080331002.000001931A729000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\fixmapi.exe",
+                                          "size":  "4096",
+                                          "base_address":  "1731315535872",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6460"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1080651814.00007FF7B8039000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\fixmapi.exe",
+                                          "size":  "12288",
+                                          "base_address":  "140701920890880",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6460"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1080638981.00007FF7B8038000.00000004.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\fixmapi.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140701920886784",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6460"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1080155024.0000001CB311E000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\fixmapi.exe",
+                                          "size":  "8192",
+                                          "base_address":  "123263377408",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6460"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000000.1079762729.00007FF7B8031000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\fixmapi.exe",
+                                          "size":  "12288",
+                                          "base_address":  "140701920858112",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "6460"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1080598335.00007FF7B8031000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\fixmapi.exe",
+                                          "size":  "12288",
+                                          "base_address":  "140701920858112",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6460"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1080203251.0000001CB347E000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\fixmapi.exe",
+                                          "size":  "8192",
+                                          "base_address":  "123266916352",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6460"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1080331002.000001931A710000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\fixmapi.exe",
+                                          "size":  "28672",
+                                          "base_address":  "1731315433472",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6460"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1080504016.000001931C144000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\fixmapi.exe",
+                                          "size":  "4096",
+                                          "base_address":  "1731342909440",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6460"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1080177329.0000001CB319E000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\fixmapi.exe",
+                                          "size":  "8192",
+                                          "base_address":  "123263901696",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6460"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1080586956.00007FF7B8030000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\fixmapi.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140701920854016",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6460"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1080504016.000001931C140000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\fixmapi.exe",
+                                          "size":  "8192",
+                                          "base_address":  "1731342893056",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6460"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1080331002.000001931A718000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\fixmapi.exe",
+                                          "size":  "65536",
+                                          "base_address":  "1731315466240",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6460"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000000.1079777421.00007FF7B8035000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\fixmapi.exe",
+                                          "size":  "12288",
+                                          "base_address":  "140701920874496",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "6460"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000000.1079807760.00007FF7B8038000.00000008.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\fixmapi.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140701920886784",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "6460"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000000.1079747145.00007FF7B8030000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\fixmapi.exe",
+                                          "size":  "4096",
+                                          "base_address":  "140701920854016",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "process_id":  "6460"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1080240618.000001931A670000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\fixmapi.exe",
+                                          "size":  "4096",
+                                          "base_address":  "1731314778112",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6460"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1080618523.00007FF7B8035000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\fixmapi.exe",
+                                          "size":  "12288",
+                                          "base_address":  "140701920874496",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6460"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1080219806.000001931A530000.00000004.00000020.00040000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\fixmapi.exe",
+                                          "size":  "4096",
+                                          "base_address":  "1731313467392",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6460"
+                                      },
+                                      {
+                                          "file_name":  "00000001.00000002.1080135312.0000001CB309C000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\fixmapi.exe",
+                                          "size":  "16384",
+                                          "base_address":  "123262844928",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "process_id":  "6460"
+                                      }
+                                  ],
+                 "verdict_confidence":  99,
+                 "command_executions":  [
+                                            "\"%SAMPLEPATH%\\fixmapi.exe\" ",
+                                            "\"%SAMPLEPATH%\\9348d9a399487ed8a7c2d10a82e964ab0f886f5dac56fd2b9ef3f88cbad40903.exe\" ",
+                                            "C:\\Windows\\system32\\UI0Detect.exe",
+                                            "\"C:\\Program Files\\Google3792_1660804976\\bin\\updater.exe\" --update --system --enable-logging --vmodule=*/chrome/updater/*=2 /sessionid {8D59E60A-2AA5-4DA2-8D68-87401022CF57}"
+                                        ],
+                 "dns_lookups":  [
+                                     {
+                                         "hostname":  "res.public.onecdn.static.microsoft",
+                                         "resolved_ips":  [
+                                                              "152.195.19.97",
+                                                              "23.213.175.170",
+                                                              "23.213.175.147"
+                                                          ]
+                                     },
+                                     {
+                                         "hostname":  "www.microsoft.com",
+                                         "resolved_ips":  [
+                                                              "23.216.81.152",
+                                                              "23.55.140.42"
+                                                          ]
+                                     }
+                                 ],
+                 "processes_injected":  [
+                                            "\\\\?\\C:\\Windows\\system32\\wbem\\WMIADAP.EXE",
+                                            "C:\\Program Files\\Google3792_1660804976\\bin\\updater.exe"
+                                        ],
+                 "verdicts":  [
+                                  "CLEAN"
+                              ],
+                 "registry_keys_opened":  [
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Active Setup\\OutlookInstallInfo",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize\\DisableMetaFiles",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize\\DisableUmpdBufferSizeCheck",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Exchange\\Setup",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Session Manager\\SafeProcessSearchMode",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Ole\\FeatureDevelopmentProperties",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\AppModel\\Lookaside\\Packages",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Ole",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Microsoft\\WindowsStore",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\fixmapi.exe",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\System",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Segment Heap",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\MUI\\Settings",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\OLE\\Tracing",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Policies\\Microsoft\\Cryptography\\Configuration",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\OLE",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\Display",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager"
+                                          ],
+                 "files_written":  [
+                                       "C:\\Windows\\System32\\mapi32.dll"
+                                   ],
+                 "attack_techniques":  {
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "link function at runtime on Windows",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "0"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "parse PE header",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "2"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1071":  [
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "Adversaries may communicate using application layer protocols to avoid detection/network filtering by blending in with existing traffic."
+                                                         }
+                                                     ],
+                                           "T1574.002":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "Tries to load missing DLLs",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "187"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1082":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Reads software policies",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "509"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

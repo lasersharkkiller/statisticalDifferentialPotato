@@ -1,0 +1,1179 @@
+{
+    "data":  {
+                 "files_written":  [
+                                       "C:\\Windows\\Debug\\WIA",
+                                       "C:\\Windows\\Debug\\WIA\\wiatrace.log"
+                                   ],
+                 "mutexes_created":  [
+                                         "Local\\SM0:3756:168:WilStaging_02",
+                                         "AD8DA490-28A3-4dfd-96BA-37453388BAEF",
+                                         "\\Sessions\\1\\BaseNamedObjects\\AD8DA490-28A3-4dfd-96BA-37453388BAEF",
+                                         "\\Sessions\\1\\BaseNamedObjects\\Global\\WIATRACE_MUTEX"
+                                     ],
+                 "processes_terminated":  [
+                                              "C:\\Windows\\System32\\wuapihost.exe",
+                                              "C:\\Windows\\System32\\UI0Detect.exe",
+                                              "C:\\Program Files\\Google3840_1395689298\\bin\\updater.exe"
+                                          ],
+                 "signature_matches":  [
+                                           {
+                                               "id":  "0",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "enumerate PE sections",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "@Ana06",
+                                                               "@mr-tz"
+                                                           ],
+                                               "match_data":  [
+                                                                  "mnemonic: movzx"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: enumerate PE sections\n    namespace: load-code/pe\n    authors:\n      - \"@Ana06\"\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: unsupported  # requires offset, operand[1].offset, characteristic, mnemonic, basicblock features\n    mbc:\n      - Discovery::Code Discovery::Enumerate PE Sections [B0046.001]\n    references:\n      - https://0x00sec.org/t/reflective-dll-injection/3080\n      - https://www.ired.team/offensive-security/code-injection-process-injection/reflective-dll-injection\n    examples:\n      - E4C33AC3638EEF68311F8AC0D72483C7:0x401510\n  features:\n    - and:\n      - os: windows\n      # there should be some complexity to functions like this\n      - count(basic blocks): 3 or more\n      - optional:\n        - offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n      - instruction:\n        - or:\n          - mnemonic: mov\n          - mnemonic: movzx\n        - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n      - basic block:\n        - or:\n          - and:\n            - description: IMAGE_FIRST_SECTION(nt_header)\n            - instruction:\n              - or:\n                - mnemonic: add\n                - mnemonic: mov\n                - mnemonic: movzx\n              - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n            - operand[1].offset: 0x18 = FileHeader.SizeOfOptionalHeader\n          - and:\n            - description: (DWORD)dll_raw + dos_header-\u003ee_lfanew + sizeof(IMAGE_NT_HEADERS) + sizeof(IMAGE_SECTION_HEADER) * i\n            - number: 0x28 = sizeof(IMAGE_SECTION_HEADER)\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0xF8 = sizeof(IMAGE_NT_HEADERS32)\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x108 = sizeof(IMAGE_NT_HEADERS64)\n      - 2 or more:\n        - operand[1].offset: 0xC = IMAGE_SECTION_HEADER.VirtualAddress\n        - operand[1].offset: 0x14 = IMAGE_SECTION_HEADER.PointerToRawData\n        - operand[1].offset: 0x10 = IMAGE_SECTION_HEADER.SizeOfRawData\n        # there\u0027s also offset 0x8 = IMAGE_SECTION_HEADER.Misc.PhysicalAddress, but it\u0027s likely too common\n      - not:\n        # non-zeroing XOR was observed in FPs\n        - characteristic: nzxor\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://0x00sec.org/t/reflective-dll-injection/3080"
+                                                            },
+                                                            {
+                                                                "ref":  "https://www.ired.team/offensive-security/code-injection-process-injection/reflective-dll-injection"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "1",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "link function at runtime on Windows",
+                                               "description":  "linking/runtime-linking",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetProcAddress"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: link function at runtime on Windows\n    namespace: linking/runtime-linking\n    authors:\n      - moritz.raabe@mandiant.com\n      - mehunhoff@google.com\n    scopes:\n      static: instruction\n      dynamic: call\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x404130\n      - Practical Malware Analysis Lab 01-04.exe_:0x401350\n  features:\n    - and:\n      - os: windows\n      - or:\n        - api: kernel32.GetProcAddress\n        - api: ntdll.LdrGetProcedureAddress\n        - api: ntdll.LdrGetProcedureAddressEx\n        - api: ntdll.LdrGetProcedureAddressForCaller\n        - api: MmGetSystemRoutineAddress\n"
+                                           },
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "parse PE header",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "IMAGE_NT_SIGNATURE (PE)",
+                                                                  "mnemonic: cmp",
+                                                                  "IMAGE_DOS_SIGNATURE (MZ)"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: parse PE header\n    namespace: load-code/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic, operand[1].offset features\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x403DD0\n  features:\n    - and:\n      - os: windows\n      - and:\n        - mnemonic: cmp\n        - or:\n          - number: 0x4550 = IMAGE_NT_SIGNATURE (PE)\n          - and:\n            - number: 0x50\n            - number: 0x45\n        - or:\n          - number: 0x5A4D = IMAGE_DOS_SIGNATURE (MZ)\n          - and:\n            - number: 0x4D\n            - number: 0x5A\n        - optional:\n          - and:\n            - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x30 = IMAGE_NT_HEADERS64.OptionalHeader.ImageBase\n          - basic block:\n            - and:\n              - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n              - 3 or more:\n                - operand[1].offset: 0x4 = IMAGE_NT_HEADERS.FileHeader.Machine\n                - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n                - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n                - operand[1].offset: 0x16 = IMAGE_NT_HEADERS.FileHeader.Characteristics\n                - operand[1].offset: 0x28 = IMAGE_NT_HEADERS.OptionalHeader.AddressOfEntryPoint  # for 32 and 64 bit\n                - or:\n                  - and:\n                    - arch: i386\n                    - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                  - and:\n                    - arch: amd64\n                    - operand[1].offset: 0x30 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n"
+                                           },
+                                           {
+                                               "id":  "4",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "accept command line arguments",
+                                               "description":  "host-interaction/cli",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: CommandLineToArgv"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: accept command line arguments\n    namespace: host-interaction/cli\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Execution::Command and Scripting Interpreter [T1059]\n    mbc:\n      - Execution::Command and Scripting Interpreter [E1059]\n    examples:\n      - e5369ac309f1be6d77afeeb3edab0ed8:0x402760\n  features:\n    - or:\n      - api: GetCommandLine\n      - api: CommandLineToArgv\n      - api: System.Environment::GetCommandLineArgs\n"
+                                           },
+                                           {
+                                               "id":  "5",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "reference analysis tools strings",
+                                               "description":  "anti-analysis",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "regex: /(?\u003c!\\w)ida[gqtuw]?(\\.exe)?$/i"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: reference analysis tools strings\n    namespace: anti-analysis\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    mbc:\n      - Discovery::Analysis Tool Discovery::Process detection [B0013.001]\n    references:\n      - https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/AntiAnalysis/process.cpp\n    examples:\n      - al-khaser_x86.exe_\n  features:\n    - or:\n      - string: /ollydbg(\\.exe)?/i\n      - string: /ProcessHacker(\\.exe)?/i\n      - string: /tcpview(\\.exe)?/i\n      - string: /autoruns(\\.exe)?/i\n      - string: /autorunsc(\\.exe)?/i\n      - string: /filemon(\\.exe)?/i\n      - string: /procmon(\\.exe)?/i\n      - string: /regmon(\\.exe)?/i\n      - string: /procexp(\\.exe)?/i\n      - string: /(?\u003c!\\w)ida[gqtuw]?(\\.exe)?$/i\n      - string: /ida[gqtuw]?64(\\.exe)?$/i\n      - string: /ImmunityDebugger(\\.exe)?/i\n      - string: /Wireshark(\\.exe)?/i\n      - string: /dumpcap(\\.exe)?/i\n      - string: /HookExplorer(\\.exe)?/i\n      - string: /ImportREC(\\.exe)?/i\n      - string: /PETools(\\.exe)?/i\n      - string: /LordPE(\\.exe)?/i\n      - string: /SysInspector(\\.exe)?/i\n      - string: /proc_analyzer(\\.exe)?/i\n      - string: /sysAnalyzer(\\.exe)?/i\n      - string: /sniff_hit(\\.exe)?/i\n      - string: /windbg(\\.exe)?/i\n      - string: /joeboxcontrol(\\.exe)?/i\n      - string: /joeboxserver(\\.exe)?/i\n      - string: /ResourceHacker(\\.exe)?/i\n      - string: /x32dbg(\\.exe)?/i\n      - string: /x64dbg(\\.exe)?/i\n      - string: /Fiddler(\\.exe)?/i\n      - string: /httpdebugger(\\.exe)?/i\n      - string: /fakenet(\\.exe)?/i\n      - string: /netmon(\\.exe)?/i\n      - string: /WPE PRO(\\.exe)?/i\n      - string: /decompile(\\.exe)?/i\n      - string: /scylla/i\n      - string: /megadumper/i\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/AntiAnalysis/process.cpp"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "9028",
+                                               "description":  "Uses 32bit PE files",
+                                               "match_data":  [
+                                                                  "EXECUTABLE_IMAGE, 32BIT_MACHINE"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "641",
+                                               "description":  "Found a high number of Window / User specific system calls (may be a loop to detect user behavior)",
+                                               "match_data":  [
+                                                                  "foregroundWindowGot 384",
+                                                                  "foregroundWindowGot 366"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "415",
+                                               "description":  "PE file has an executable .text section and no other executable section",
+                                               "match_data":  [
+                                                                  "Section: .text IMAGE_SCN_CNT_CODE, IMAGE_SCN_MEM_EXECUTE, IMAGE_SCN_MEM_READ"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "509",
+                                               "description":  "Reads software policies",
+                                               "match_data":  [
+                                                                  "HKEY_CURRENT_USER\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "#registry_keys_opened",
+                                                                "value":  "HKEY_CURRENT_USER\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "640",
+                                               "description":  "Sample monitors window changes (e.g. starting applications), analyze the sample with the \u0027Simulates keyboard and window changes\u0027 cookbook",
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "852",
+                                               "description":  "Sample has a GUI, but  has not found any clickable buttons, likely more UI automation may extend behavior",
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "431",
+                                               "description":  "PE /OLE file has a valid certificate with Microsoft as Issuer",
+                                               "match_data":  [
+                                                                  "Valid certificate with Microsoft Issuer"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "206",
+                                               "description":  "Performs DNS lookups",
+                                               "match_data":  [
+                                                                  "queries for: tse1.mm.bing.net"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "#dns_lookups",
+                                                                "value":  "queries for: tse1.mm.bing.net"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "653",
+                                               "description":  "Sample file is different than original file name gathered from version info",
+                                               "match_data":  [
+                                                                  "OriginalFilenameImagingDevices.cplj% vs ImagingDevices.exe"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "#memory_dumps",
+                                                                "value":  "ImagingDevices.exe, 00000000.00000002.1237751795.0000000000014000.00000002.00000001.01000000.00000003.sdmp"
+                                                            },
+                                                            {
+                                                                "ref":  "#memory_dumps",
+                                                                "value":  "ImagingDevices.exe, 00000000.00000000.996426266.0000000000014000.00000002.00000001.01000000.00000003.sdmp"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "411",
+                                               "description":  "PE file contains a mix of data directories often seen in goodware",
+                                               "match_data":  [
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_IMPORT",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_RESOURCE",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_BASERELOC",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_DEBUG",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_IAT"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "715",
+                                               "description":  "Classification label",
+                                               "match_data":  [
+                                                                  "clean2.winEXE@1/0@1/0"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "406",
+                                               "description":  "Contains modern PE file flags such as dynamic base (ASLR) or NX",
+                                               "match_data":  [
+                                                                  "DYNAMIC_BASE, NX_COMPAT, GUARD_CF, TERMINAL_SERVER_AWARE"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "507",
+                                               "description":  "Uses an in-process (OLE) Automation server",
+                                               "match_data":  [
+                                                                  "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{00f29a34-b8a1-482c-bcf8-3ac7b0fe8f62}\\InprocServer32"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "428",
+                                               "description":  "PE file contains executable resources (Code or Archives)",
+                                               "match_data":  [
+                                                                  "Resource name: RT_VERSION type: COM executable for DOS"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "89",
+                                               "description":  "Creates files inside the system directory",
+                                               "match_data":  [
+                                                                  "C:\\Windows\\Debug\\WIA"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "404",
+                                               "description":  "PE / OLE file has a valid certificate",
+                                               "match_data":  [
+                                                                  "certificate valid"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "203",
+                                               "description":  "Binary contains paths to debug symbols",
+                                               "match_data":  [
+                                                                  "ImagingDevices.pdb source: ImagingDevices.exe",
+                                                                  "ImagingDevices.pdbGCTL source: ImagingDevices.exe"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "412",
+                                               "description":  "PE file contains a debug data directory",
+                                               "match_data":  [
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_DEBUG"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           }
+                                       ],
+                 "verdict_confidence":  98,
+                 "tags":  [
+                              "DETECT_DEBUG_ENVIRONMENT"
+                          ],
+                 "modules_loaded":  [
+                                        "%SAMPLEPATH%\\ImagingDevices.exe"
+                                    ],
+                 "tls":  [
+                             {
+                                 "subject":  {
+                                                 "ST":  "WA",
+                                                 "L":  "Redmond",
+                                                 "O":  "Microsoft Corporation",
+                                                 "C":  "US"
+                                             },
+                                 "issuer":  {
+                                                "CN":  "Microsoft Azure TLS Issuing CA 05",
+                                                "O":  "Microsoft Corporation",
+                                                "C":  "US"
+                                            },
+                                 "serial_number":  "3300ccfa6671f5fac42868f9b5000000ccfa66",
+                                 "thumbprint":  "1836a0d60e157ad82326f320fff05fee1f67737f",
+                                 "version":  "TLS 1.2",
+                                 "sni":  "api.msn.com",
+                                 "ja3":  "a0e9f5d64349fb13191bc781f81f42e1",
+                                 "ja3s":  "60a1c7426de3ff26002f692fbe0d7408"
+                             }
+                         ],
+                 "files_dropped":  [
+                                       {
+                                           "path":  "C:\\Windows\\debug\\WIA"
+                                       },
+                                       {
+                                           "path":  "C:\\Windows\\debug\\WIA\\wiatrace.log"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER5E6.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER5E6.tmp.WERInternalMetadata.xml"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER5F8.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER5F8.tmp.csv"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER5F9.tmp"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER5F9.tmp.txt"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\141.0.7340.0"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\141.0.7340.0\\Crashpad"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\141.0.7340.0\\Crashpad\\reports"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\141.0.7340.0\\Crashpad\\attachments"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\141.0.7340.0\\Crashpad\\metadata"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files\\Google652_719076622"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\141.0.7340.0\\uninstall.cmd"
+                                       },
+                                       {
+                                           "path":  "C:\\Program Files (x86)\\Google\\GoogleUpdater\\141.0.7340.0\\updater.exe"
+                                       }
+                                   ],
+                 "registry_keys_opened":  [
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Windows",
+                                              "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize\\AppsUseLightTheme",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Lsa\\FipsAlgorithmPolicy\\STE",
+                                              "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\AccListViewV6",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Input",
+                                              "HKEY_CURRENT_USER\\Control Panel\\Desktop\\SmoothScroll",
+                                              "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\msasn1",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\Interface\\{5E38B83C-8CF1-11D1-BF92-0060081ED811}\\ProxyStubClsid32\\(Default)",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Input\\ResyncResetTime",
+                                              "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\EnableBalloonTips",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\OOBE\\LaunchUserOOBE",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\FontSubstitutes\\Segoe UI",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Lsa\\FipsAlgorithmPolicy\\MDMEnabled",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Input\\MaxResyncAttempts",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Session Manager\\ResourcePolicies",
+                                              "HKEY_LOCAL_MACHINE\\System\\Setup",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\LanguageOverlay\\OverlayPackages\\en-US",
+                                              "HKEY_CURRENT_USER\\Control Panel\\Desktop",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\Setup\\SystemSetupInProgress",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\FontLink\\SystemLink",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\FontSubstitutes",
+                                              "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\ListviewAlphaSelect",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Lsa\\FipsAlgorithmPolicy",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\Interface\\{5E38B83C-8CF1-11D1-BF92-0060081ED811}",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Windows\\IsVailContainer",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\Interface\\{5E38B83C-8CF1-11D1-BF92-0060081ED811}\\ProxyStubClsid32",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\Setup\\PnpSetupInProgress",
+                                              "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+                                              "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\ListviewShadow",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Lsa\\FipsAlgorithmPolicy\\Enabled",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\OOBE",
+                                              "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\UseDoubleClickTimer",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\CTF\\",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\OOBE",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{B6C292BC-7C88-41EE-8B54-8EC92617E599}\\InprocServer32",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{0c15d503-d017-47ce-9016-7b3f978721cc}\\InprocServer32",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\StillImage\\Trace",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{0AF10CEC-2ECD-4B92-9581-34F6AE0637F3}",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Classes",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Lsa\\FipsAlgorithmPolicy",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\ImagingDevices.exe",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Ole",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{00f29a34-b8a1-482c-bcf8-3ac7b0fe8f62}\\LocalServer",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{0c15d503-d017-47ce-9016-7b3f978721cc}\\LocalServer",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\Interface\\{5EB2502A-8CF1-11D1-BF92-0060081ED811}\\ProxyStubClsid32",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\OLE\\AppCompat",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\OLE\\Tracing",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Policies\\Microsoft\\MUI\\Settings",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\SideBySide",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\ComputerName\\ActiveComputerName",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\MUI\\Settings\\LanguageConfiguration",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{00f29a34-b8a1-482c-bcf8-3ac7b0fe8f62}\\Elevation",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Session Manager",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{A1F4E726-8CF1-11D1-BF92-0060081ED811}\\InprocHandler",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Srp\\GP\\DLL",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{4DB1AD10-3391-11D2-9A33-00C04FA36145}\\InprocServer32",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{0af10cec-2ecd-4b92-9581-34f6ae0637f3}\\InprocHandler32",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{00f29a34-b8a1-482c-bcf8-3ac7b0fe8f62}\\InprocHandler",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{4DB1AD10-3391-11D2-9A33-00C04FA36145}\\LocalServer",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Rpc\\Extensions",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\MUI\\UILanguages\\en-US",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Policies\\Microsoft\\Windows NT\\Rpc",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows NT\\CurrentVersion\\msasn1",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Nls\\CustomLocale",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{0af10cec-2ecd-4b92-9581-34f6ae0637f3}\\Elevation",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Microsoft\\Windows\\Appx",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\Interface\\{79C07CF1-CBDD-41EE-8EC3-F00080CADA7A}\\ProxyStubClsid32",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{4DB1AD10-3391-11D2-9A33-00C04FA36145}\\LocalServer32",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{B6C292BC-7C88-41EE-8B54-8EC92617E599}\\InprocHandler",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\NLS\\Language",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\LanguagePack\\SurrogateFallback\\Segoe UI",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\OLE",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{0af10cec-2ecd-4b92-9581-34f6ae0637f3}\\LocalServer",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{A1F4E726-8CF1-11D1-BF92-0060081ED811}\\TreatAs",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{0C15D503-D017-47CE-9016-7B3F978721CC}",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{00f29a34-b8a1-482c-bcf8-3ac7b0fe8f62}\\InprocHandler32",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{0af10cec-2ecd-4b92-9581-34f6ae0637f3}\\TreatAs",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{4DB1AD10-3391-11D2-9A33-00C04FA36145}\\InprocHandler32",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Rpc",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{4DB1AD10-3391-11D2-9A33-00C04FA36145}\\InprocHandler",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Ole",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{4DB1AD10-3391-11D2-9A33-00C04FA36145}\\Elevation",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\COM3",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{B6C292BC-7C88-41EE-8B54-8EC92617E599}\\TreatAs",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{0c15d503-d017-47ce-9016-7b3f978721cc}\\Elevation",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\FileSystem\\",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Policies\\Microsoft\\Windows\\Display",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\AppModel\\Lookaside\\Packages",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{00F29A34-B8A1-482C-BCF8-3AC7B0FE8F62}",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Nls\\Sorting\\Versions",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{A1F4E726-8CF1-11D1-BF92-0060081ED811}\\InprocServer32",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\SafeBoot\\Option",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\LanguagePack\\DataStore_V1.0",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\MUI\\UILanguages",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{A1F4E726-8CF1-11D1-BF92-0060081ED811}",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{A1F4E726-8CF1-11D1-BF92-0060081ED811}\\InprocHandler32",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Nls\\ExtendedLocale",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\Interface\\{5EB2502A-8CF1-11D1-BF92-0060081ED811}",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Windows NT\\CurrentVersion\\FontSubstitutes",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{B6C292BC-7C88-41EE-8B54-8EC92617E599}\\InprocHandler32",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\OLE",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\Interface\\{00000134-0000-0000-C000-000000000046}",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{00f29a34-b8a1-482c-bcf8-3ac7b0fe8f62}\\InprocServer32",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\SideBySide\\AssemblyStorageRoots",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{00f29a34-b8a1-482c-bcf8-3ac7b0fe8f62}\\TreatAs",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{0c15d503-d017-47ce-9016-7b3f978721cc}\\TreatAs",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{0c15d503-d017-47ce-9016-7b3f978721cc}\\InprocHandler32",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\AppID\\ImagingDevices.exe",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{0af10cec-2ecd-4b92-9581-34f6ae0637f3}\\InprocHandler",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Lsa",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{0af10cec-2ecd-4b92-9581-34f6ae0637f3}\\LocalServer32",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\Interface\\{5E38B83C-8CF1-11D1-BF92-0060081ED811}",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Segment Heap",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\LanguageOverlay\\OverlayPackages\\en-US",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\Interface\\{00000134-0000-0000-C000-000000000046}\\ProxyStubClsid32",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Windows",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Policies\\Microsoft\\WindowsStore",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{4DB1AD10-3391-11D2-9A33-00C04FA36145}",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\CTF\\Compatibility\\ImagingDevices.exe",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Wow64\\x86",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\MUI\\UILanguages\\PendingDelete",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{4DB1AD10-3391-11D2-9A33-00C04FA36145}\\TreatAs",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Policies\\Microsoft\\Cryptography\\Configuration",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\OLEAUT",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\LanguagePack\\SurrogateFallback",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\Interface\\{79C07CF1-CBDD-41EE-8EC3-F00080CADA7A}",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Nls\\Sorting\\Ids",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Nls\\CustomLocale",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{B6C292BC-7C88-41EE-8B54-8EC92617E599}",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Ole\\FeatureDevelopmentProperties",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{0c15d503-d017-47ce-9016-7b3f978721cc}\\LocalServer32",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{0c15d503-d017-47ce-9016-7b3f978721cc}\\InprocHandler",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{0af10cec-2ecd-4b92-9581-34f6ae0637f3}\\InprocServer32",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{00f29a34-b8a1-482c-bcf8-3ac7b0fe8f62}\\LocalServer32",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\StillImage\\Trace\\STI.dll"
+                                          ],
+                 "processes_created":  [
+                                           "\"C:\\Users\\\u003cUSER\u003e\\AppData\\Local\\Temp\\ImagingDevices.exe\"",
+                                           "%SAMPLEPATH%\\ImagingDevices.exe",
+                                           "C:\\Windows\\System32\\UI0Detect.exe",
+                                           "C:\\Program Files\\Google3840_1395689298\\bin\\updater.exe",
+                                           "C:\\Users\\user\\Desktop\\ImagingDevices.exe"
+                                       ],
+                 "ja3_digests":  [
+                                     "a0e9f5d64349fb13191bc781f81f42e1"
+                                 ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "link function at runtime on Windows",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "1"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "parse PE header",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "3"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1059",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "accept command line arguments",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "4"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1071",
+                                                     "signature_description":  "Adversaries may communicate using application layer protocols to avoid detection/network filtering by blending in with existing traffic."
+                                                 },
+                                                 {
+                                                     "id":  "T1036",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Creates files inside the system directory",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "89"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1010",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Sample monitors Window changes (e.g. starting applications), analyze the sample with the simulation cookbook",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "640"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Reads software policies",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "509"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1095",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Performs DNS lookups",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "206"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1071",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Performs DNS lookups",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "206"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "command_executions":  [
+                                            "\"%SAMPLEPATH%\\ImagingDevices.exe\" ",
+                                            "C:\\Windows\\system32\\UI0Detect.exe",
+                                            "\"C:\\Program Files\\Google3840_1395689298\\bin\\updater.exe\" --update --system --enable-logging --vmodule=*/chrome/updater/*=2 /sessionid {9A54B93D-3821-42F0-887F-1EAEF6D13226}"
+                                        ],
+                 "dns_lookups":  [
+                                     {
+                                         "hostname":  "www.microsoft.com",
+                                         "resolved_ips":  [
+                                                              "23.55.140.42"
+                                                          ]
+                                     },
+                                     {
+                                         "hostname":  "tse1.mm.bing.net",
+                                         "resolved_ips":  [
+                                                              "204.79.197.200",
+                                                              "13.107.21.200"
+                                                          ]
+                                     }
+                                 ],
+                 "ip_traffic":  [
+                                    {
+                                        "destination_ip":  "204.79.197.203",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "a83f:8110:2800:0:2800:0:1800:0",
+                                        "destination_port":  53,
+                                        "transport_layer_protocol":  "UDP"
+                                    },
+                                    {
+                                        "destination_ip":  "20.99.133.109",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "192.229.211.108",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "20.99.185.48",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.216.147.64",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "20.99.186.246",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "192.168.0.208",
+                                        "destination_port":  137,
+                                        "transport_layer_protocol":  "UDP"
+                                    },
+                                    {
+                                        "destination_ip":  "23.55.140.42",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    },
+                                    {
+                                        "destination_ip":  "151.101.22.172",
+                                        "destination_port":  80,
+                                        "transport_layer_protocol":  "TCP"
+                                    }
+                                ],
+                 "files_deleted":  [
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER5E6.tmp.WERInternalMetadata.xml",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER5F8.tmp.csv",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER5F9.tmp.txt"
+                                   ],
+                 "verdicts":  [
+                                  "CLEAN"
+                              ],
+                 "processes_injected":  [
+                                            "C:\\Program Files\\Google3840_1395689298\\bin\\updater.exe"
+                                        ],
+                 "files_opened":  [
+                                      "C:\\Windows\\System32\\sti.dll",
+                                      "C:\\Windows\\System32\\kernel.appcore.dll",
+                                      "C:\\Users\\\u003cUSER\u003e\\AppData\\Local\\Temp\\ImagingDevices.exe",
+                                      "C:\\Users\\\u003cUSER\u003e\\AppData\\Local\\Temp\\TextShaping.dll",
+                                      "C:\\Windows\\System32\\TextShaping.dll",
+                                      "\\Device\\DeviceApi\\CMNotify",
+                                      "C:\\Windows\\System32\\msasn1.dll",
+                                      "C:\\Users\\\u003cUSER\u003e\\AppData\\Local\\Temp\\imageres.dll",
+                                      "C:\\Windows\\System32\\imageres.dll",
+                                      "C:\\Windows\\SystemResources\\imageres.dll.mun",
+                                      "C:\\Windows\\System32\\textinputframework.dll",
+                                      "C:\\Windows\\System32\\CoreUIComponents.dll",
+                                      "C:\\Windows\\System32\\CoreMessaging.dll",
+                                      "C:\\Windows\\System32\\ntmarta.dll",
+                                      "C:\\Windows\\System32\\WinTypes.dll",
+                                      "C:\\Windows\\SystemResources\\USER32.dll.mun",
+                                      "\\crashpad_652_JDDUTWOAKEBJRHPO",
+                                      "C:\\Program Files (x86)\\Windows Photo Viewer\\PhotoAcq.dll",
+                                      "C:\\Program Files (x86)\\Windows Photo Viewer\\PhotoBase.dll",
+                                      "C:\\Program Files (x86)\\Windows Photo Viewer\\en-US\\PhotoAcq.dll.mui",
+                                      "C:\\Users\\user\\Desktop\\en-US\\ImagingDevices.exe.mui",
+                                      "C:\\Users\\user\\Desktop\\en\\ImagingDevices.exe.mui",
+                                      "C:\\Windows\\Debug\\WIA",
+                                      "C:\\Windows\\Debug\\WIA\\wiatrace.log",
+                                      "C:\\Windows\\Globalization\\Sorting\\sortdefault.nls",
+                                      "C:\\Windows\\SysWOW64\\DEVOBJ.dll",
+                                      "C:\\Windows\\SysWOW64\\IMM32.DLL",
+                                      "C:\\Windows\\SysWOW64\\OLEACC.dll",
+                                      "C:\\Windows\\SysWOW64\\OLEACCRC.DLL",
+                                      "C:\\Windows\\SysWOW64\\PROPSYS.dll",
+                                      "C:\\Windows\\SysWOW64\\PortableDeviceApi.dll",
+                                      "C:\\Windows\\SysWOW64\\PortableDeviceTypes.dll",
+                                      "C:\\Windows\\SysWOW64\\STI.dll",
+                                      "C:\\Windows\\SysWOW64\\VERSION.dll",
+                                      "C:\\Windows\\SysWOW64\\WINMM.dll",
+                                      "C:\\Windows\\SysWOW64\\WINMMBASE.dll",
+                                      "C:\\Windows\\SysWOW64\\atlthunk.dll",
+                                      "C:\\Windows\\SysWOW64\\dwmapi.dll",
+                                      "C:\\Windows\\SysWOW64\\en-US\\USER32.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\imageres.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\imageres.dll",
+                                      "C:\\Windows\\SysWOW64\\uxtheme.dll",
+                                      "C:\\Windows\\SysWOW64\\wiatrace.dll",
+                                      "C:\\Windows\\SysWOW64\\winmmbase.dll",
+                                      "C:\\Windows\\WinSxS\\x86_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_1ba91cf2911002f6",
+                                      "C:\\Windows\\WinSxS\\x86_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_1ba91cf2911002f6\\COMCTL32.dll",
+                                      "C:\\Windows\\WinSxS\\x86_microsoft.windows.gdiplus_6595b64144ccf1df_1.1.17134.1304_none_4c940fd7eba27cc4",
+                                      "C:\\Windows\\WinSxS\\x86_microsoft.windows.gdiplus_6595b64144ccf1df_1.1.17134.1304_none_4c940fd7eba27cc4\\gdiplus.dll"
+                                  ],
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "3756",
+                                            "name":  "\"C:\\Users\\\u003cUSER\u003e\\AppData\\Local\\Temp\\ImagingDevices.exe\""
+                                        },
+                                        {
+                                            "process_id":  "3004",
+                                            "name":  "%WINDIR%\\explorer.exe",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "2816",
+                                                                 "name":  "%SAMPLEPATH%\\ImagingDevices.exe"
+                                                             }
+                                                         ]
+                                        },
+                                        {
+                                            "process_id":  "7832",
+                                            "name":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe"
+                                        }
+                                    ],
+                 "memory_dumps":  [
+                                      {
+                                          "file_name":  "00000000.00000001.996477137.0000000000014000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "4096",
+                                          "base_address":  "81920",
+                                          "stage":  "MEM_STAGE_IMAGE_LOAD"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1237801063.0000000002C7B000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "20480",
+                                          "base_address":  "46641152",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1237834186.0000000002E28000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "122880",
+                                          "base_address":  "48398336",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000000.996369053.0000000000010000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "4096",
+                                          "base_address":  "65536",
+                                          "stage":  "MEM_STAGE_NEW"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000003.997468189.0000000002E54000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "16384",
+                                          "base_address":  "48578560",
+                                          "stage":  "MEM_STAGE_FREE"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1237965674.0000000004A6F000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "4096",
+                                          "base_address":  "78049280",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1237791485.0000000002C39000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "28672",
+                                          "base_address":  "46370816",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1237957096.0000000004A2E000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "8192",
+                                          "base_address":  "77783040",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1237813439.0000000002CD6000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "8192",
+                                          "base_address":  "47013888",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1237813439.0000000002CD0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "16384",
+                                          "base_address":  "46989312",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1237751795.0000000000014000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "86016",
+                                          "base_address":  "81920",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "refs":  [
+                                                       {
+                                                           "ref":  "#signature_matches",
+                                                           "value":  "653"
+                                                       }
+                                                   ]
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1237770402.0000000002990000.00000004.00000020.00040000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "4096",
+                                          "base_address":  "43581440",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000003.997612388.0000000002E5A000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "20480",
+                                          "base_address":  "48603136",
+                                          "stage":  "MEM_STAGE_FREE"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1237974683.0000000004AAE000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "8192",
+                                          "base_address":  "78307328",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1237726714.0000000000010000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "4096",
+                                          "base_address":  "65536",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1238004709.0000000004B10000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "8192",
+                                          "base_address":  "78708736",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000003.1074269183.0000000002E7E000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "4096",
+                                          "base_address":  "48750592",
+                                          "stage":  "MEM_STAGE_FREE"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1237920352.0000000004960000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "12288",
+                                          "base_address":  "76939264",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1237834186.0000000002E66000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "98304",
+                                          "base_address":  "48652288",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000003.997428618.0000000002E78000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "32768",
+                                          "base_address":  "48726016",
+                                          "stage":  "MEM_STAGE_FREE"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1237891388.0000000004800000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "4096",
+                                          "base_address":  "75497472",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000003.997439902.0000000002E54000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "147456",
+                                          "base_address":  "48578560",
+                                          "stage":  "MEM_STAGE_FREE"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000003.1016658347.0000000002E8F000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "4096",
+                                          "base_address":  "48820224",
+                                          "stage":  "MEM_STAGE_FREE"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1237739464.0000000000011000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "8192",
+                                          "base_address":  "69632",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1237783884.00000000029A0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "4096",
+                                          "base_address":  "43646976",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000000.996419211.0000000000011000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "8192",
+                                          "base_address":  "69632",
+                                          "stage":  "MEM_STAGE_NEW"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1238004709.0000000004B14000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "20480",
+                                          "base_address":  "78725120",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1237903832.0000000004900000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "4096",
+                                          "base_address":  "76546048",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1237938293.00000000049AE000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "8192",
+                                          "base_address":  "77258752",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1237949107.00000000049EF000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "4096",
+                                          "base_address":  "77524992",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1237920352.0000000004965000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "12288",
+                                          "base_address":  "76959744",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1237912354.0000000004930000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "4096",
+                                          "base_address":  "76742656",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1237996210.0000000004AEF000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "4096",
+                                          "base_address":  "78573568",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000003.997456169.0000000002E5F000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "102400",
+                                          "base_address":  "48623616",
+                                          "stage":  "MEM_STAGE_FREE"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1237834186.0000000002E48000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "118784",
+                                          "base_address":  "48529408",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1237834186.0000000002E20000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "28672",
+                                          "base_address":  "48365568",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000000.996426266.0000000000014000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "86016",
+                                          "base_address":  "81920",
+                                          "stage":  "MEM_STAGE_NEW",
+                                          "refs":  [
+                                                       {
+                                                           "ref":  "#signature_matches",
+                                                           "value":  "653"
+                                                       }
+                                                   ]
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000003.997468189.0000000002E5A000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "20480",
+                                          "base_address":  "48603136",
+                                          "stage":  "MEM_STAGE_FREE"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000003.998571041.0000000002E74000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Users\\user\\Desktop\\ImagingDevices.exe",
+                                          "size":  "114688",
+                                          "base_address":  "48709632",
+                                          "stage":  "MEM_STAGE_FREE"
+                                      }
+                                  ],
+                 "mbc":  [
+                             {
+                                 "id":  "B0046.001",
+                                 "objective":  "Discovery",
+                                 "behavior":  "Code Discovery",
+                                 "method":  "Enumerate PE Sections",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "0"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1059",
+                                 "objective":  "Execution",
+                                 "behavior":  "Command and Scripting Interpreter",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "4"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0013.001",
+                                 "objective":  "Discovery",
+                                 "behavior":  "Analysis Tool Discovery",
+                                 "method":  "Process detection",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "5"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "OC0006"
+                             },
+                             {
+                                 "id":  "C0002"
+                             }
+                         ],
+                 "attack_techniques":  {
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "link function at runtime on Windows",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "1"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "parse PE header",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "3"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1059":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "accept command line arguments",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "4"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1071":  [
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "Adversaries may communicate using application layer protocols to avoid detection/network filtering by blending in with existing traffic."
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Performs DNS lookups",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "206"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1036":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Creates files inside the system directory",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "89"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1010":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Sample monitors Window changes (e.g. starting applications), analyze the sample with the simulation cookbook",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "640"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1082":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Reads software policies",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "509"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1095":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Performs DNS lookups",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "206"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

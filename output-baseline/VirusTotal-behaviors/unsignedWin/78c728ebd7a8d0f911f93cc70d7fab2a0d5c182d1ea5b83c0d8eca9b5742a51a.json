@@ -1,0 +1,221 @@
+{
+    "data":  {
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "2216",
+                                            "name":  "%windir%\\System32\\svchost.exe -k WerSvcGroup"
+                                        },
+                                        {
+                                            "process_id":  "2648",
+                                            "name":  "%CONHOST% \"-577246020-8763644420834183981331340762513225453-10287669531378048401159112787"
+                                        },
+                                        {
+                                            "process_id":  "2836",
+                                            "name":  "wmiadap.exe /F /T /R"
+                                        },
+                                        {
+                                            "process_id":  "2880",
+                                            "name":  "%windir%\\system32\\wbem\\wmiprvse.exe"
+                                        },
+                                        {
+                                            "process_id":  "2580",
+                                            "name":  "%SANDBOX_DLL_LOADER_AMD64% %SAMPLEPATH% 483"
+                                        }
+                                    ],
+                 "processes_terminated":  [
+                                              "%windir%\\System32\\svchost.exe -k WerSvcGroup",
+                                              "wmiadap.exe /F /T /R"
+                                          ],
+                 "mbc":  [
+                             {
+                                 "id":  "E1059",
+                                 "objective":  "Execution",
+                                 "behavior":  "Command and Scripting Interpreter",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "1"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1083",
+                                 "objective":  "Discovery",
+                                 "behavior":  "File and Directory Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "4"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "signature_matches":  [
+                                           {
+                                               "id":  "0",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "unmanaged call",
+                                               "description":  "runtime : managed code calls unmanaged (native) code, often seen in .NET",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: unmanaged call\n    namespace: runtime\n    authors:\n      - michael.hunhoff@mandiant.com\n    description: managed code calls unmanaged (native) code, often seen in .NET\n    scopes:\n      static: function\n      dynamic: unsupported\n  features:\n    - or:\n      - characteristic: unmanaged call\n      - match: unmanaged call via dynamic PInvoke in .NET\n      - api: System.Runtime.InteropServices.Marshal::GetDelegateForFunctionPointer\n"
+                                           },
+                                           {
+                                               "id":  "1",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "run PowerShell expression",
+                                               "description":  "load-code/powershell/",
+                                               "authors":  [
+                                                               "anamaria.martinezgom@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Management.Automation.PowerShell::AddScript",
+                                                                  "api: System.Management.Automation.PowerShell::Create",
+                                                                  "api: System.Management.Automation.PowerShell::Invoke"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: run PowerShell expression\n    namespace: load-code/powershell/\n    authors:\n      - anamaria.martinezgom@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Execution::Command and Scripting Interpreter::PowerShell [T1059.001]\n    mbc:\n      - Execution::Command and Scripting Interpreter [E1059]\n    examples:\n      - 692f7fd6d198e804d6af98eb9e390d61:0x6000004\n  features:\n    - and:\n      - or:\n        - string: / iex\\(/i\n        - string: / iex /i\n        - string: /Invoke-Expression/i\n        - api: System.Management.Automation.PowerShell::Create\n        - api: System.Management.Automation.PowerShell::AddScript\n        - api: System.Management.Automation.PowerShell::Invoke\n      - optional:\n        - substring: \"powershell.exe \"\n"
+                                           },
+                                           {
+                                               "id":  "2",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "find data using regex in .NET",
+                                               "description":  "data-manipulation/regex",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Text.RegularExpressions.Regex::ctor",
+                                                                  "api: System.Text.RegularExpressions.Regex::IsMatch"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: find data using regex in .NET\n    namespace: data-manipulation/regex\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n  features:\n    - or:\n      - api: System.Text.RegularExpressions.Regex::Matches\n      - api: System.Text.RegularExpressions.Regex::Match\n      - api: System.Text.RegularExpressions.Regex::IsMatch\n      - api: System.Text.RegularExpressions.Regex::EnumerateMatches\n      - api: System.Text.RegularExpressions.Regex::Replace\n      - api: System.Text.RegularExpressions.Regex::Split\n      - api: System.Text.RegularExpressions.Regex::ctor\n"
+                                           },
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "access .NET resource",
+                                               "description":  "executable/resource",
+                                               "authors":  [
+                                                               "@mr-tz"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Resources.ResourceManager::ctor"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: access .NET resource\n    namespace: executable/resource\n    authors:\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: span of calls\n    examples:\n      - 387f15043f0198fd3a637b0758c2b6dde9ead795c3ed70803426fc355731b173:0x06000084\n  features:\n    - and:\n      - format: dotnet\n      - or:\n        - api: System.Resources.ResourceManager::ctor\n        - api: System.Reflection.Assembly::GetManifestResourceStream\n"
+                                           },
+                                           {
+                                               "id":  "4",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check if file exists",
+                                               "description":  "host-interaction/file-system/exists",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.IO.File::Exists"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check if file exists\n    namespace: host-interaction/file-system/exists\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    examples:\n      - 31600AD0D1A7EA615690DF111AE36C73:0x401284\n  features:\n    - or:\n      - basic block:\n        - and:\n          - api: kernel32.GetFileAttributes\n          - instruction:\n            - mnemonic: cmp\n            - number: 0xFFFFFFFF = INVALID_FILE_ATTRIBUTES\n      - basic block:\n        - and:\n          - api: kernel32.GetLastError\n          - instruction:\n            - mnemonic: cmp\n            - number: 2 = ERROR_FILE_NOT_FOUND\n      - api: shlwapi.PathFileExists\n      - api: System.IO.File::Exists\n      - property/read: System.IO.FileSystemInfo::Exists\n"
+                                           },
+                                           {
+                                               "id":  "5",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "compiled to the .NET platform",
+                                               "description":  "runtime/dotnet",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: compiled to the .NET platform\n    namespace: runtime/dotnet\n    authors:\n      - william.ballenthin@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    examples:\n      - b9f5bd514485fb06da39beff051b9fdc\n  features:\n    - or:\n      - format: dotnet\n      - import: mscoree._CorExeMain\n      - import: mscoree._corexemain\n      - import: mscoree._CorDllMain\n      - import: mscoree._cordllmain\n"
+                                           },
+                                           {
+                                               "id":  "7",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "reference SQL statements",
+                                               "description":  "collection/database/sql",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "regex: /SELECT.*FROM.*WHERE/"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: reference SQL statements\n    namespace: collection/database/sql\n    authors:\n      - william.ballenthin@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Collection::Data from Information Repositories [T1213]\n    examples:\n      - 5F66B82558CA92E54E77F216EF4C066C:0x42B1DF\n  features:\n    - and:\n      - string: /SELECT.*FROM.*WHERE/\n"
+                                           }
+                                       ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1059.001",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "run PowerShell expression",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "1"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1083",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "check if file exists",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "4"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1213",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "reference SQL statements",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "7"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "verdicts":  [
+                                  "UNKNOWN_VERDICT"
+                              ],
+                 "attack_techniques":  {
+                                           "T1059.001":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "run PowerShell expression",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "1"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1083":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "check if file exists",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "4"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1213":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "reference SQL statements",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "7"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

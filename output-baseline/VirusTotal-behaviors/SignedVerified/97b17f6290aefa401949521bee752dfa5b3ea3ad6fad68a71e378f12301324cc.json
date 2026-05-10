@@ -1,0 +1,759 @@
+{
+    "data":  {
+                 "signature_matches":  [
+                                           {
+                                               "id":  "0",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "invoke .NET assembly method",
+                                               "description":  "load-code/dotnet",
+                                               "authors":  [
+                                                               "anushka.virgaonkar@mandiant.com",
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Reflection.ConstructorInfo::Invoke"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: invoke .NET assembly method\n    namespace: load-code/dotnet\n    authors:\n      - anushka.virgaonkar@mandiant.com\n      - mehunhoff@google.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Defense Evasion::Reflective Code Loading [T1620]\n  features:\n    - and:\n      - format: dotnet\n      - optional:\n        - api: System.Reflection.Module::GetMethod\n        - api: System.Reflection.Module::GetMethodImpl\n        - api: System.Reflection.Module::GetMethods\n        - api: System.Reflection.Module::ResolveMethod\n        - api: System.Type::GetMethod\n        - api: System.Type::GetMethodImpl\n        - api: System.Type::GetMethods\n      - or:\n        - api: System.Delegate::DynamicInvoke\n        - api: System.Delegate::DynamicInvokeImpl\n        - api: System.Type::InvokeMember\n        - api: System.Reflection.MethodInfo::Invoke\n        - api: System.Reflection.MethodBase::Invoke\n        - api: System.Reflection.ConstructorInfo::Invoke\n"
+                                           },
+                                           {
+                                               "id":  "1",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "find data using regex in .NET",
+                                               "description":  "data-manipulation/regex",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Text.RegularExpressions.Regex::Match",
+                                                                  "api: System.Text.RegularExpressions.Regex::IsMatch",
+                                                                  "api: System.Text.RegularExpressions.Regex::Split"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: find data using regex in .NET\n    namespace: data-manipulation/regex\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n  features:\n    - or:\n      - api: System.Text.RegularExpressions.Regex::Matches\n      - api: System.Text.RegularExpressions.Regex::Match\n      - api: System.Text.RegularExpressions.Regex::IsMatch\n      - api: System.Text.RegularExpressions.Regex::EnumerateMatches\n      - api: System.Text.RegularExpressions.Regex::Replace\n      - api: System.Text.RegularExpressions.Regex::Split\n      - api: System.Text.RegularExpressions.Regex::ctor\n"
+                                           },
+                                           {
+                                               "id":  "2",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "hash data using SHA256",
+                                               "description":  "data-manipulation/hashing/sha256",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com",
+                                                               "william.ballenthin@mandiant.com",
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Security.Cryptography.HashAlgorithm::ComputeHash",
+                                                                  "api: System.Security.Cryptography.SHA256Managed::ctor"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: hash data using SHA256\n    namespace: data-manipulation/hashing/sha256\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n      - william.ballenthin@mandiant.com\n      - mehunhoff@google.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Cryptography::Cryptographic Hash::SHA256 [C0029.003]\n    references:\n      - https://www.rfc-editor.org/rfc/rfc6234\n    examples:\n      - C0CFFCF211035A839E28D542DE300298:0x180011400\n      - 6CC148363200798A12091B97A17181A1:0x140120240\n      - 44d40faf3f1fe4ed969befab7afcd2f0:0x10033570\n  features:\n    - or:\n      - and:\n        - number: 0x6A09E667 = H(0)0\n        - number: 0xBB67AE85 = H(0)1\n        - number: 0x3C6EF372 = H(0)2\n        - number: 0xA54FF53A = H(0)3\n        - number: 0x510E527F = H(0)4\n        - number: 0x9B05688C = H(0)5\n        - number: 0x1F83D9AB = H(0)6\n        - number: 0x5BE0CD19 = H(0)7\n      - bytes: 67 E6 09 6A 85 AE 67 BB 72 F3 6E 3C 3A F5 4F A5 7F 52 0E 51 8C 68 05 9B AB D9 83 1F 19 CD E0 5B = H(0)\n      - and:\n        # there are 64 constants but we\u0027ll only include 8 here for simplicity\n        - number: 0x428a2f98\n        - number: 0x71374491\n        - number: 0xb5c0fbcf\n        - number: 0xe9b5dba5\n        - number: 0x3956c25b\n        - number: 0x59f111f1\n        - number: 0x923f82a4\n        - number: 0xab1c5ed5\n        - not:\n          - or:\n            - number: 0xd728ae22 = lower half of SHA512 constant, 0x428a2f98d728ae22\n            - number: 0x23ef65cd = lower half of SHA512 constant, 0x7137449123ef65cd\n      - and:\n        - format: dotnet\n        - or:\n          - api: System.Security.Cryptography.SHA256Managed::Initialize\n          - api: System.Security.Cryptography.SHA256CryptoServiceProvider::Initialize\n          - api: System.Security.Cryptography.SHA256::Create\n          - api: System.Security.Cryptography.SHA256Managed::ctor\n        - optional:\n          - api: System.Security.Cryptography.HashAlgorithm::ComputeHash\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://www.rfc-editor.org/rfc/rfc6234"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "delete registry value",
+                                               "description":  "host-interaction/registry/delete",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "create or open registry key",
+                                                                  "api: Microsoft.Win32.RegistryKey::OpenSubKey",
+                                                                  "api: Microsoft.Win32.RegistryKey::DeleteValue"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: delete registry value\n    namespace: host-interaction/registry/delete\n    authors:\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Defense Evasion::Modify Registry [T1112]\n    mbc:\n      - Operating System::Registry::Delete Registry Value [C0036.007]\n    examples:\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x4041A0\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegDeleteValue\n        - api: advapi32.RegDeleteKeyValue\n        - api: ZwDeleteValueKey\n        - api: NtDeleteValueKey\n        - api: RtlDeleteRegistryValue\n        - api: SHDeleteValue\n        - api: SHRegDeleteUSValue\n        - api: Microsoft.Win32.RegistryKey::DeleteValue\n"
+                                           },
+                                           {
+                                               "id":  "4",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "interact with driver via IOCTL",
+                                               "description":  "host-interaction/driver",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: DeviceIoControl"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: interact with driver via IOCTL\n    namespace: host-interaction/driver\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: instruction\n      dynamic: call\n    examples:\n      - Practical Malware Analysis Lab 10-03.exe_:0x40108c\n  features:\n    - or:\n      - api: DeviceIoControl\n"
+                                           },
+                                           {
+                                               "id":  "5",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check if file exists",
+                                               "description":  "host-interaction/file-system/exists",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.IO.File::Exists"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check if file exists\n    namespace: host-interaction/file-system/exists\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    examples:\n      - 31600AD0D1A7EA615690DF111AE36C73:0x401284\n  features:\n    - or:\n      - basic block:\n        - and:\n          - api: kernel32.GetFileAttributes\n          - instruction:\n            - mnemonic: cmp\n            - number: 0xFFFFFFFF = INVALID_FILE_ATTRIBUTES\n      - basic block:\n        - and:\n          - api: kernel32.GetLastError\n          - instruction:\n            - mnemonic: cmp\n            - number: 2 = ERROR_FILE_NOT_FOUND\n      - api: shlwapi.PathFileExists\n      - api: System.IO.File::Exists\n      - property/read: System.IO.FileSystemInfo::Exists\n"
+                                           },
+                                           {
+                                               "id":  "7",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get common file path",
+                                               "description":  "host-interaction/file-system",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Environment::GetFolderPath"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get common file path\n    namespace: host-interaction/file-system\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    examples:\n      - Practical Malware Analysis Lab 03-02.dll_:0x10003415\n      - 972B219F18379907A045431303F4DA7D:0x404887\n  features:\n    - or:\n      - api: kernel32.GetTempPath\n      - api: kernel32.GetTempFileName\n      - api: kernel32.GetSystemDirectory\n      - api: kernel32.GetWindowsDirectory\n      - api: kernel32.GetSystemWow64Directory\n      - api: GetAllUsersProfileDirectory\n      - api: GetAppContainerFolderPath\n      - api: GetCurrentDirectory\n      - api: GetDefaultUserProfileDirectory\n      - api: GetProfilesDirectory\n      - api: GetUserProfileDirectory\n      - api: SHGetFolderPathAndSubDir\n      - api: shell32.SHGetFolderPath\n      - api: shell32.SHGetFolderLocation\n      - api: shell32.SHGetKnownFolderPath\n      - api: shell32.SHGetSpecialFolderPath\n      - api: shell32.SHGetSpecialFolderLocation\n      - api: System.IO.Directory::GetCurrentDirectory\n      - api: System.Environment::GetFolderPath\n      - property/read: System.Environment::SystemDirectory\n      - property/read: System.Environment::CurrentDirectory\n"
+                                           },
+                                           {
+                                               "id":  "8",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get disk information",
+                                               "description":  "host-interaction/hardware/storage",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetLogicalDriveStrings",
+                                                                  "api: GetVolumeNameForVolumeMountPoint",
+                                                                  "property: System.IO.DriveInfo::DriveFormat"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get disk information\n    namespace: host-interaction/hardware/storage\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Information Discovery [T1082]\n    mbc:\n      - Discovery::System Information Discovery [E1082]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x4052A0\n      - 972B219F18379907A045431303F4DA7D:0x41064E\n  features:\n    - or:\n      - api: kernel32.GetDriveType\n      - api: kernel32.GetLogicalDrives\n      - api: kernel32.GetVolumeInformation\n      - api: kernel32.GetVolumeNameForVolumeMountPoint\n      - api: kernel32.GetVolumePathNamesForVolumeName\n      - api: kernel32.GetLogicalDriveStrings\n      - api: kernel32.QueryDosDevice\n      - property/read: System.IO.DriveInfo::VolumeLabel\n      - property/read: System.IO.DriveInfo::DriveType\n      - property/read: System.IO.DriveInfo::DriveFormat\n      - property/read: System.IO.DriveInfo::Name\n"
+                                           },
+                                           {
+                                               "id":  "9",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get hostname",
+                                               "description":  "host-interaction/os/hostname",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "joakim@intezer.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "property: System.Environment::MachineName"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get hostname\n    namespace: host-interaction/os/hostname\n    authors:\n      - moritz.raabe@mandiant.com\n      - joakim@intezer.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Information Discovery [T1082]\n    mbc:\n      - Discovery::System Information Discovery [E1082]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x4052A0\n      - 7351f8a40c5450557b24622417fc478d:0x405438\n  features:\n    - or:\n      - api: kernel32.GetComputerName\n      - api: kernel32.GetComputerNameEx\n      - api: GetComputerObjectName\n      - api: ws2_32.gethostname\n      - api: gethostname\n      - property/read: System.Environment::MachineName\n"
+                                           },
+                                           {
+                                               "id":  "10",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "set registry value",
+                                               "description":  "host-interaction/registry/create",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: Microsoft.Win32.RegistryKey::SetValue"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: set registry value\n    namespace: host-interaction/registry/create\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Operating System::Registry::Set Registry Key [C0036.001]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13147AF0\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x40433E\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x40415E\n      - 98c37c3c23bbfb362dac7754c6ba48e75cf24d73bc963a4cdfca557b9e016909:0x40294D\n  features:\n    - or:\n      - and:\n        - optional:\n          - match: create or open registry key\n        - or:\n          - api: advapi32.RegSetValue\n          - api: advapi32.RegSetValueEx\n          - api: advapi32.RegSetKeyValue\n          - api: ZwSetValueKey\n          - api: NtSetValueKey\n          - api: RtlWriteRegistryValue\n          - api: SHSetValue\n          - api: SHRegSetPath\n          - api: SHRegSetValue\n          - api: SHRegSetUSValue\n          - api: SHRegWriteUSValue\n          - api: Microsoft.Win32.RegistryKey::SetValue\n          - api: Microsoft.Win32.Registry::SetValue\n      - and:\n        - match: host-interaction/process/create\n        - string: \"/add/i\"\n        - or:\n          - string: \"/reg(|.exe)/i\"\n          - string: \"/hklm/i\"\n          - string: \"/HKEY_LOCAL_MACHINE/i\"\n          - string: \"/hkcu/i\"\n          - string: \"/HKEY_CURRENT_USER/i\"\n"
+                                           },
+                                           {
+                                               "id":  "11",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "load XML in .NET",
+                                               "description":  "data-manipulation/xml",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Xml.XmlDocument::Load"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: load XML in .NET\n    namespace: data-manipulation/xml\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n  features:\n    - or:\n      - api: System.Xml.XmlDocument::Load\n      - api: System.Xml.XmlDocument::LoadXml\n"
+                                           },
+                                           {
+                                               "id":  "12",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "manipulate unmanaged memory in .NET",
+                                               "description":  "host-interaction/memory",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "class: System.Runtime.InteropServices.Marshal"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: manipulate unmanaged memory in .NET\n    namespace: host-interaction/memory\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires class features\n  features:\n    - or:\n      - class: System.Runtime.InteropServices.Marshal\n"
+                                           },
+                                           {
+                                               "id":  "13",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get OS version in .NET",
+                                               "description":  "host-interaction/os/version",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "property: System.Environment::OSVersion",
+                                                                  "property: System.OperatingSystem::Version"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get OS version in .NET\n    namespace: host-interaction/os/version\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: unsupported  # requires property features\n    att\u0026ck:\n      - Discovery::System Information Discovery [T1082]\n  features:\n    - or:\n      - property/read: System.Environment::OSVersion\n      - property/read: System.Environment::Is64BitOperatingSystem\n      - property/read: System.OperatingSystem::Version\n      - property/read: Microsoft.VisualBasic.Devices.ComputerInfo::OSFullName\n      - property/read: System.Runtime.InteropServices.RuntimeInformation::OSDescription\n"
+                                           },
+                                           {
+                                               "id":  "14",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "allocate unmanaged memory in .NET",
+                                               "description":  "host-interaction/memory",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Runtime.InteropServices.Marshal::AllocHGlobal"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: allocate unmanaged memory in .NET\n    namespace: host-interaction/memory\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n  features:\n    - or:\n      - api: System.Runtime.InteropServices.Marshal::AllocHGlobal\n"
+                                           },
+                                           {
+                                               "id":  "15",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "contains PDB path",
+                                               "description":  "executable/pe/pdb",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "regex: /:\\\\.*\\.pdb/"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: contains PDB path\n    namespace: executable/pe/pdb\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    examples:\n      - 464EF2CA59782CE697BC329713698CCC  # level32.exe\n  features:\n    - string: /:\\\\.*\\.pdb/\n"
+                                           },
+                                           {
+                                               "id":  "16",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "delete registry key",
+                                               "description":  "host-interaction/registry/delete",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "johnk3r"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: Microsoft.Win32.RegistryKey::OpenRemoteBaseKey",
+                                                                  "api: Microsoft.Win32.RegistryKey::DeleteSubKeyTree",
+                                                                  "create or open registry key"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: delete registry key\n    namespace: host-interaction/registry/delete\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - johnk3r\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Defense Evasion::Modify Registry [T1112]\n    mbc:\n      - Operating System::Registry::Delete Registry Key [C0036.002]\n    examples:\n      - 4f11bdb380dafa2518053c6d20147a05:0x402A36\n      - 493167E85E45363D09495D0841C30648:0x404D60\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegDeleteKey\n        - api: advapi32.RegDeleteTree\n        - api: advapi32.RegDeleteKeyEx\n        - api: advapi32.RegDeleteKeyTransacted\n        - api: ZwDeleteKey\n        - api: NtDeleteKey\n        - api: SHDeleteKey\n        - api: SHDeleteEmptyKey\n        - api: SHRegDeleteEmptyUSKey\n        - api: Microsoft.Win32.RegistryKey::DeleteSubKey\n        - api: Microsoft.Win32.RegistryKey::DeleteSubKeyTree\n"
+                                           },
+                                           {
+                                               "id":  "17",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "query or enumerate registry key",
+                                               "description":  "host-interaction/registry",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "create or open registry key",
+                                                                  "api: Microsoft.Win32.RegistryKey::OpenSubKey",
+                                                                  "api: Microsoft.Win32.RegistryKey::CreateSubKey"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: query or enumerate registry key\n    namespace: host-interaction/registry\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::Query Registry [T1012]\n    mbc:\n      - Operating System::Registry::Query Registry Key [C0036.005]\n    examples:\n      - 493167E85E45363D09495D0841C30648:0x404930\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x402608\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegEnumKey\n        - api: advapi32.RegEnumKeyEx\n        - api: advapi32.RegQueryInfoKeyA\n        - api: ZwQueryKey\n        - api: ZwEnumerateKey\n        - api: NtQueryKey\n        - api: NtEnumerateKey\n        - api: RtlCheckRegistryKey\n        - api: SHEnumKeyEx\n        - api: SHQueryInfoKey\n        - api: SHRegEnumUSKey\n        - api: SHRegQueryInfoUSKey\n        - api: Microsoft.Win32.RegistryKey::GetSubKeyNames\n        - api: Microsoft.Win32.RegistryKey::OpenBaseKey\n        - api: Microsoft.Win32.RegistryKey::OpenRemoteBaseKey\n        - api: Microsoft.Win32.RegistryKey::OpenSubKey\n"
+                                           },
+                                           {
+                                               "id":  "18",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "unmanaged call",
+                                               "description":  "runtime : managed code calls unmanaged (native) code, often seen in .NET",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: unmanaged call\n    namespace: runtime\n    authors:\n      - michael.hunhoff@mandiant.com\n    description: managed code calls unmanaged (native) code, often seen in .NET\n    scopes:\n      static: function\n      dynamic: unsupported\n  features:\n    - or:\n      - characteristic: unmanaged call\n      - match: unmanaged call via dynamic PInvoke in .NET\n      - api: System.Runtime.InteropServices.Marshal::GetDelegateForFunctionPointer\n"
+                                           },
+                                           {
+                                               "id":  "20",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "access .NET resource",
+                                               "description":  "executable/resource",
+                                               "authors":  [
+                                                               "@mr-tz"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Reflection.Assembly::GetManifestResourceStream",
+                                                                  "api: System.Resources.ResourceManager::ctor"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: access .NET resource\n    namespace: executable/resource\n    authors:\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: span of calls\n    examples:\n      - 387f15043f0198fd3a637b0758c2b6dde9ead795c3ed70803426fc355731b173:0x06000084\n  features:\n    - and:\n      - format: dotnet\n      - or:\n        - api: System.Resources.ResourceManager::ctor\n        - api: System.Reflection.Assembly::GetManifestResourceStream\n"
+                                           },
+                                           {
+                                               "id":  "21",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "delete file",
+                                               "description":  "host-interaction/file-system/delete",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.IO.File::Delete"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: delete file\n    namespace: host-interaction/file-system/delete\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - File System::Delete File [C0047]\n    examples:\n      - 946A99F36A46D335DEC080D9A4371940:0x100015F0\n      # MoveFileEx\n      - 31600AD0D1A7EA615690DF111AE36C73:0x401A15\n      # NtDeleteFile\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x140001E04\n  features:\n    - or:\n      - api: kernel32.DeleteFile\n      - api: DeleteFileTransacted\n      - api: NtDeleteFile\n      - api: ZwDeleteFile\n      - api: remove\n      - api: _wremove\n      - api: System.IO.File::Delete\n      - api: System.IO.FileSystemInfo::Delete\n      # static\n      - basic block:\n        - and:\n          - number: 3 = FO_DELETE\n          - or:\n            - api: kernel32.SHFileOperation\n      - basic block:\n        - and:\n          - number: 4 = MOVEFILE_DELAY_UNTIL_REBOOT\n          - number: 0 = NULL\n          - api: MoveFileEx\n      # dynamic\n      - call:\n        - and:\n          - number: 3 = FO_DELETE\n          - or:\n            - api: kernel32.SHFileOperation\n      - call:\n        - and:\n          - number: 4 = MOVEFILE_DELAY_UNTIL_REBOOT\n          - number: 0 = NULL\n          - api: MoveFileEx\n"
+                                           },
+                                           {
+                                               "id":  "22",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "access WMI data in .NET",
+                                               "description":  "host-interaction/wmi",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Management.ManagementObjectSearcher::ctor",
+                                                                  "api: System.Management.ManagementObjectSearcher::Get"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: access WMI data in .NET\n    namespace: host-interaction/wmi\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Execution::Windows Management Instrumentation [T1047]\n  features:\n    - or:\n      - and:\n        - api: System.Management.ManagementClass::ctor\n        - optional:\n          - api: System.Management.ManagementClass::GetInstances\n          - api: System.Management.ManagementObjectCollection::GetEnumerator\n      - and:\n        - api: System.Management.ManagementObjectSearcher::Get\n        - optional:\n          - api: System.Management.ManagementObjectSearcher::ctor\n"
+                                           },
+                                           {
+                                               "id":  "24",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "copy file",
+                                               "description":  "host-interaction/file-system/copy",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.IO.File::Copy"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: copy file\n    namespace: host-interaction/file-system/copy\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - File System::Copy File [C0045]\n    examples:\n      - Practical Malware Analysis Lab 01-01.exe_:0x401440\n  features:\n    - or:\n      - api: kernel32.CopyFile\n      - api: kernel32.CopyFileEx\n      - api: CopyFile2\n      - api: CopyFileTransacted\n      - api: LZCopy\n      - api: System.IO.FileInfo::CopyTo\n      - api: System.IO.File::Copy\n      - basic block:\n        - and:\n          - number: 2 = FO_COPY\n          - or:\n            - api: kernel32.SHFileOperation\n      - call:\n        - and:\n          - number: 2 = FO_COPY\n          - or:\n            - api: kernel32.SHFileOperation\n"
+                                           },
+                                           {
+                                               "id":  "25",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "compiled to the .NET platform",
+                                               "description":  "runtime/dotnet",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: compiled to the .NET platform\n    namespace: runtime/dotnet\n    authors:\n      - william.ballenthin@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    examples:\n      - b9f5bd514485fb06da39beff051b9fdc\n  features:\n    - or:\n      - format: dotnet\n      - import: mscoree._CorExeMain\n      - import: mscoree._corexemain\n      - import: mscoree._CorDllMain\n      - import: mscoree._cordllmain\n"
+                                           },
+                                           {
+                                               "id":  "26",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "suspend thread",
+                                               "description":  "host-interaction/thread/suspend",
+                                               "authors":  [
+                                                               "0x534a@mailbox.org",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Threading.Thread::Sleep"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: suspend thread\n    namespace: host-interaction/thread/suspend\n    authors:\n      - 0x534a@mailbox.org\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - Process::Suspend Thread [C0055]\n    examples:\n      - 787cbc8a6d1bc58ea169e51e1ad029a637f22560660cc129ab8a099a745bd50e:0x502f4c\n  features:\n    - or:\n      - api: kernel32.SuspendThread\n      - api: ntdll.NtSuspendThread\n      - api: ntdll.ZwSuspendThread\n      - api: System.Threading.Thread::Suspend\n      - api: System.Threading.Thread::Sleep\n"
+                                           },
+                                           {
+                                               "id":  "28",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get file version info",
+                                               "description":  "host-interaction/file-system/meta",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Diagnostics.FileVersionInfo::GetVersionInfo"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get file version info\n    namespace: host-interaction/file-system/meta\n    authors:\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    examples:\n      - mimikatz.exe_:0x45E308\n  features:\n    - and:\n      - or:\n        - api: version.GetFileVersionInfo\n        - api: version.GetFileVersionInfoEx\n        - api: System.Diagnostics.FileVersionInfo::GetVersionInfo\n      - optional:\n        - description: retrieve specified version information from the version-information resource\n        - api: version.VerQueryValue\n        - or:\n          - api: version.GetFileVersionInfoSize\n          - api: version.GetFileVersionInfoSizeEx\n"
+                                           }
+                                       ],
+                 "mbc":  [
+                             {
+                                 "id":  "C0029.003",
+                                 "objective":  "Cryptography",
+                                 "behavior":  "Cryptographic Hash",
+                                 "method":  "SHA256",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "2"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.007",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Delete Registry Value",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "3"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1083",
+                                 "objective":  "Discovery",
+                                 "behavior":  "File and Directory Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "5"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1083",
+                                 "objective":  "Discovery",
+                                 "behavior":  "File and Directory Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "7"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1082",
+                                 "objective":  "Discovery",
+                                 "behavior":  "System Information Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "8"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1082",
+                                 "objective":  "Discovery",
+                                 "behavior":  "System Information Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "9"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.001",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Set Registry Key",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "10"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.002",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Delete Registry Key",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "16"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.005",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Query Registry Key",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "17"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0047",
+                                 "objective":  "File System",
+                                 "behavior":  "Delete File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "21"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0045",
+                                 "objective":  "File System",
+                                 "behavior":  "Copy File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "24"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0055",
+                                 "objective":  "Process",
+                                 "behavior":  "Suspend Thread",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "26"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1083",
+                                 "objective":  "Discovery",
+                                 "behavior":  "File and Directory Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "28"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1620",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "invoke .NET assembly method",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "0"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1112",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "delete registry value",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "3"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1083",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "check if file exists",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "5"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1083",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get common file path",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "7"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get disk information",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "8"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get hostname",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "9"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get OS version in .NET",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "13"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1112",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "delete registry key",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "16"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1012",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "query or enumerate registry key",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "17"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1047",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "access WMI data in .NET",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "22"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1083",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get file version info",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "28"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "attack_techniques":  {
+                                           "T1620":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "invoke .NET assembly method",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "0"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1112":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "delete registry value",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "3"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "delete registry key",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "16"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1083":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "check if file exists",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "5"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get common file path",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "7"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get file version info",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "28"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1082":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get disk information",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "8"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get hostname",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "9"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get OS version in .NET",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "13"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1012":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "query or enumerate registry key",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "17"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1047":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "access WMI data in .NET",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "22"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

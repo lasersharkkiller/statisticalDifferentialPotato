@@ -1,0 +1,2111 @@
+{
+    "data":  {
+                 "signature_matches":  [
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "delete registry key",
+                                               "description":  "host-interaction/registry/delete",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "johnk3r"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: RegOpenKeyEx",
+                                                                  "create or open registry key",
+                                                                  "api: RegDeleteKeyEx"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: delete registry key\n    namespace: host-interaction/registry/delete\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - johnk3r\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Defense Evasion::Modify Registry [T1112]\n    mbc:\n      - Operating System::Registry::Delete Registry Key [C0036.002]\n    examples:\n      - 4f11bdb380dafa2518053c6d20147a05:0x402A36\n      - 493167E85E45363D09495D0841C30648:0x404D60\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegDeleteKey\n        - api: advapi32.RegDeleteTree\n        - api: advapi32.RegDeleteKeyEx\n        - api: advapi32.RegDeleteKeyTransacted\n        - api: ZwDeleteKey\n        - api: NtDeleteKey\n        - api: SHDeleteKey\n        - api: SHDeleteEmptyKey\n        - api: SHRegDeleteEmptyUSKey\n        - api: Microsoft.Win32.RegistryKey::DeleteSubKey\n        - api: Microsoft.Win32.RegistryKey::DeleteSubKeyTree\n"
+                                           },
+                                           {
+                                               "id":  "5",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "set registry value",
+                                               "description":  "host-interaction/registry/create",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: RegCreateKeyEx",
+                                                                  "create or open registry key",
+                                                                  "api: RegSetValueEx"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: set registry value\n    namespace: host-interaction/registry/create\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Operating System::Registry::Set Registry Key [C0036.001]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13147AF0\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x40433E\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x40415E\n      - 98c37c3c23bbfb362dac7754c6ba48e75cf24d73bc963a4cdfca557b9e016909:0x40294D\n  features:\n    - or:\n      - and:\n        - optional:\n          - match: create or open registry key\n        - or:\n          - api: advapi32.RegSetValue\n          - api: advapi32.RegSetValueEx\n          - api: advapi32.RegSetKeyValue\n          - api: ZwSetValueKey\n          - api: NtSetValueKey\n          - api: RtlWriteRegistryValue\n          - api: SHSetValue\n          - api: SHRegSetPath\n          - api: SHRegSetValue\n          - api: SHRegSetUSValue\n          - api: SHRegWriteUSValue\n          - api: Microsoft.Win32.RegistryKey::SetValue\n          - api: Microsoft.Win32.Registry::SetValue\n      - and:\n        - match: host-interaction/process/create\n        - string: \"/add/i\"\n        - or:\n          - string: \"/reg(|.exe)/i\"\n          - string: \"/hklm/i\"\n          - string: \"/HKEY_LOCAL_MACHINE/i\"\n          - string: \"/hkcu/i\"\n          - string: \"/HKEY_CURRENT_USER/i\"\n"
+                                           },
+                                           {
+                                               "id":  "6",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "implement COM DLL",
+                                               "description":  "executable/pe",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: implement COM DLL\n    namespace: executable/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    references:\n      - https://learn.microsoft.com/en-us/windows/win32/api/combaseapi/nf-combaseapi-dllgetclassobject\n  features:\n    - and:\n      - export: DllGetClassObject\n      - optional:\n        - export: DllRegisterServer\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://learn.microsoft.com/en-us/windows/win32/api/combaseapi/nf-combaseapi-dllgetclassobject"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "7",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "enumerate PE sections",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "@Ana06",
+                                                               "@mr-tz"
+                                                           ],
+                                               "match_data":  [
+                                                                  "mnemonic: movzx"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: enumerate PE sections\n    namespace: load-code/pe\n    authors:\n      - \"@Ana06\"\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: unsupported  # requires offset, operand[1].offset, characteristic, mnemonic, basicblock features\n    mbc:\n      - Discovery::Code Discovery::Enumerate PE Sections [B0046.001]\n    references:\n      - https://0x00sec.org/t/reflective-dll-injection/3080\n      - https://www.ired.team/offensive-security/code-injection-process-injection/reflective-dll-injection\n    examples:\n      - E4C33AC3638EEF68311F8AC0D72483C7:0x401510\n  features:\n    - and:\n      - os: windows\n      # there should be some complexity to functions like this\n      - count(basic blocks): 3 or more\n      - optional:\n        - offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n      - instruction:\n        - or:\n          - mnemonic: mov\n          - mnemonic: movzx\n        - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n      - basic block:\n        - or:\n          - and:\n            - description: IMAGE_FIRST_SECTION(nt_header)\n            - instruction:\n              - or:\n                - mnemonic: add\n                - mnemonic: mov\n                - mnemonic: movzx\n              - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n            - operand[1].offset: 0x18 = FileHeader.SizeOfOptionalHeader\n          - and:\n            - description: (DWORD)dll_raw + dos_header-\u003ee_lfanew + sizeof(IMAGE_NT_HEADERS) + sizeof(IMAGE_SECTION_HEADER) * i\n            - number: 0x28 = sizeof(IMAGE_SECTION_HEADER)\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0xF8 = sizeof(IMAGE_NT_HEADERS32)\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x108 = sizeof(IMAGE_NT_HEADERS64)\n      - 2 or more:\n        - operand[1].offset: 0xC = IMAGE_SECTION_HEADER.VirtualAddress\n        - operand[1].offset: 0x14 = IMAGE_SECTION_HEADER.PointerToRawData\n        - operand[1].offset: 0x10 = IMAGE_SECTION_HEADER.SizeOfRawData\n        # there\u0027s also offset 0x8 = IMAGE_SECTION_HEADER.Misc.PhysicalAddress, but it\u0027s likely too common\n      - not:\n        # non-zeroing XOR was observed in FPs\n        - characteristic: nzxor\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://0x00sec.org/t/reflective-dll-injection/3080"
+                                                            },
+                                                            {
+                                                                "ref":  "https://www.ired.team/offensive-security/code-injection-process-injection/reflective-dll-injection"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "8",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "parse PE header",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "IMAGE_NT_SIGNATURE (PE)",
+                                                                  "mnemonic: cmp",
+                                                                  "IMAGE_DOS_SIGNATURE (MZ)"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: parse PE header\n    namespace: load-code/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic, operand[1].offset features\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x403DD0\n  features:\n    - and:\n      - os: windows\n      - and:\n        - mnemonic: cmp\n        - or:\n          - number: 0x4550 = IMAGE_NT_SIGNATURE (PE)\n          - and:\n            - number: 0x50\n            - number: 0x45\n        - or:\n          - number: 0x5A4D = IMAGE_DOS_SIGNATURE (MZ)\n          - and:\n            - number: 0x4D\n            - number: 0x5A\n        - optional:\n          - and:\n            - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x30 = IMAGE_NT_HEADERS64.OptionalHeader.ImageBase\n          - basic block:\n            - and:\n              - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n              - 3 or more:\n                - operand[1].offset: 0x4 = IMAGE_NT_HEADERS.FileHeader.Machine\n                - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n                - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n                - operand[1].offset: 0x16 = IMAGE_NT_HEADERS.FileHeader.Characteristics\n                - operand[1].offset: 0x28 = IMAGE_NT_HEADERS.OptionalHeader.AddressOfEntryPoint  # for 32 and 64 bit\n                - or:\n                  - and:\n                    - arch: i386\n                    - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                  - and:\n                    - arch: amd64\n                    - operand[1].offset: 0x30 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n"
+                                           },
+                                           {
+                                               "id":  "9",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "persist via COM hijack",
+                                               "description":  "persistence/registry",
+                                               "authors":  [
+                                                               "j.j.vannielen@utwente.nl"
+                                                           ],
+                                               "match_data":  [
+                                                                  "create or open registry key",
+                                                                  "api: RegSetValueEx",
+                                                                  "api: RegCreateKeyEx"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: persist via COM hijack\n    namespace: persistence/registry\n    authors:\n      - j.j.vannielen@utwente.nl\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Persistence::Event Triggered Execution::Component Object Model Hijacking [T1546.015]\n    references:\n      - https://www.mdsec.co.uk/2019/05/persistence-the-continued-or-prolonged-existence-of-something-part-2-com-hijacking/\n      - https://stmxcsr.com/persistence/com-hijacking.html\n  features:\n    - and:\n      - match: set registry value\n      - or:\n        - string: /Classes\\\\CLSID/i\n        - string: /Classes\\\\WOW6432Node\\\\CLSID/i\n      - or:\n        - string: /InProcServer32/i\n        - string: /LocalServer32/i\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://www.mdsec.co.uk/2019/05/persistence-the-continued-or-prolonged-existence-of-something-part-2-com-hijacking/"
+                                                            },
+                                                            {
+                                                                "ref":  "https://stmxcsr.com/persistence/com-hijacking.html"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "stealth_network",
+                                               "name":  "stealth_network",
+                                               "description":  "Network activity detected but not expressed in monitor API logs",
+                                               "match_data":  [
+                                                                  "{\"ip\": \"52.165.164.15\"}",
+                                                                  "{\"ip\": \"20.190.155.16\"}",
+                                                                  "{\"ip\": \"4.154.131.237\"}",
+                                                                  "{\"ip\": \"20.12.23.50\"}",
+                                                                  "{\"ip\": \"192.229.211.108\"}",
+                                                                  "{\"ip\": \"72.21.81.240\"}",
+                                                                  "{\"ip\": \"204.79.197.203\"}",
+                                                                  "{\"ip\": \"20.49.150.241\"}",
+                                                                  "{\"ip\": \"23.195.81.58\"}",
+                                                                  "{\"domain\": \"settings-win.data.microsoft.com\"}",
+                                                                  "{\"domain\": \"settings-prod-uks-2.uksouth.cloudapp.azure.com\"}",
+                                                                  "{\"domain\": \"slscr.update.microsoft.com\"}",
+                                                                  "{\"domain\": \"glb.sls.prod.dcat.dsp.trafficmanager.net\"}",
+                                                                  "{\"domain\": \"ctldl.windowsupdate.com\"}",
+                                                                  "{\"domain\": \"_ldap._tcp.dc._msdcs.WORKGROUP.hostonly\"}",
+                                                                  "{\"domain\": \"www.msftconnecttest.com\"}",
+                                                                  "{\"domain\": \"wpad.hostonly\"}",
+                                                                  "{\"domain\": \"ocsp.digicert.com\"}",
+                                                                  "{\"domain\": \"fe2cr.update.microsoft.com\"}",
+                                                                  "{\"domain\": \"login.live.com\"}",
+                                                                  "{\"domain\": \"fe3cr.delivery.mp.microsoft.com\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "queries_keyboard_layout",
+                                               "name":  "queries_keyboard_layout",
+                                               "description":  "Queries the keyboard layout",
+                                               "match_data":  [
+                                                                  "{\"type\": \"call\", \"pid\": 4016, \"cid\": 500}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "network_http",
+                                               "name":  "network_http",
+                                               "description":  "Performs some HTTP requests",
+                                               "match_data":  [
+                                                                  "{\"url\": \"http://www.msftconnecttest.com/connecttest.txt\"}",
+                                                                  "{\"url\": \"http://ocsp.digicert.com/MFEwTzBNMEswSTAJBgUrDgMCGgUABBQ50otx%2Fh0Ztl%2Bz8SiPI7wEWVxDlQQUTiJUIBiV5uNu5g%2F6%2BrkS7QYXjzkCEA77flR%2B3w%2FxBpruV2lte6A%3D\"}",
+                                                                  "{\"url\": \"http://ocsp.digicert.com/MFEwTzBNMEswSTAJBgUrDgMCGgUABBSAUQYBMq2awn1Rh6Doh%2FsBYgFV7gQUA95QNVbRTLtm8KPiGxvDl7I90VUCEAJ0LqoXyo4hxxe7H%2Fz9DKA%3D\"}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_LOW"
+                                           },
+                                           {
+                                               "id":  "injection_rwx",
+                                               "name":  "injection_rwx",
+                                               "description":  "Creates RWX memory",
+                                               "match_data":  [
+                                                                  "{\"type\": \"call\", \"pid\": 4016, \"cid\": 43}"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_LOW"
+                                           },
+                                           {
+                                               "id":  "311",
+                                               "description":  "Creates a DirectInput object (often for capturing keystrokes)",
+                                               "match_data":  [
+                                                                  "      \u003cHOOK MODULE=\"DDRAW.DLL\" FUNCTION=\"DirectDrawCreateEx\"/\u003e"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "#memory_dumps",
+                                                                "value":  "loaddll32.exe, 00000000.00000002.1330493055.00000000003BC000.00000004.00000020.00020000.00000000.sdmp"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "9028",
+                                               "description":  "Uses 32bit PE files",
+                                               "match_data":  [
+                                                                  "EXECUTABLE_IMAGE, 32BIT_MACHINE, DLL"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "415",
+                                               "description":  "PE file has an executable .text section and no other executable section",
+                                               "match_data":  [
+                                                                  "Section: .text IMAGE_SCN_CNT_CODE, IMAGE_SCN_MEM_EXECUTE, IMAGE_SCN_MEM_READ"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "509",
+                                               "description":  "Reads software policies",
+                                               "match_data":  [
+                                                                  "HKEY_CURRENT_USER\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "#registry_keys_opened",
+                                                                "value":  "HKEY_CURRENT_USER\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "3",
+                                               "description":  "AV process strings found (often used to terminate AV products)",
+                                               "match_data":  [
+                                                                  "c:\\program files\\windows defender\\msmpeng.exe",
+                                                                  "MsMpEng.exe"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "337",
+                                               "description":  "Queries the volume information (name, serial number etc) of a device",
+                                               "match_data":  [
+                                                                  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA70E.tmp VolumeInformation",
+                                                                  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA70E.tmp.dmp VolumeInformation",
+                                                                  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA7F9.tmp VolumeInformation",
+                                                                  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA7F9.tmp.WERInternalMetadata.xml VolumeInformation",
+                                                                  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA896.tmp VolumeInformation",
+                                                                  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA896.tmp.xml VolumeInformation"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "431",
+                                               "description":  "PE /OLE file has a valid certificate with Microsoft as Issuer",
+                                               "match_data":  [
+                                                                  "Valid certificate with Microsoft Issuer"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "81",
+                                               "description":  "One or more processes crash",
+                                               "match_data":  [
+                                                                  "C:\\Windows\\SysWOW64\\WerFault.exe C:\\Windows\\SysWOW64\\WerFault.exe -u -p 7632 -s 732"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "219",
+                                               "description":  "Runs a DLL by calling functions",
+                                               "match_data":  [
+                                                                  "C:\\Windows\\SysWOW64\\rundll32.exe rundll32.exe  \"C:\\Users\\user\\Desktop\\wmiutils.dll\",#1"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "229",
+                                               "description":  "Spawns processes",
+                                               "match_data":  [
+                                                                  "C:\\Windows\\System32\\loaddll32.exe loaddll32.exe \"C:\\Users\\user\\Desktop\\wmiutils.dll\"",
+                                                                  "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1",
+                                                                  "C:\\Windows\\SysWOW64\\cmd.exe cmd.exe /C rundll32.exe \"C:\\Users\\user\\Desktop\\wmiutils.dll\",#1",
+                                                                  "C:\\Windows\\SysWOW64\\regsvr32.exe regsvr32.exe /s C:\\Users\\user\\Desktop\\wmiutils.dll",
+                                                                  "C:\\Windows\\SysWOW64\\rundll32.exe rundll32.exe  \"C:\\Users\\user\\Desktop\\wmiutils.dll\",#1",
+                                                                  "C:\\Windows\\SysWOW64\\rundll32.exe rundll32.exe C:\\Users\\user\\Desktop\\wmiutils.dll,DllCanUnloadNow",
+                                                                  "C:\\Windows\\SysWOW64\\rundll32.exe rundll32.exe C:\\Users\\user\\Desktop\\wmiutils.dll,DllGetClassObject",
+                                                                  "C:\\Windows\\SysWOW64\\WerFault.exe C:\\Windows\\SysWOW64\\WerFault.exe -u -p 7632 -s 732",
+                                                                  "C:\\Windows\\SysWOW64\\rundll32.exe rundll32.exe C:\\Users\\user\\Desktop\\wmiutils.dll,DllRegisterServer"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "406",
+                                               "description":  "Contains modern PE file flags such as dynamic base (ASLR) or NX",
+                                               "match_data":  [
+                                                                  "DYNAMIC_BASE, NX_COMPAT, GUARD_CF"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "847388368",
+                                               "description":  "Sigma detected: Potential System DLL Sideloading From Non System Locations",
+                                               "match_data":  [
+                                                                  "Data: Company: Microsoft Corporation, Description: WMI, FileVersion: 10.0.26100.1 (WinBuild.160101.0800), Hashes: SHA1=50AD704468BCF1B538A360418781924A8C5218B9,MD5=155F2D878B52DFD500D3F3C3D4290801,SHA"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_LOW"
+                                           },
+                                           {
+                                               "id":  "187",
+                                               "description":  "Tries to load missing DLLs",
+                                               "match_data":  [
+                                                                  "apphelp.dll",
+                                                                  "wbemcomn.dll",
+                                                                  "bcrypt.dll",
+                                                                  "aclayers.dll",
+                                                                  "mpr.dll",
+                                                                  "sfc.dll",
+                                                                  "propsys.dll",
+                                                                  "iphlpapi.dll",
+                                                                  "sfc_os.dll",
+                                                                  "uxtheme.dll"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "-891046401",
+                                               "description":  "Sigma detected: Potential Persistence Via COM Hijacking From Suspicious Locations",
+                                               "match_data":  [
+                                                                  "Data: Details: C:\\Users\\user\\Desktop\\wmiutils.dll, EventID: 13, EventType: SetValue, Image: C:\\Windows\\System32\\loaddll32.exe, ProcessId: 7460, TargetObject: HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW643"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_LOW"
+                                           },
+                                           {
+                                               "id":  "95",
+                                               "description":  "Creates mutexes",
+                                               "match_data":  [
+                                                                  "\\Sessions\\1\\BaseNamedObjects\\Local\\SM0:7468:120:WilError_01",
+                                                                  "\\Sessions\\1\\BaseNamedObjects\\Local\\WERReportingForProcess7632"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "203",
+                                               "description":  "Binary contains paths to debug symbols",
+                                               "match_data":  [
+                                                                  "wmiutils.pdbGCTL source: rundll32.exe, 00000007.00000002.1015160255.000000006C841000.00000020.00000001.01000000.00000003.sdmp, wmiutils.dll",
+                                                                  "wmiutils.pdb source: rundll32.exe, 00000007.00000002.1015160255.000000006C841000.00000020.00000001.01000000.00000003.sdmp, wmiutils.dll"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "1884",
+                                               "description":  "Contains medium sleeps (\u003e= 30s)",
+                                               "match_data":  [
+                                                                  "delay time: 120000"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "76",
+                                               "description":  "Checks if the current process is being debugged",
+                                               "match_data":  [
+                                                                  "DebugPort"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "234",
+                                               "description":  "Binary contains a suspicious time stamp",
+                                               "match_data":  [
+                                                                  "0xD7256496 [Fri May 19 05:20:22 2084 UTC]"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "238",
+                                               "description":  "URLs found in memory or binary data",
+                                               "match_data":  [
+                                                                  "http://upx.sf.net"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "217",
+                                               "description":  "Registers a DLL",
+                                               "match_data":  [
+                                                                  "C:\\Windows\\SysWOW64\\regsvr32.exe regsvr32.exe /s C:\\Users\\user\\Desktop\\wmiutils.dll"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "871",
+                                               "description":  "Sample execution stops while process was sleeping (likely an evasion)",
+                                               "match_data":  [
+                                                                  "Thread delayed"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "236",
+                                               "description":  "Creates temporary files",
+                                               "match_data":  [
+                                                                  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA70E.tmp"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "411",
+                                               "description":  "PE file contains a mix of data directories often seen in goodware",
+                                               "match_data":  [
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_IMPORT",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_RESOURCE",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_BASERELOC",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_DEBUG",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG",
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_IAT"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "715",
+                                               "description":  "Classification label",
+                                               "match_data":  [
+                                                                  "mal48.winDLL@15/5@0/0"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "381",
+                                               "description":  "Disables application error messsages (SetErrorMode)",
+                                               "match_data":  [
+                                                                  "NOOPENFILEERRORBOX",
+                                                                  "FAILCRITICALERRORS | NOGPFAULTERRORBOX"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "626",
+                                               "description":  "Sample tries to load a library which is not present or installed on the analysis machine, adding the library might reveal more behavior",
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "263",
+                                               "description":  "May try to detect the virtual machine to hinder analysis (VM artifact strings found in memory)",
+                                               "match_data":  [
+                                                                  "c:\\windows\\system32\\driverstore\\filerepository\\vmci.inf_amd64_5e38a278d114b813",
+                                                                  "VMware",
+                                                                  "scsi/disk\u0026ven_vmware\u0026prod_virtual_disk/5\u00261ec51bf7\u00260\u0026000000",
+                                                                  "VMware Virtual USB Mouse",
+                                                                  "BiosVendor:VMware, Inc.,BiosVersion:VMW71.00V.17369862.B64.2012240522,BiosReleaseDate:12/24/2020,BiosMajorRelease:0xff,BiosMinorRelease:0xff,SystemManufacturer:VMware, Inc.,SystemProduct:VMware7,1,Sys",
+                                                                  "VMware, Inc.e",
+                                                                  "vmci.syshbin",
+                                                                  "VMware, Inc.",
+                                                                  ".Z$c:/windows/system32/drivers/vmci.sys",
+                                                                  "VMware VMCI Bus Device0",
+                                                                  "Ascsi/cdrom\u0026ven_necvmwar\u0026prod_vmware_sata_cd00/5\u0026354ae4d7\u00260\u0026000000",
+                                                                  "c:/windows/system32/drivers/vmci.sys",
+                                                                  ":scsi/disk\u0026ven_vmware\u0026prod_virtual_disk/5\u00261ec51bf7\u00260\u0026000000",
+                                                                  "pci\\ven_15ad\u0026dev_0740\u0026subsys_074015ad,root\\vmwvmcihostdev",
+                                                                  "vmci.inf_amd64_5e38a278d114b813, ",
+                                                                  "vmci.sys",
+                                                                  "\\driver\\vmci,\\driver\\pci",
+                                                                  "scsi/cdrom\u0026ven_necvmwar\u0026prod_vmware_sata_cd00/5\u0026354ae4d7\u00260\u0026000000",
+                                                                  "Microsoft Hyper-V Generation Counter",
+                                                                  "VMware7,1",
+                                                                  "NECVMWar VMware SATA CD00",
+                                                                  "VMware Virtual disk SCSI Disk Device",
+                                                                  "scsi\\cdromnecvmwarvmware_sata_cd001.00,scsi\\cdromnecvmwarvmware_sata_cd00,scsi\\cdromnecvmwar,scsi\\necvmwarvmware_sata_cd001,necvmwarvmware_sata_cd001,gencdrom",
+                                                                  "scsi\\diskvmware__virtual_disk____2.0_,scsi\\diskvmware__virtual_disk____,scsi\\diskvmware__,scsi\\vmware__virtual_disk____2,vmware__virtual_disk____2,gendisk",
+                                                                  "VMware7,1p",
+                                                                  "VMware-42 17 d3 d6 44 e2 f8 7c-b5 2b 9b f6 4d 71 be 04",
+                                                                  "VMware PCI VMCI Bus Device",
+                                                                  "vmci.inf_amd64_5e38a278d114b813",
+                                                                  "VMware VMCI Bus Device",
+                                                                  "VMware, Inc.ps",
+                                                                  "VMware, Inc.00"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "1318",
+                                               "description":  "Creates a process in suspended mode (likely to inject code)",
+                                               "match_data":  [
+                                                                  "C:\\Windows\\SysWOW64\\rundll32.exe rundll32.exe  \"C:\\Users\\user\\Desktop\\wmiutils.dll\",#1"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "404",
+                                               "description":  "PE / OLE file has a valid certificate",
+                                               "match_data":  [
+                                                                  "certificate valid"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           },
+                                           {
+                                               "id":  "412",
+                                               "description":  "PE file contains a debug data directory",
+                                               "match_data":  [
+                                                                  "data directory type: IMAGE_DIRECTORY_ENTRY_DEBUG"
+                                                              ],
+                                               "severity":  "IMPACT_SEVERITY_INFO"
+                                           }
+                                       ],
+                 "registry_keys_deleted":  [
+                                               "\\REGISTRY\\A\\{df402403-d1bc-7f4b-6a1a-c18368620c2e}\\Root\\InventoryApplicationFile\\PermissionsCheckTestKey"
+                                           ],
+                 "files_deleted":  [
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA70E.tmp",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA70E.tmp.dmp",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA7F9.tmp",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA896.tmp"
+                                   ],
+                 "registry_keys_set":  [
+                                           {
+                                               "key":  "\\REGISTRY\\A\\{df402403-d1bc-7f4b-6a1a-c18368620c2e}\\Root\\InventoryApplicationFile\\PermissionsCheckTestKey"
+                                           },
+                                           {
+                                               "key":  "\\REGISTRY\\A\\{df402403-d1bc-7f4b-6a1a-c18368620c2e}\\Root\\InventoryApplicationFile\\rundll32.exe|ccf370e740f0e788"
+                                           },
+                                           {
+                                               "key":  "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Windows\\Windows Error Reporting\\Debug"
+                                           },
+                                           {
+                                               "key":  "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{CF4CC405-E2C5-4DDD-B3CE-5E7582D8C9FA}\\InprocServer32\\NULL",
+                                               "value":  "C:\\Users\\user\\Desktop\\wmiutils.dll"
+                                           },
+                                           {
+                                               "key":  "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{EB87E1BD-3233-11D2-AEC9-00C04FB68820}\\InprocServer32\\NULL",
+                                               "value":  "C:\\Users\\user\\Desktop\\wmiutils.dll"
+                                           },
+                                           {
+                                               "key":  "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{EAC8A024-21E2-4523-AD73-A71A0AA2F56A}\\InprocServer32\\NULL",
+                                               "value":  "C:\\Users\\user\\Desktop\\wmiutils.dll"
+                                           },
+                                           {
+                                               "key":  "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\AmiHivePermissionsCorrect",
+                                               "value":  "1"
+                                           },
+                                           {
+                                               "key":  "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\AmiHiveOwnerCorrect",
+                                               "value":  "1"
+                                           },
+                                           {
+                                               "key":  "\\REGISTRY\\A\\{df402403-d1bc-7f4b-6a1a-c18368620c2e}\\Root\\InventoryApplicationFile\\rundll32.exe|ccf370e740f0e788\\ProgramId",
+                                               "value":  "0000f519feec486de87ed73cb92d3cac802400000000"
+                                           },
+                                           {
+                                               "key":  "\\REGISTRY\\A\\{df402403-d1bc-7f4b-6a1a-c18368620c2e}\\Root\\InventoryApplicationFile\\rundll32.exe|ccf370e740f0e788\\FileId",
+                                               "value":  "0000bcc5dc3222034d3f257f1fd35889e5be90f09b5f"
+                                           },
+                                           {
+                                               "key":  "\\REGISTRY\\A\\{df402403-d1bc-7f4b-6a1a-c18368620c2e}\\Root\\InventoryApplicationFile\\rundll32.exe|ccf370e740f0e788\\LowerCaseLongPath",
+                                               "value":  "c:\\windows\\syswow64\\rundll32.exe"
+                                           },
+                                           {
+                                               "key":  "\\REGISTRY\\A\\{df402403-d1bc-7f4b-6a1a-c18368620c2e}\\Root\\InventoryApplicationFile\\rundll32.exe|ccf370e740f0e788\\LongPathHash",
+                                               "value":  "rundll32.exe|ccf370e740f0e788"
+                                           },
+                                           {
+                                               "key":  "\\REGISTRY\\A\\{df402403-d1bc-7f4b-6a1a-c18368620c2e}\\Root\\InventoryApplicationFile\\rundll32.exe|ccf370e740f0e788\\Name",
+                                               "value":  "rundll32.exe"
+                                           },
+                                           {
+                                               "key":  "\\REGISTRY\\A\\{df402403-d1bc-7f4b-6a1a-c18368620c2e}\\Root\\InventoryApplicationFile\\rundll32.exe|ccf370e740f0e788\\Publisher",
+                                               "value":  "microsoft corporation"
+                                           },
+                                           {
+                                               "key":  "\\REGISTRY\\A\\{df402403-d1bc-7f4b-6a1a-c18368620c2e}\\Root\\InventoryApplicationFile\\rundll32.exe|ccf370e740f0e788\\Version",
+                                               "value":  "10.0.17134.1 (winbuild.160101.0800)"
+                                           },
+                                           {
+                                               "key":  "\\REGISTRY\\A\\{df402403-d1bc-7f4b-6a1a-c18368620c2e}\\Root\\InventoryApplicationFile\\rundll32.exe|ccf370e740f0e788\\BinFileVersion",
+                                               "value":  "10.0.17134.1"
+                                           },
+                                           {
+                                               "key":  "\\REGISTRY\\A\\{df402403-d1bc-7f4b-6a1a-c18368620c2e}\\Root\\InventoryApplicationFile\\rundll32.exe|ccf370e740f0e788\\BinaryType",
+                                               "value":  "pe32_i386"
+                                           },
+                                           {
+                                               "key":  "\\REGISTRY\\A\\{df402403-d1bc-7f4b-6a1a-c18368620c2e}\\Root\\InventoryApplicationFile\\rundll32.exe|ccf370e740f0e788\\ProductName",
+                                               "value":  "microsoft. windows. operating system"
+                                           },
+                                           {
+                                               "key":  "\\REGISTRY\\A\\{df402403-d1bc-7f4b-6a1a-c18368620c2e}\\Root\\InventoryApplicationFile\\rundll32.exe|ccf370e740f0e788\\ProductVersion",
+                                               "value":  "10.0.17134.1"
+                                           },
+                                           {
+                                               "key":  "\\REGISTRY\\A\\{df402403-d1bc-7f4b-6a1a-c18368620c2e}\\Root\\InventoryApplicationFile\\rundll32.exe|ccf370e740f0e788\\LinkDate",
+                                               "value":  "01/30/1986 11:42:44"
+                                           },
+                                           {
+                                               "key":  "\\REGISTRY\\A\\{df402403-d1bc-7f4b-6a1a-c18368620c2e}\\Root\\InventoryApplicationFile\\rundll32.exe|ccf370e740f0e788\\BinProductVersion",
+                                               "value":  "10.0.17134.1"
+                                           },
+                                           {
+                                               "key":  "\\REGISTRY\\A\\{df402403-d1bc-7f4b-6a1a-c18368620c2e}\\Root\\InventoryApplicationFile\\rundll32.exe|ccf370e740f0e788\\Size",
+                                               "value":  "00 F2 00 00 00 00 00 00 "
+                                           },
+                                           {
+                                               "key":  "\\REGISTRY\\A\\{df402403-d1bc-7f4b-6a1a-c18368620c2e}\\Root\\InventoryApplicationFile\\rundll32.exe|ccf370e740f0e788\\Language",
+                                               "value":  "1033"
+                                           },
+                                           {
+                                               "key":  "\\REGISTRY\\A\\{df402403-d1bc-7f4b-6a1a-c18368620c2e}\\Root\\InventoryApplicationFile\\rundll32.exe|ccf370e740f0e788\\IsPeFile",
+                                               "value":  "1"
+                                           },
+                                           {
+                                               "key":  "\\REGISTRY\\A\\{df402403-d1bc-7f4b-6a1a-c18368620c2e}\\Root\\InventoryApplicationFile\\rundll32.exe|ccf370e740f0e788\\IsOsComponent",
+                                               "value":  "1"
+                                           },
+                                           {
+                                               "key":  "\\REGISTRY\\A\\{df402403-d1bc-7f4b-6a1a-c18368620c2e}\\Root\\InventoryApplicationFile\\rundll32.exe|ccf370e740f0e788\\Usn",
+                                               "value":  "20 05 00 1E 00 00 00 00 "
+                                           },
+                                           {
+                                               "key":  "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\Windows Error Reporting\\Debug\\ExceptionRecord",
+                                               "value":  "05 00 00 C0 00 00 00 00 00 00 00 00 EB 35 84 6C 02 00 00 00 00 00 00 00 8A 02 05 00 00 00 00 00 00 0"
+                                           }
+                                       ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1112",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "delete registry key",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "3"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "parse PE header",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "8"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1546.015",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "persist via COM hijack",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "9"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1071",
+                                                     "signature_description":  "Adversaries may communicate using application layer protocols to avoid detection/network filtering by blending in with existing traffic."
+                                                 },
+                                                 {
+                                                     "id":  "T1574.002",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Tries to load missing DLLs",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "187"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1218.010",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Registers a DLL",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "217"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1218.011",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Runs a DLL by calling functions",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "219"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1497",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Contains medium sleeps (\u003e= 30s)",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "1884"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1497",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Checks if the current process is being debugged",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "76"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1070.006",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Binary contains a suspicious time stamp",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "234"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1056",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Creates a DirectInput object (often for capturing keystrokes)",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "311"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1518.001",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "May try to detect the virtual machine to hinder analysis (VM artifact strings found in memory)",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "263"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1518.001",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Checks if the current process is being debugged",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "76"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1518.001",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "AV process strings found (often used to terminate AV products)",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "3"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Reads software policies",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "509"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "Queries the volume information (name, serial number etc) of a device",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "337"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "files_written":  [
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA70E.tmp",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA70E.tmp.dmp",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA7F9.tmp",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA7F9.tmp.WERInternalMetadata.xml",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA896.tmp",
+                                       "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA896.tmp.xml",
+                                       "C:\\Users\\user\\AppData\\Local\\DBG",
+                                       "\\Device\\ConDrv\\\\Connect"
+                                   ],
+                 "tls":  [
+                             {
+                                 "subject":  {
+                                                 "ST":  "WA",
+                                                 "L":  "Redmond",
+                                                 "O":  "Microsoft Corporation",
+                                                 "C":  "US"
+                                             },
+                                 "issuer":  {
+                                                "CN":  "Microsoft Azure RSA TLS Issuing CA 08",
+                                                "O":  "Microsoft Corporation",
+                                                "C":  "US"
+                                            },
+                                 "serial_number":  "3300327c5d285afba28b8a2ef0000000327c5d",
+                                 "thumbprint":  "61ed54ec6c9bde82e57f673c5ba3d5f6e71d77a3",
+                                 "version":  "TLS 1.2",
+                                 "sni":  "api.msn.com",
+                                 "ja3":  "a0e9f5d64349fb13191bc781f81f42e1",
+                                 "ja3s":  "60a1c7426de3ff26002f692fbe0d7408",
+                                 "ip_traffic":  [
+                                                    {
+                                                        "destination_ip":  "204.79.197.203",
+                                                        "destination_port":  443,
+                                                        "transport_layer_protocol":  "TCP"
+                                                    }
+                                                ]
+                             }
+                         ],
+                 "ja3_digests":  [
+                                     "a0e9f5d64349fb13191bc781f81f42e1"
+                                 ],
+                 "memory_dumps":  [
+                                      {
+                                          "file_name":  "0000000A.00000002.1019248626.0000000002F4F000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "49606656",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1330493055.00000000003B0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\System32\\loaddll32.exe",
+                                          "size":  "40960",
+                                          "base_address":  "3866624",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "0000000A.00000002.1019281862.0000000002FDA000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "102400",
+                                          "base_address":  "50176000",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000002.1003823291.00000000031AE000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "8192",
+                                          "base_address":  "52092928",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1330487176.0000000000350000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\System32\\loaddll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "3473408",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1014850269.000000000257B000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "20480",
+                                          "base_address":  "39301120",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000003.1330435596.0000000000370000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\System32\\loaddll32.exe",
+                                          "size":  "8192",
+                                          "base_address":  "3604480",
+                                          "stage":  "MEM_STAGE_FREE"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1014916622.00000000029FE000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "8192",
+                                          "base_address":  "44032000",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1330556972.0000000000FAE000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\System32\\loaddll32.exe",
+                                          "size":  "8192",
+                                          "base_address":  "16441344",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1330539133.0000000000EFB000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\System32\\loaddll32.exe",
+                                          "size":  "20480",
+                                          "base_address":  "15708160",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1003835980.000000000342E000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "8192",
+                                          "base_address":  "54714368",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1015004336.0000000002A7E000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "8192",
+                                          "base_address":  "44556288",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1014815664.00000000024C0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "38535168",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1003757858.000000000325C000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "16384",
+                                          "base_address":  "52805632",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1330547264.0000000000F6E000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\System32\\loaddll32.exe",
+                                          "size":  "8192",
+                                          "base_address":  "16179200",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1003799988.0000000000F30000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\regsvr32.exe",
+                                          "size":  "20480",
+                                          "base_address":  "15925248",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1003776279.0000000000EAB000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\regsvr32.exe",
+                                          "size":  "20480",
+                                          "base_address":  "15380480",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "0000000A.00000002.1019205685.0000000002BA0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "20480",
+                                          "base_address":  "45744128",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1015022267.0000000002ABF000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "44822528",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1003731763.0000000002FD0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "50135040",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "0000000A.00000002.1019165034.0000000002B1C000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "16384",
+                                          "base_address":  "45203456",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1014874911.0000000002930000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "20480",
+                                          "base_address":  "43188224",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1003760239.0000000000E6C000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\regsvr32.exe",
+                                          "size":  "16384",
+                                          "base_address":  "15122432",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000002.1003895787.000000000328F000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "53014528",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1003910403.000000000316B000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\regsvr32.exe",
+                                          "size":  "110592",
+                                          "base_address":  "51818496",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1015065448.0000000002ACA000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "106496",
+                                          "base_address":  "44867584",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "0000000A.00000002.1019212748.0000000002BF0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "20480",
+                                          "base_address":  "46071808",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1330599539.000000000122E000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\System32\\loaddll32.exe",
+                                          "size":  "8192",
+                                          "base_address":  "19062784",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "0000000A.00000002.1019178746.0000000002B5B000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "20480",
+                                          "base_address":  "45461504",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000002.1003987900.0000000004CE0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "80609280",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1330493055.00000000003BC000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\System32\\loaddll32.exe",
+                                          "size":  "110592",
+                                          "base_address":  "3915776",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "refs":  [
+                                                       {
+                                                           "ref":  "#signature_matches",
+                                                           "value":  "311"
+                                                       }
+                                                   ]
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000002.1003929018.0000000003340000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "36864",
+                                          "base_address":  "53739520",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1003872539.0000000000FEF000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\regsvr32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "16707584",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1003797652.00000000033E0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "20480",
+                                          "base_address":  "54394880",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000002.1003929018.000000000334A000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "102400",
+                                          "base_address":  "53780480",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "0000000A.00000002.1019273858.0000000002FCF000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "50130944",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1003993244.0000000003330000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\regsvr32.exe",
+                                          "size":  "20480",
+                                          "base_address":  "53673984",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1015188332.000000006C855000.00000004.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "1820676096",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "0000000A.00000002.1019317114.0000000004A60000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "77987840",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000002.1003733735.0000000002D80000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "47710208",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1003852976.0000000003460000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "32768",
+                                          "base_address":  "54919168",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "0000000A.00000002.1019262748.0000000002F8E000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "8192",
+                                          "base_address":  "49864704",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1015107645.0000000004520000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "72482816",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1015141024.000000006C840000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "1820590080",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1330529051.0000000000BFD000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\System32\\loaddll32.exe",
+                                          "size":  "12288",
+                                          "base_address":  "12570624",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1003910403.0000000003160000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\regsvr32.exe",
+                                          "size":  "36864",
+                                          "base_address":  "51773440",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1003972982.0000000004DEF000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "81719296",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1003713367.0000000000BE0000.00000004.00000020.00040000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\regsvr32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "12451840",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1003852976.000000000346A000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "102400",
+                                          "base_address":  "54960128",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1330611368.000000000132F000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\System32\\loaddll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "20115456",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "0000000A.00000002.1019223040.0000000002F0E000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "8192",
+                                          "base_address":  "49340416",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000002.1003719209.0000000002D70000.00000004.00000020.00040000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "47644672",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1330563665.0000000000FE0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\System32\\loaddll32.exe",
+                                          "size":  "24576",
+                                          "base_address":  "16646144",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1015065448.0000000002AC0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "32768",
+                                          "base_address":  "44826624",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000002.1003771700.000000000303B000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "20480",
+                                          "base_address":  "50573312",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1014974569.0000000002A3F000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "44298240",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1003771961.000000000329B000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "20480",
+                                          "base_address":  "53063680",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "0000000A.00000002.1019102384.0000000002A90000.00000004.00000020.00040000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "44630016",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1015160255.000000006C841000.00000020.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "81920",
+                                          "base_address":  "1820594176",
+                                          "stage":  "MEM_STAGE_EXIT",
+                                          "refs":  [
+                                                       {
+                                                           "ref":  "#signature_matches",
+                                                           "value":  "203"
+                                                       }
+                                                   ]
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1003716770.0000000002FC0000.00000004.00000020.00040000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "50069504",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "0000000A.00000002.1019281862.0000000002FD0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "32768",
+                                          "base_address":  "50135040",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1003854356.0000000000FA0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\regsvr32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "16384000",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1014799827.00000000024B0000.00000004.00000020.00040000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "38469632",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1330514902.0000000000910000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\System32\\loaddll32.exe",
+                                          "size":  "8192",
+                                          "base_address":  "9502720",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1330588484.00000000011EF000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\System32\\loaddll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "18804736",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000002.1003872465.000000000324E000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "8192",
+                                          "base_address":  "52748288",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1003837912.0000000000F7E000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\regsvr32.exe",
+                                          "size":  "8192",
+                                          "base_address":  "16244736",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1014894805.000000000297E000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "8192",
+                                          "base_address":  "43507712",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1003885728.000000000372F000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "57864192",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "0000000A.00000002.1019117456.0000000002AA0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "44695552",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1003905741.0000000003750000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "20480",
+                                          "base_address":  "57999360",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1003994797.0000000004EB0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "82509824",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000002.1003842500.00000000031EF000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "52359168",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000005.00000002.1003950790.0000000004DAE000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "8192",
+                                          "base_address":  "81453056",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000002.1003857891.00000000031F0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "24576",
+                                          "base_address":  "52363264",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1014906465.00000000029B0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "20480",
+                                          "base_address":  "43712512",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000002.1003788579.0000000003150000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "20480",
+                                          "base_address":  "51707904",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1015215505.000000006C856000.00000002.00000001.01000000.00000003.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "16384",
+                                          "base_address":  "1820680192",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000003.00000002.1003731868.0000000000BF0000.00000004.00000020.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\regsvr32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "12517376",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1330570449.00000000010EF000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\System32\\loaddll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "17756160",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000000.00000002.1330476171.0000000000270000.00000004.00000020.00040000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\System32\\loaddll32.exe",
+                                          "size":  "4096",
+                                          "base_address":  "2555904",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000004.00000002.1003758429.0000000002DFC000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "16384",
+                                          "base_address":  "48218112",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1014866148.000000000290E000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "8192",
+                                          "base_address":  "43048960",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      },
+                                      {
+                                          "file_name":  "00000007.00000002.1014840078.000000000253B000.00000004.00000010.00020000.00000000.sdmp",
+                                          "process":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                          "size":  "20480",
+                                          "base_address":  "39038976",
+                                          "stage":  "MEM_STAGE_EXIT"
+                                      }
+                                  ],
+                 "memory_pattern_domains":  [
+                                                "upx.sf.net"
+                                            ],
+                 "processes_created":  [
+                                           "\"C:\\Windows\\system32\\regsvr32.exe\" C:\\Users\\\u003cUSER\u003e\\AppData\\Local\\Temp\\wmiutils.dll",
+                                           "C:\\Windows\\System32\\loaddll32.exe loaddll32.exe \"C:\\Users\\user\\Desktop\\wmiutils.dll\"",
+                                           "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1",
+                                           "C:\\Windows\\SysWOW64\\cmd.exe cmd.exe /C rundll32.exe \"C:\\Users\\user\\Desktop\\wmiutils.dll\",#1",
+                                           "C:\\Windows\\SysWOW64\\rundll32.exe rundll32.exe  \"C:\\Users\\user\\Desktop\\wmiutils.dll\",#1",
+                                           "C:\\Windows\\SysWOW64\\regsvr32.exe regsvr32.exe /s C:\\Users\\user\\Desktop\\wmiutils.dll",
+                                           "C:\\Windows\\SysWOW64\\rundll32.exe rundll32.exe C:\\Users\\user\\Desktop\\wmiutils.dll,DllCanUnloadNow",
+                                           "C:\\Windows\\SysWOW64\\rundll32.exe rundll32.exe C:\\Users\\user\\Desktop\\wmiutils.dll,DllGetClassObject",
+                                           "C:\\Windows\\SysWOW64\\WerFault.exe -u -p 7632 -s 732",
+                                           "C:\\Windows\\SysWOW64\\rundll32.exe rundll32.exe C:\\Users\\user\\Desktop\\wmiutils.dll,DllRegisterServer"
+                                       ],
+                 "sigma_analysis_results":  [
+                                                {
+                                                    "match_context":  [
+                                                                          {
+                                                                              "values":  {
+                                                                                             "Hashes":  "SHA1=50AD704468BCF1B538A360418781924A8C5218B9,MD5=155F2D878B52DFD500D3F3C3D4290801,SHA256=F994CC300C60541F35504457E0149CAEC51E025ED16DF63502F7E72422A2741A,IMPHASH=7923EB72437079CB7404BC1A824487B1",
+                                                                                             "Product":  "Microsoft\\xae Windows\\xae Operating System",
+                                                                                             "OriginalFileName":  "wmiutils.dll",
+                                                                                             "ImageLoaded":  "C:\\Users\\george\\Desktop\\wmiutils.dll",
+                                                                                             "Description":  "WMI",
+                                                                                             "SignatureStatus":  "Valid",
+                                                                                             "EventID":  "7",
+                                                                                             "FileVersion":  "10.0.26100.1 (WinBuild.160101.0800)",
+                                                                                             "Signed":  "true",
+                                                                                             "Signature":  "Microsoft Windows",
+                                                                                             "Image":  "C:\\Windows\\System32\\loaddll32.exe",
+                                                                                             "Company":  "Microsoft Corporation"
+                                                                                         }
+                                                                          },
+                                                                          {
+                                                                              "values":  {
+                                                                                             "Hashes":  "SHA1=50AD704468BCF1B538A360418781924A8C5218B9,MD5=155F2D878B52DFD500D3F3C3D4290801,SHA256=F994CC300C60541F35504457E0149CAEC51E025ED16DF63502F7E72422A2741A,IMPHASH=7923EB72437079CB7404BC1A824487B1",
+                                                                                             "Product":  "Microsoft\\xae Windows\\xae Operating System",
+                                                                                             "OriginalFileName":  "wmiutils.dll",
+                                                                                             "ImageLoaded":  "C:\\Users\\george\\Desktop\\wmiutils.dll",
+                                                                                             "Description":  "WMI",
+                                                                                             "SignatureStatus":  "Valid",
+                                                                                             "EventID":  "7",
+                                                                                             "FileVersion":  "10.0.26100.1 (WinBuild.160101.0800)",
+                                                                                             "Signed":  "true",
+                                                                                             "Signature":  "Microsoft Windows",
+                                                                                             "Image":  "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                                                                             "Company":  "Microsoft Corporation"
+                                                                                         }
+                                                                          },
+                                                                          {
+                                                                              "values":  {
+                                                                                             "Product":  "Microsoft\\xae Windows\\xae Operating System",
+                                                                                             "Hashes":  "SHA1=50AD704468BCF1B538A360418781924A8C5218B9,MD5=155F2D878B52DFD500D3F3C3D4290801,SHA256=F994CC300C60541F35504457E0149CAEC51E025ED16DF63502F7E72422A2741A,IMPHASH=7923EB72437079CB7404BC1A824487B1",
+                                                                                             "OriginalFileName":  "wmiutils.dll",
+                                                                                             "ImageLoaded":  "C:\\Users\\george\\Desktop\\wmiutils.dll",
+                                                                                             "Description":  "WMI",
+                                                                                             "SignatureStatus":  "Valid",
+                                                                                             "EventID":  "7",
+                                                                                             "FileVersion":  "10.0.26100.1 (WinBuild.160101.0800)",
+                                                                                             "Signed":  "true",
+                                                                                             "Signature":  "Microsoft Windows",
+                                                                                             "Image":  "C:\\Windows\\SysWOW64\\regsvr32.exe",
+                                                                                             "Company":  "Microsoft Corporation"
+                                                                                         }
+                                                                          }
+                                                                      ],
+                                                    "rule_level":  "high",
+                                                    "rule_id":  "e4b059c53908c7008669e834c3c05ad45881842235e14670eb30e91a8df736d4",
+                                                    "rule_source":  "Sigma Integrated Rule Set (GitHub)",
+                                                    "rule_title":  "Potential System DLL Sideloading From Non System Locations",
+                                                    "rule_description":  "Detects DLL sideloading of DLLs usually located in system locations (System32, SysWOW64, etc.).",
+                                                    "rule_author":  "Nasreddine Bencherchali (Nextron Systems)"
+                                                }
+                                            ],
+                 "dns_lookups":  [
+                                     {
+                                         "hostname":  "tse1.mm.bing.net",
+                                         "resolved_ips":  [
+                                                              "13.107.21.200",
+                                                              "204.79.197.200"
+                                                          ]
+                                     }
+                                 ],
+                 "mbc":  [
+                             {
+                                 "id":  "C0036.002",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Delete Registry Key",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "3"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.001",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Set Registry Key",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "5"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0046.001",
+                                 "objective":  "Discovery",
+                                 "behavior":  "Code Discovery",
+                                 "method":  "Enumerate PE Sections",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "7"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "OC0006"
+                             },
+                             {
+                                 "id":  "C0005.001"
+                             },
+                             {
+                                 "id":  "C0002"
+                             }
+                         ],
+                 "ip_traffic":  [
+                                    {
+                                        "destination_ip":  "204.79.197.203",
+                                        "destination_port":  443,
+                                        "transport_layer_protocol":  "TCP"
+                                    }
+                                ],
+                 "files_opened":  [
+                                      "C:\\Windows\\SystemResources\\USER32.dll.mun",
+                                      "C:\\Windows\\SysWOW64\\imageres.dll",
+                                      "C:\\Windows\\SystemResources\\imageres.dll.mun",
+                                      "C:\\Program Files (x86)\\Common Files\\Oracle\\Java\\javapath",
+                                      "C:\\Program Files (x86)\\Common Files\\Oracle\\Java\\javapath\\",
+                                      "C:\\Program Files\\dotnet",
+                                      "C:\\Program Files\\dotnet\\",
+                                      "C:\\ProgramData\\Microsoft\\",
+                                      "C:\\ProgramData\\Microsoft\\Windows\\",
+                                      "C:\\ProgramData\\Microsoft\\Windows\\WER",
+                                      "C:\\ProgramData\\Microsoft\\Windows\\WER\\",
+                                      "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER1B9B.tmp.csv",
+                                      "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WER1BEA.tmp.txt",
+                                      "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA70E.tmp",
+                                      "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA70E.tmp.dmp",
+                                      "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA7F9.tmp",
+                                      "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA7F9.tmp.WERInternalMetadata.xml",
+                                      "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA896.tmp",
+                                      "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA896.tmp.xml",
+                                      "C:\\ProgramData\\chocolatey\\bin",
+                                      "C:\\ProgramData\\chocolatey\\bin\\",
+                                      "C:\\Users\\user\\.dotnet\\tools",
+                                      "C:\\Users\\user\\AppData\\Local\\DBG\\config.xml",
+                                      "C:\\Users\\user\\AppData\\Local\\Dbg\\EngineExtensions32",
+                                      "C:\\Users\\user\\AppData\\Local\\Dbg\\Visualizers\\",
+                                      "C:\\Users\\user\\AppData\\Local\\Microsoft\\WindowsApps",
+                                      "C:\\Users\\user\\AppData\\Local\\Microsoft\\WindowsApps\\",
+                                      "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python311",
+                                      "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python311\\",
+                                      "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python311\\Scripts",
+                                      "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\",
+                                      "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python39",
+                                      "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python39\\",
+                                      "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python39\\Scripts",
+                                      "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python39\\Scripts\\",
+                                      "C:\\Users\\user\\AppData\\Roaming\\Microsoft\\SystemCertificates\\My\\AppContainerUserCertRead",
+                                      "C:\\Users\\user\\AppData\\Roaming\\Microsoft\\SystemCertificates\\My\\CRLs\\",
+                                      "C:\\Users\\user\\AppData\\Roaming\\Microsoft\\SystemCertificates\\My\\CTLs\\",
+                                      "C:\\Users\\user\\AppData\\Roaming\\Microsoft\\SystemCertificates\\My\\Certificates\\",
+                                      "C:\\Users\\user\\Desktop\\en-US\\wmiutils.dll.mui",
+                                      "C:\\Users\\user\\Desktop\\en\\wmiutils.dll.mui",
+                                      "C:\\Users\\user\\Desktop\\wmiutils.dll",
+                                      "C:\\Users\\user\\Desktop\\wmiutils.dll.123.Manifest",
+                                      "C:\\Users\\user\\Desktop\\wmiutils.dll.124.Manifest",
+                                      "C:\\Users\\user\\Desktop\\wmiutils.dll.2.Manifest",
+                                      "C:\\Windows\\AppPatch\\sysmain.sdb",
+                                      "C:\\Windows\\Globalization\\Sorting\\sortdefault.nls",
+                                      "C:\\Windows\\SYSTEM32\\ole32.dll",
+                                      "C:\\Windows\\SysWOW64",
+                                      "C:\\Windows\\SysWOW64\\",
+                                      "C:\\Windows\\SysWOW64\\ADVAPI32.dll",
+                                      "C:\\Windows\\SysWOW64\\AcLayers.DLL",
+                                      "C:\\Windows\\SysWOW64\\AcLayers.dll",
+                                      "C:\\Windows\\SysWOW64\\CRYPTBASE.dll",
+                                      "C:\\Windows\\SysWOW64\\CRYPTSP.dll",
+                                      "C:\\Windows\\SysWOW64\\DSREG.DLL",
+                                      "C:\\Windows\\SysWOW64\\FLTLIB.DLL",
+                                      "C:\\Windows\\SysWOW64\\GDI32.dll",
+                                      "C:\\Windows\\SysWOW64\\IMM32.DLL",
+                                      "C:\\Windows\\SysWOW64\\IPHLPAPI.DLL",
+                                      "C:\\Windows\\SysWOW64\\KERNEL32.DLL",
+                                      "C:\\Windows\\SysWOW64\\KERNELBASE.dll",
+                                      "C:\\Windows\\SysWOW64\\MPR.dll",
+                                      "C:\\Windows\\SysWOW64\\MSCTF.dll",
+                                      "C:\\Windows\\SysWOW64\\NETAPI32.dll",
+                                      "C:\\Windows\\SysWOW64\\OLE32.dll",
+                                      "C:\\Windows\\SysWOW64\\OLEAUT32.dll",
+                                      "C:\\Windows\\SysWOW64\\OpenSSH",
+                                      "C:\\Windows\\SysWOW64\\PROPSYS.dll",
+                                      "C:\\Windows\\SysWOW64\\RMCLIENT.dll",
+                                      "C:\\Windows\\SysWOW64\\RPCRT4.dll",
+                                      "C:\\Windows\\SysWOW64\\SETUPAPI.dll",
+                                      "C:\\Windows\\SysWOW64\\SHELL32.dll",
+                                      "C:\\Windows\\SysWOW64\\Secur32.dll",
+                                      "C:\\Windows\\SysWOW64\\SspiCli.dll",
+                                      "C:\\Windows\\SysWOW64\\USER32.dll",
+                                      "C:\\Windows\\SysWOW64\\Visualizers\\",
+                                      "C:\\Windows\\SysWOW64\\WINSPOOL.DRV",
+                                      "C:\\Windows\\SysWOW64\\WINXP",
+                                      "C:\\Windows\\SysWOW64\\WS2_32.dll",
+                                      "C:\\Windows\\SysWOW64\\Wbem",
+                                      "C:\\Windows\\SysWOW64\\Wbem\\",
+                                      "C:\\Windows\\SysWOW64\\WindowsPowerShell\\v1.0",
+                                      "C:\\Windows\\SysWOW64\\WindowsPowerShell\\v1.0\\",
+                                      "C:\\Windows\\SysWOW64\\XmlLite.dll",
+                                      "C:\\Windows\\SysWOW64\\advapi32.dll",
+                                      "C:\\Windows\\SysWOW64\\aepic.dll",
+                                      "C:\\Windows\\SysWOW64\\apphelp.dll",
+                                      "C:\\Windows\\SysWOW64\\bcrypt.dll",
+                                      "C:\\Windows\\SysWOW64\\bcryptPrimitives.dll",
+                                      "C:\\Windows\\SysWOW64\\cfgmgr32.dll",
+                                      "C:\\Windows\\SysWOW64\\combase.dll",
+                                      "C:\\Windows\\SysWOW64\\dbgcore.DLL",
+                                      "C:\\Windows\\SysWOW64\\dbgeng.dll",
+                                      "C:\\Windows\\SysWOW64\\dbghelp.dll",
+                                      "C:\\Windows\\SysWOW64\\dbgmodel.dll",
+                                      "C:\\Windows\\SysWOW64\\drivers\\",
+                                      "C:\\Windows\\SysWOW64\\dwmapi.dll",
+                                      "C:\\Windows\\SysWOW64\\en-US\\FLTLIB.DLL.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\IPHLPAPI.DLL.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\KERNEL32.DLL.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\KERNELBASE.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\MPR.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\MSCTF.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\OLEAUT32.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\PROPSYS.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\RPCRT4.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\SETUPAPI.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\SHELL32.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\USER32.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\WINSPOOL.DRV.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\WS2_32.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\WerFault.exe.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\advapi32.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\apphelp.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\bcrypt.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\combase.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\dwmapi.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\faultrep.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\ntdll.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\ole32.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\powrprof.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\regsvr32.exe.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\rundll32.exe.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\sechost.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\shcore.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\shlwapi.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\tzres.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\uxtheme.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\wer.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en-US\\windows.storage.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\en\\OLEAUT32.dll.mui",
+                                      "C:\\Windows\\SysWOW64\\faultrep.dll",
+                                      "C:\\Windows\\SysWOW64\\gdi32full.dll",
+                                      "C:\\Windows\\SysWOW64\\imagehlp.dll",
+                                      "C:\\Windows\\SysWOW64\\kernel.appcore.dll",
+                                      "C:\\Windows\\SysWOW64\\loaddll32.exe",
+                                      "C:\\Windows\\SysWOW64\\msvcp110_win.dll",
+                                      "C:\\Windows\\SysWOW64\\msvcp_win.dll",
+                                      "C:\\Windows\\SysWOW64\\msvcrt.dll",
+                                      "C:\\Windows\\SysWOW64\\ntdll.dll",
+                                      "C:\\Windows\\SysWOW64\\ntmarta.dll",
+                                      "C:\\Windows\\SysWOW64\\ole32.dll",
+                                      "C:\\Windows\\SysWOW64\\policymanager.dll",
+                                      "C:\\Windows\\SysWOW64\\powrprof.dll",
+                                      "C:\\Windows\\SysWOW64\\pri",
+                                      "C:\\Windows\\SysWOW64\\profapi.dll",
+                                      "C:\\Windows\\SysWOW64\\regsvr32.exe",
+                                      "C:\\Windows\\SysWOW64\\rsaenh.dll",
+                                      "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                      "C:\\Windows\\SysWOW64\\sechost.dll",
+                                      "C:\\Windows\\SysWOW64\\sfc.dll",
+                                      "C:\\Windows\\SysWOW64\\sfc_os.DLL",
+                                      "C:\\Windows\\SysWOW64\\shcore.dll",
+                                      "C:\\Windows\\SysWOW64\\shlwapi.dll",
+                                      "C:\\Windows\\SysWOW64\\twinapi.appcore.dll",
+                                      "C:\\Windows\\SysWOW64\\tzres.dll",
+                                      "C:\\Windows\\SysWOW64\\ucrtbase.dll",
+                                      "C:\\Windows\\SysWOW64\\uxtheme.dll",
+                                      "C:\\Windows\\SysWOW64\\verifier.dll",
+                                      "C:\\Windows\\SysWOW64\\version.dll",
+                                      "C:\\Windows\\SysWOW64\\wbemcomn.dll",
+                                      "C:\\Windows\\SysWOW64\\wer.dll",
+                                      "C:\\Windows\\SysWOW64\\wer.dll.3.Manifest",
+                                      "C:\\Windows\\SysWOW64\\win32u.dll",
+                                      "C:\\Windows\\SysWOW64\\windows.storage.dll",
+                                      "C:\\Windows\\SysWOW64\\winext",
+                                      "C:\\Windows\\SysWOW64\\winext\\arcade",
+                                      "C:\\Windows\\SysWOW64\\winxp\\triage.ini",
+                                      "C:\\Windows\\System32\\en-US\\user32.dll.mui",
+                                      "C:\\Windows\\WinSxS\\FileMaps\\$$_syswow64_21ffbdd2a2dd92e0.cdf-ms",
+                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_d3fbe61b7c93d9f0",
+                                      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_d3fbe61b7c93d9f0\\comctl32.DLL",
+                                      "C:\\Windows\\WinSxS\\x86_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_1ba91cf2911002f6",
+                                      "C:\\Windows\\WinSxS\\x86_microsoft.windows.common-controls_6595b64144ccf1df_6.0.17134.1304_none_1ba91cf2911002f6\\Comctl32.dll",
+                                      "C:\\Windows\\system32\\IMM32.DLL",
+                                      "C:\\Windows\\system32\\conhost.exe",
+                                      "C:\\Windows\\system32\\dwmapi.dll",
+                                      "C:\\Windows\\system32\\en-US\\conhost.exe.mui",
+                                      "C:\\Windows\\system32\\loaddll32.exe",
+                                      "C:\\Windows\\system32\\uxtheme.dll",
+                                      "C:\\Windows\\system32\\uxtheme.dll.Config",
+                                      "MountPointManager",
+                                      "PhysicalDrive0",
+                                      "\\Device\\ConDrv\\Server",
+                                      "\\Device\\ConDrv\\\\Reference",
+                                      "\\Device\\IPT",
+                                      "\\Device\\KsecDD",
+                                      "c:\\windows\\SysWOW64\\",
+                                      "c:\\windows\\SysWOW64\\rundll32.exe"
+                                  ],
+                 "tags":  [
+                              "CHECKS_USER_INPUT",
+                              "DETECT_DEBUG_ENVIRONMENT"
+                          ],
+                 "registry_keys_opened":  [
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\OOBE",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\WBEM\\CIMOM\\Logging Directory",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Session Manager\\ResourcePolicies",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\WBEM\\CIMOM",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{EB87E1BD-3233-11D2-AEC9-00C04FB68820}\\(Default)",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\WBEM\\CIMOM\\Logging",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Windows\\IsVailContainer",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Windows",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\WBEM\\CIMOM\\Log File Max Size",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Lsa\\FipsAlgorithmPolicy\\MDMEnabled",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\CLASSES\\CLSID\\{EB87E1BD-3233-11D2-AEC9-00C04FB68820}",
+                                              "HKEY_CLASSES_ROOT\\dllfile",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\.dll\\(Default)",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\CLASSES\\CLSID\\{EAC8A024-21E2-4523-AD73-A71A0AA2F56A}",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize\\DisableUmpdBufferSizeCheck",
+                                              "HKEY_CURRENT_USER\\Software\\Classes\\.dll",
+                                              "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize\\AppsUseLightTheme",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Lsa\\FipsAlgorithmPolicy\\STE",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{EAC8A024-21E2-4523-AD73-A71A0AA2F56A}\\(Default)",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Input\\MaxResyncAttempts",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Lsa\\FipsAlgorithmPolicy",
+                                              "HKEY_CLASSES_ROOT\\.dll",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\OOBE\\LaunchUserOOBE",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\FontLink\\SystemLink",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\dllfile\\AutoRegister",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{CF4CC405-E2C5-4DDD-B3CE-5E7582D8C9FA}\\(Default)",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize\\DisableMetaFiles",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\CLASSES\\CLSID\\{CF4CC405-E2C5-4DDD-B3CE-5E7582D8C9FA}",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Input",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Lsa\\FipsAlgorithmPolicy\\Enabled",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\LanguageOverlay\\OverlayPackages\\en-US",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Input\\ResyncResetTime",
+                                              "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Lsa\\FipsAlgorithmPolicy",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\SideBySide",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Nls\\CustomLocale",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\NLS\\Language",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\rundll32.exe",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion",
+                                              "\\REGISTRY\\A\\{df402403-d1bc-7f4b-6a1a-c18368620c2e}\\Root",
+                                              "HKEY_CURRENT_USER_Classes",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{EB87E1BD-3233-11D2-AEC9-00C04FB68820}\\InprocServer32",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Classes\\dllfile",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\OLE\\Tracing",
+                                              "HKEY_CURRENT_USER_Classes\\dllfile\\AutoRegister",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\CLASSES\\WOW6432Node\\CLSID\\{EB87E1BD-3233-11D2-AEC9-00C04FB68820}",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\cmd.exe",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\OLEAUT",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\LanguageOverlay\\OverlayPackages\\en-US",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\SafeBoot\\Option",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\regsvr32.exe",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\OLE",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Wow64\\x86",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\MUI\\UILanguages\\en-US",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\MUI\\UILanguages\\PendingDelete",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Nls\\CustomLocale",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Ole\\FeatureDevelopmentProperties",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Srp\\GP\\DLL",
+                                              "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows NT\\CurrentVersion",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Policies\\Microsoft\\WindowsStore",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Nls\\ExtendedLocale",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\loaddll32.exe",
+                                              "HKEY_CURRENT_USER_Classes\\.dll",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Policies\\Microsoft\\Cryptography\\Configuration",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\FileSystem\\",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\CLASSES\\WOW6432Node\\CLSID\\{EAC8A024-21E2-4523-AD73-A71A0AA2F56A}",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Disable8And16BitMitigation",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\AppModel\\Lookaside\\Packages",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Segment Heap",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{EAC8A024-21E2-4523-AD73-A71A0AA2F56A}\\InprocServer32",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Classes\\.dll",
+                                              "HKEY_CURRENT_USER_Classes\\dllfile",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Wow64\\x86\\xtajit",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Lsa",
+                                              "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\DllNXOptions",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\MUI\\Settings\\LanguageConfiguration",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Session Manager",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Nls\\Sorting\\Versions",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\MUI\\UILanguages",
+                                              "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Session Manager\\AppCertDlls",
+                                              "\\REGISTRY\\A\\{df402403-d1bc-7f4b-6a1a-c18368620c2e}\\Root\\InventoryApplicationFile",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Policies\\Microsoft\\Windows\\Display",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\WBEM\\CIMOM",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList",
+                                              "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Ole",
+                                              "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\CLASSES\\WOW6432Node\\CLSID\\{CF4CC405-E2C5-4DDD-B3CE-5E7582D8C9FA}",
+                                              "HKEY_LOCAL_MACHINE\\system\\CurrentControlSet\\control\\NetworkProvider\\HwOrder",
+                                              "HKEY_LOCAL_MACHINE\\system\\CurrentControlSet\\control\\NetworkProvider\\ProviderOrder",
+                                              "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager",
+                                              "HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Policies\\Microsoft\\MUI\\Settings",
+                                              "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID\\{CF4CC405-E2C5-4DDD-B3CE-5E7582D8C9FA}\\InprocServer32"
+                                          ],
+                 "processes_terminated":  [
+                                              "C:\\Windows\\System32\\loaddll32.exe",
+                                              "C:\\Windows\\SysWOW64\\cmd.exe",
+                                              "C:\\Windows\\SysWOW64\\regsvr32.exe",
+                                              "C:\\Windows\\SysWOW64\\rundll32.exe",
+                                              "C:\\Windows\\SysWOW64\\WerFault.exe"
+                                          ],
+                 "memory_pattern_urls":  [
+                                             "http://upx.sf.net"
+                                         ],
+                 "files_dropped":  [
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA7F9.tmp.WERInternalMetadata.xml",
+                                           "sha256":  "646c421d9a7f81cf1a16fab12a9a848f1d63b9e151d38e6d24ad7cbb01b41833",
+                                           "type":  "XML"
+                                       },
+                                       {
+                                           "path":  "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp\\WERA896.tmp.xml",
+                                           "sha256":  "c9a21a6af18d1f49dbc8a4262a7570ab358a9db7fbb3a02da50199d1badeb36b",
+                                           "type":  "XML"
+                                       }
+                                   ],
+                 "mutexes_created":  [
+                                         "NULL",
+                                         "\\Sessions\\1\\BaseNamedObjects\\Local\\WERReportingForProcess7632",
+                                         "\\Sessions\\1\\BaseNamedObjects\\Global\\AmiProviderMutex_InventoryApplicationFile",
+                                         "\\Sessions\\1\\BaseNamedObjects\\Global\\8cfc02a1-c268-4b45-b911-94454e9b4638"
+                                     ],
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "4016",
+                                            "name":  "\"C:\\Windows\\system32\\regsvr32.exe\" C:\\Users\\\u003cUSER\u003e\\AppData\\Local\\Temp\\wmiutils.dll"
+                                        },
+                                        {
+                                            "process_id":  "7460",
+                                            "name":  "C:\\Windows\\System32\\loaddll32.exe loaddll32.exe \"C:\\Users\\user\\Desktop\\wmiutils.dll\"",
+                                            "children":  [
+                                                             {
+                                                                 "process_id":  "7468",
+                                                                 "name":  "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1"
+                                                             },
+                                                             {
+                                                                 "process_id":  "7512",
+                                                                 "name":  "C:\\Windows\\SysWOW64\\cmd.exe cmd.exe /C rundll32.exe \"C:\\Users\\user\\Desktop\\wmiutils.dll\",#1",
+                                                                 "children":  [
+                                                                                  {
+                                                                                      "process_id":  "7532",
+                                                                                      "name":  "C:\\Windows\\SysWOW64\\rundll32.exe rundll32.exe  \"C:\\Users\\user\\Desktop\\wmiutils.dll\",#1"
+                                                                                  }
+                                                                              ]
+                                                             },
+                                                             {
+                                                                 "process_id":  "7520",
+                                                                 "name":  "C:\\Windows\\SysWOW64\\regsvr32.exe regsvr32.exe /s C:\\Users\\user\\Desktop\\wmiutils.dll"
+                                                             },
+                                                             {
+                                                                 "process_id":  "7540",
+                                                                 "name":  "C:\\Windows\\SysWOW64\\rundll32.exe rundll32.exe C:\\Users\\user\\Desktop\\wmiutils.dll,DllCanUnloadNow"
+                                                             },
+                                                             {
+                                                                 "process_id":  "7632",
+                                                                 "name":  "C:\\Windows\\SysWOW64\\rundll32.exe rundll32.exe C:\\Users\\user\\Desktop\\wmiutils.dll,DllGetClassObject",
+                                                                 "children":  [
+                                                                                  {
+                                                                                      "process_id":  "7688",
+                                                                                      "name":  "C:\\Windows\\SysWOW64\\WerFault.exe -u -p 7632 -s 732"
+                                                                                  }
+                                                                              ]
+                                                             },
+                                                             {
+                                                                 "process_id":  "7744",
+                                                                 "name":  "C:\\Windows\\SysWOW64\\rundll32.exe rundll32.exe C:\\Users\\user\\Desktop\\wmiutils.dll,DllRegisterServer"
+                                                             }
+                                                         ]
+                                        }
+                                    ],
+                 "attack_techniques":  {
+                                           "T1112":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "delete registry key",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "3"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "parse PE header",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "8"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1546.015":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "persist via COM hijack",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "9"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1071":  [
+                                                         {
+                                                             "severity":  "UNKNOWN",
+                                                             "description":  "Adversaries may communicate using application layer protocols to avoid detection/network filtering by blending in with existing traffic."
+                                                         }
+                                                     ],
+                                           "T1574.002":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "Tries to load missing DLLs",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "187"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1218.010":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "Registers a DLL",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "217"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1218.011":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "Runs a DLL by calling functions",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "219"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1497":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Contains medium sleeps (\u003e= 30s)",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "1884"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Checks if the current process is being debugged",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "76"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1070.006":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "Binary contains a suspicious time stamp",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "234"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1056":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Creates a DirectInput object (often for capturing keystrokes)",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "311"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1518.001":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "May try to detect the virtual machine to hinder analysis (VM artifact strings found in memory)",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "263"
+                                                                              }
+                                                                          ]
+                                                             },
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "Checks if the current process is being debugged",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "76"
+                                                                              }
+                                                                          ]
+                                                             },
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "AV process strings found (often used to terminate AV products)",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "3"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1082":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Reads software policies",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "509"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "Queries the volume information (name, serial number etc) of a device",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "337"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

@@ -1,0 +1,1768 @@
+{
+  "data": {
+    "files_written": [
+      "\\Device\\ConDrv\\\\Connect"
+    ],
+    "signature_matches": [
+      {
+        "id": "0",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "set registry value",
+        "description": "host-interaction/registry/create",
+        "authors": [
+          "moritz.raabe@mandiant.com",
+          "michael.hunhoff@mandiant.com"
+        ],
+        "match_data": [
+          "api: RegOpenKeyTransacted",
+          "api: RegOpenKeyEx",
+          "api: RegSetValueEx"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: set registry value\n    namespace: host-interaction/registry/create\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Operating System::Registry::Set Registry Key [C0036.001]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13147AF0\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x40433E\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x40415E\n      - 98c37c3c23bbfb362dac7754c6ba48e75cf24d73bc963a4cdfca557b9e016909:0x40294D\n  features:\n    - or:\n      - and:\n        - optional:\n          - match: create or open registry key\n        - or:\n          - api: advapi32.RegSetValue\n          - api: advapi32.RegSetValueEx\n          - api: advapi32.RegSetKeyValue\n          - api: ZwSetValueKey\n          - api: NtSetValueKey\n          - api: RtlWriteRegistryValue\n          - api: SHSetValue\n          - api: SHRegSetPath\n          - api: SHRegSetValue\n          - api: SHRegSetUSValue\n          - api: SHRegWriteUSValue\n          - api: Microsoft.Win32.RegistryKey::SetValue\n          - api: Microsoft.Win32.Registry::SetValue\n      - and:\n        - match: host-interaction/process/create\n        - string: \"/add/i\"\n        - or:\n          - string: \"/reg(|.exe)/i\"\n          - string: \"/hklm/i\"\n          - string: \"/HKEY_LOCAL_MACHINE/i\"\n          - string: \"/hkcu/i\"\n          - string: \"/HKEY_CURRENT_USER/i\"\n"
+      },
+      {
+        "id": "1",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "create process on Windows",
+        "description": "host-interaction/process/create",
+        "authors": [
+          "moritz.raabe@mandiant.com"
+        ],
+        "match_data": [
+          "api: CreateProcess"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: create process on Windows\n    namespace: host-interaction/process/create\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: instruction\n      dynamic: call\n    mbc:\n      - Process::Create Process [C0017]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x406DB0\n      - Practical Malware Analysis Lab 01-04.exe_:0x4011FC\n  features:\n    - and:\n      - os: windows\n      - or:\n        - api: kernel32.WinExec\n        - api: kernel32.CreateProcess\n        - api: shell32.ShellExecute\n        - api: shell32.ShellExecuteEx\n        - api: advapi32.CreateProcessAsUser\n        - api: advapi32.CreateProcessWithLogon\n        - api: advapi32.CreateProcessWithToken\n        - api: kernel32.CreateProcessInternal\n        - api: ntdll.NtCreateUserProcess\n        - api: ntdll.NtCreateProcess\n        - api: ntdll.NtCreateProcessEx\n        - api: ntdll.ZwCreateProcess\n        - api: ZwCreateProcessEx\n        - api: ntdll.ZwCreateUserProcess\n        - api: ntdll.RtlCreateUserProcess\n"
+      },
+      {
+        "id": "3",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "parse PE header",
+        "description": "load-code/pe",
+        "authors": [
+          "moritz.raabe@mandiant.com"
+        ],
+        "match_data": [
+          "mnemonic: cmp",
+          "IMAGE_DOS_SIGNATURE (MZ)",
+          "IMAGE_NT_SIGNATURE (PE)"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: parse PE header\n    namespace: load-code/pe\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic, operand[1].offset features\n    att&ck:\n      - Execution::Shared Modules [T1129]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x403DD0\n  features:\n    - and:\n      - os: windows\n      - and:\n        - mnemonic: cmp\n        - or:\n          - number: 0x4550 = IMAGE_NT_SIGNATURE (PE)\n          - and:\n            - number: 0x50\n            - number: 0x45\n        - or:\n          - number: 0x5A4D = IMAGE_DOS_SIGNATURE (MZ)\n          - and:\n            - number: 0x4D\n            - number: 0x5A\n        - optional:\n          - and:\n            - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n            - or:\n              - and:\n                - arch: i386\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n              - and:\n                - arch: amd64\n                - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n                - operand[1].offset: 0x30 = IMAGE_NT_HEADERS64.OptionalHeader.ImageBase\n          - basic block:\n            - and:\n              - operand[1].offset: 0x3C = IMAGE_DOS_HEADER.e_lfanew\n              - 3 or more:\n                - operand[1].offset: 0x4 = IMAGE_NT_HEADERS.FileHeader.Machine\n                - operand[1].offset: 0x6 = IMAGE_NT_HEADERS.FileHeader.NumberOfSections\n                - operand[1].offset: 0x14 = IMAGE_NT_HEADERS.FileHeader.SizeOfOptionalHeader\n                - operand[1].offset: 0x16 = IMAGE_NT_HEADERS.FileHeader.Characteristics\n                - operand[1].offset: 0x28 = IMAGE_NT_HEADERS.OptionalHeader.AddressOfEntryPoint  # for 32 and 64 bit\n                - or:\n                  - and:\n                    - arch: i386\n                    - operand[1].offset: 0x34 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage\n                  - and:\n                    - arch: amd64\n                    - operand[1].offset: 0x30 = IMAGE_NT_HEADERS.OptionalHeader.ImageBase\n                    - operand[1].offset: 0x50 = IMAGE_NT_HEADERS64.OptionalHeader.SizeOfImage\n"
+      },
+      {
+        "id": "4",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "write file on Windows",
+        "description": "host-interaction/file-system/write",
+        "authors": [
+          "william.ballenthin@mandiant.com",
+          "anushka.virgaonkar@mandiant.com"
+        ],
+        "match_data": [
+          "api: WriteFile",
+          "FILE_WRITE_DATA"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: write file on Windows\n    namespace: host-interaction/file-system/write\n    authors:\n      - william.ballenthin@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - File System::Writes File [C0052]\n    examples:\n      - Practical Malware Analysis Lab 01-04.exe_:0x4011FC\n      # ntdll\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x1400025C4\n  features:\n    - or:\n      - and:\n        - os: windows\n        - optional:\n          - basic block:\n            - or:\n              - number: 0x40000000 = GENERIC_WRITE\n              - number: 0x2 = FILE_WRITE_DATA\n              - match: create or open file\n          - call:\n            - or:\n              - number: 0x40000000 = GENERIC_WRITE\n              - number: 0x2 = FILE_WRITE_DATA\n              - match: create or open file\n        - or:\n          - api: kernel32.WriteFile\n          - api: kernel32.WriteFileEx\n          - api: NtWriteFile\n          - api: ZwWriteFile\n          - api: _fwrite\n          - api: fwrite\n"
+      },
+      {
+        "id": "6",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "check if file exists",
+        "description": "host-interaction/file-system/exists",
+        "authors": [
+          "moritz.raabe@mandiant.com",
+          "michael.hunhoff@mandiant.com"
+        ],
+        "match_data": [
+          "api: GetFileAttributes",
+          "mnemonic: cmp",
+          "api: GetLastError"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: check if file exists\n    namespace: host-interaction/file-system/exists\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att&ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    examples:\n      - 31600AD0D1A7EA615690DF111AE36C73:0x401284\n  features:\n    - or:\n      - basic block:\n        - and:\n          - api: kernel32.GetFileAttributes\n          - instruction:\n            - mnemonic: cmp\n            - number: 0xFFFFFFFF = INVALID_FILE_ATTRIBUTES\n      - basic block:\n        - and:\n          - api: kernel32.GetLastError\n          - instruction:\n            - mnemonic: cmp\n            - number: 2 = ERROR_FILE_NOT_FOUND\n      - api: shlwapi.PathFileExists\n      - api: System.IO.File::Exists\n      - property/read: System.IO.FileSystemInfo::Exists\n"
+      },
+      {
+        "id": "7",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "create process suspended",
+        "description": "host-interaction/process/create",
+        "authors": [
+          "william.ballenthin@mandiant.com",
+          "mehunhoff@google.com"
+        ],
+        "match_data": [
+          "CREATE_SUSPENDED",
+          "api: CreateProcess"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: create process suspended\n    namespace: host-interaction/process/create\n    authors:\n      - william.ballenthin@mandiant.com\n      - mehunhoff@google.com\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - Process::Create Process::Create Suspended Process [C0017.003]\n    references:\n      - https://www.trustwave.com/en-us/resources/blogs/spiderlabs-blog/an-in-depth-look-at-mailto-ransomware-part-two-of-three/\n      - https://learn.microsoft.com/en-us/windows/win32/procthread/process-creation-flags#flags\n    examples:\n      - Practical Malware Analysis Lab 03-03.exe_:0x4010EA\n  features:\n    - or:\n      - and:\n        - or:\n          - number: 0x08000004 = CREATE_NO_WINDOW | CREATE_SUSPENDED\n          - number: 0x800000C = CREATE_SUSPENDED | DETACHED_PROCESS | CREATE_NO_WINDOW\n          - number: 4 = CREATE_SUSPENDED\n          - number: 2 = DEBUG_ONLY_THIS_PROCESS\n        - or:\n          - api: kernel32.CreateProcess\n          - api: kernel32.CreateProcessInternal\n          - api: advapi32.CreateProcessAsUser\n          - api: advapi32.CreateProcessWithLogon\n          - api: advapi32.CreateProcessWithToken\n      - and:\n        - or:\n          - number: 0x10 = PROCESS_CREATE_FLAGS_CREATE_SUSPENDED\n          - number: 0x2000010 = PROCESS_CREATE_FLAGS_CREATE_SUSPENDED | PROCESS_CREATE_FLAGS_NO_WINDOW\n          - number: 0x11 = PROCESS_CREATE_FLAGS_CREATE_SUSPENDED | PROCESS_CREATE_FLAGS_BREAKAWAY\n        - or:\n          - api: ntdll.NtCreateProcessEx\n          - api: ZwCreateProcessEx\n          - api: ntdll.NtCreateUserProcess\n          - api: ntdll.ZwCreateUserProcess\n          - api: ntdll.RtlCreateUserProcess\n",
+        "refs": [
+          {
+            "ref": "https://www.trustwave.com/en-us/resources/blogs/spiderlabs-blog/an-in-depth-look-at-mailto-ransomware-part-two-of-three/"
+          },
+          {
+            "ref": "https://learn.microsoft.com/en-us/windows/win32/procthread/process-creation-flags#flags"
+          }
+        ]
+      },
+      {
+        "id": "8",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "hash data via BCrypt",
+        "description": "data-manipulation/hashing",
+        "authors": [
+          "michael.hunhoff@mandiant.com"
+        ],
+        "match_data": [
+          "api: BCryptFinishHash",
+          "api: BCryptHashData",
+          "api: BCryptCreateHash"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: hash data via BCrypt\n    namespace: data-manipulation/hashing\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att&ck:\n      - Defense Evasion::Obfuscated Files or Information [T1027]\n    mbc:\n      - Cryptography::Cryptographic Hash [C0029]\n  features:\n    - and:\n      - or:\n        - api: BCryptHash\n        - and:\n          - api: BCryptHashData\n          - optional:\n            - api: BCryptFinishHash\n            - api: BCryptDestroyHash\n            - api: BCryptCreateHash\n      - optional:\n        - api: BCryptOpenAlgorithmProvider\n        - api: BCryptCloseAlgorithmProvider\n"
+      },
+      {
+        "id": "10",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "extract resource via kernel32 functions",
+        "description": "executable/resource",
+        "authors": [
+          "william.ballenthin@mandiant.com"
+        ],
+        "match_data": [
+          "api: LockResource",
+          "api: LoadResource",
+          "api: FindResourceEx"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: extract resource via kernel32 functions\n    namespace: executable/resource\n    authors:\n      - william.ballenthin@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    examples:\n      - BF88E1BD4A3BDE10B419A622278F1FF7:0x401000\n      - Practical Malware Analysis Lab 01-04.exe_:0x4011FC\n      # ntdll\n      - 563653399B82CD443F120ECEFF836EA3678D4CF11D9B351BB737573C2D856299:0x140001ABA\n  features:\n    - or:\n      - and:\n        - or:\n          - api: kernel32.LoadResource\n          - api: kernel32.LockResource\n          - api: LdrAccessResource\n        - optional:\n          - api: kernel32.GetModuleHandle\n          # may occur in parent function, see 0664B09A86EC2DF7DFE01A93E184A1FA23DF66EA82CAB39000944E418EC1F7B2\n          - or:\n            - api: kernel32.FindResource\n            - api: kernel32.FindResourceEx\n            - api: LdrFindResource_U\n            - api: LdrFindResourceEx_U\n          - api: kernel32.SizeofResource\n          - api: kernel32.FreeResource\n"
+      },
+      {
+        "id": "11",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "clear Windows event logs",
+        "description": "anti-analysis/anti-forensic/clear-logs",
+        "authors": [
+          "michael.hunhoff@mandiant.com"
+        ],
+        "match_data": [
+          "api: EvtClearLog"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: clear Windows event logs\n    namespace: anti-analysis/anti-forensic/clear-logs\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att&ck:\n      - Defense Evasion::Indicator Removal::Clear Windows Event Logs [T1070.001]\n    examples:\n      - 82BF6347ACF15E5D883715DC289D8A2B:0x14005E0C0\n      - mimikatz.exe_:0x45228B\n  features:\n    - and:\n      - os: windows\n      - or:\n        - and:\n          - or:\n            - api: advapi32.ElfClearEventLogFile\n            - api: advapi32.ClearEventLog\n            - api: wevtapi.EvtClearLog\n          - optional:\n            - api: advapi32.OpenEventLog\n            - api: advapi32.GetNumberOfEventLogRecords\n            - api: wevtapi.EvtOpenLog\n            - api: wevtapi.EvtOpenSession\n        - basic block:\n          - and:\n            - string: /wevtutil(\\.exe)?\\s+(clear-log|cl)/i\n        - call:\n          - and:\n            - string: /wevtutil(\\.exe)?\\s+(clear-log|cl)/i\n"
+      },
+      {
+        "id": "14",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "read file on Windows",
+        "description": "host-interaction/file-system/read",
+        "authors": [
+          "moritz.raabe@mandiant.com",
+          "anushka.virgaonkar@mandiant.com"
+        ],
+        "match_data": [
+          "create or open file",
+          "GENERIC_READ",
+          "api: ReadFile"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: read file on Windows\n    namespace: host-interaction/file-system/read\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - File System::Read File [C0051]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x1314567B\n  features:\n    - or:\n      - and:\n        - os: windows\n        - optional:\n          - and:\n            - number: 0x80000000 = GENERIC_READ\n            - match: create or open file\n        - or:\n          - api: kernel32.ReadFile\n          - api: ReadFileEx\n          - api: NtReadFile\n          - api: ZwReadFile\n          - api: LZRead\n          - api: _read\n          - api: fread\n"
+      },
+      {
+        "id": "15",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "modify access privileges",
+        "description": "host-interaction/process/modify",
+        "authors": [
+          "moritz.raabe@mandiant.com"
+        ],
+        "match_data": [
+          "api: AdjustTokenPrivileges"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: modify access privileges\n    namespace: host-interaction/process/modify\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: instruction\n      dynamic: call\n    att&ck:\n      - Privilege Escalation::Access Token Manipulation [T1134]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x403BE0\n  features:\n    - and:\n      - api: advapi32.AdjustTokenPrivileges\n"
+      },
+      {
+        "id": "16",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "get file attributes",
+        "description": "host-interaction/file-system/meta",
+        "authors": [
+          "michael.hunhoff@mandiant.com",
+          "anushka.virgaonkar@mandiant.com"
+        ],
+        "match_data": [
+          "api: GetFileAttributes"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: get file attributes\n    namespace: host-interaction/file-system/meta\n    authors:\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - File System::Get File Attributes [C0049]\n    examples:\n      - 03B236B23B1EC37C663527C1F53AF3FE:0x180019824\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x4028B6\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x4029E0\n  features:\n    - or:\n      - api: kernel32.GetFileAttributes\n      - api: ZwQueryDirectoryFile\n      - api: ZwQueryInformationFile\n      - api: NtQueryDirectoryFile\n      - api: NtQueryInformationFile\n      - api: System.IO.File::GetAttributes\n      - api: System.IO.File::GetCreationTime\n      - api: System.IO.File::GetCreationTimeUtc\n      - api: System.IO.File::GetLastAccessTime\n      - api: System.IO.File::GetLastAccessTimeUtc\n      - api: System.IO.File::GetLastWriteTime\n      - api: System.IO.File::GetLastWriteTimeUtc\n      - property/read: System.IO.FileSystemInfo::Attributes\n      - api: stat\n      - api: fstat\n      - api: lstat\n      - api: fstatat\n"
+      },
+      {
+        "id": "17",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "accept command line arguments",
+        "description": "host-interaction/cli",
+        "authors": [
+          "moritz.raabe@mandiant.com",
+          "anushka.virgaonkar@mandiant.com"
+        ],
+        "match_data": [
+          "api: GetCommandLine"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: accept command line arguments\n    namespace: host-interaction/cli\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att&ck:\n      - Execution::Command and Scripting Interpreter [T1059]\n    mbc:\n      - Execution::Command and Scripting Interpreter [E1059]\n    examples:\n      - e5369ac309f1be6d77afeeb3edab0ed8:0x402760\n  features:\n    - or:\n      - api: GetCommandLine\n      - api: CommandLineToArgv\n      - api: System.Environment::GetCommandLineArgs\n"
+      },
+      {
+        "id": "18",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "get file size",
+        "description": "host-interaction/file-system/meta",
+        "authors": [
+          "michael.hunhoff@mandiant.com",
+          "anushka.virgaonkar@mandiant.com"
+        ],
+        "match_data": [
+          "api: GetFileSize"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: get file size\n    namespace: host-interaction/file-system/meta\n    authors:\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att&ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    examples:\n      - mimikatz.exe_:0x40630D\n  features:\n    - or:\n      - api: kernel32.GetFileSize\n      - api: kernel32.GetFileSizeEx\n      - property/read: System.IO.FileInfo::Length\n"
+      },
+      {
+        "id": "19",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "delete registry key",
+        "description": "host-interaction/registry/delete",
+        "authors": [
+          "moritz.raabe@mandiant.com",
+          "michael.hunhoff@mandiant.com",
+          "johnk3r"
+        ],
+        "match_data": [
+          "api: RegOpenKeyTransacted",
+          "api: RegDeleteKeyTransacted",
+          "api: RegOpenKeyEx"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: delete registry key\n    namespace: host-interaction/registry/delete\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - johnk3r\n    scopes:\n      static: function\n      dynamic: span of calls\n    att&ck:\n      - Defense Evasion::Modify Registry [T1112]\n    mbc:\n      - Operating System::Registry::Delete Registry Key [C0036.002]\n    examples:\n      - 4f11bdb380dafa2518053c6d20147a05:0x402A36\n      - 493167E85E45363D09495D0841C30648:0x404D60\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegDeleteKey\n        - api: advapi32.RegDeleteTree\n        - api: advapi32.RegDeleteKeyEx\n        - api: advapi32.RegDeleteKeyTransacted\n        - api: ZwDeleteKey\n        - api: NtDeleteKey\n        - api: SHDeleteKey\n        - api: SHDeleteEmptyKey\n        - api: SHRegDeleteEmptyUSKey\n        - api: Microsoft.Win32.RegistryKey::DeleteSubKey\n        - api: Microsoft.Win32.RegistryKey::DeleteSubKeyTree\n"
+      },
+      {
+        "id": "20",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "query or enumerate registry value",
+        "description": "host-interaction/registry",
+        "authors": [
+          "william.ballenthin@mandiant.com",
+          "michael.hunhoff@mandiant.com",
+          "anushka.virgaonkar@mandiant.com"
+        ],
+        "match_data": [
+          "api: RegOpenKeyTransacted",
+          "api: RegGetValue",
+          "api: RegOpenKeyEx"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: query or enumerate registry value\n    namespace: host-interaction/registry\n    authors:\n      - william.ballenthin@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att&ck:\n      - Discovery::Query Registry [T1012]\n    mbc:\n      - Operating System::Registry::Query Registry Value [C0036.006]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13145B5A\n      - Practical Malware Analysis Lab 03-02.dll_:0x100047AD\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegGetValue\n        - api: advapi32.RegEnumValue\n        - api: advapi32.RegQueryValue\n        - api: advapi32.RegQueryValueEx\n        - api: advapi32.RegQueryMultipleValues\n        - api: ZwQueryValueKey\n        - api: ZwEnumerateValueKey\n        - api: NtQueryValueKey\n        - api: NtEnumerateValueKey\n        - api: RtlQueryRegistryValues\n        - api: SHGetValue\n        - api: SHEnumValue\n        - api: SHRegGetInt\n        - api: SHRegGetPath\n        - api: SHRegGetValue\n        - api: SHQueryValueEx\n        - api: SHRegGetUSValue\n        - api: SHOpenRegStream\n        - api: SHRegEnumUSValue\n        - api: SHOpenRegStream2\n        - api: SHRegQueryUSValue\n        - api: SHRegGetBoolUSValue\n        - api: SHRegGetValueFromHKCUHKLM\n        - api: SHRegGetBoolValueFromHKCUHKLM\n        - api: Microsoft.Win32.RegistryKey::GetValue\n        - api: Microsoft.Win32.RegistryKey::GetValueKind\n        - api: Microsoft.Win32.RegistryKey::GetValueNames\n        - api: Microsoft.Win32.Registry::GetValue\n"
+      },
+      {
+        "id": "21",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "delete registry value",
+        "description": "host-interaction/registry/delete",
+        "authors": [
+          "michael.hunhoff@mandiant.com",
+          "anushka.virgaonkar@mandiant.com"
+        ],
+        "match_data": [
+          "api: RegDeleteValue"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: delete registry value\n    namespace: host-interaction/registry/delete\n    authors:\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att&ck:\n      - Defense Evasion::Modify Registry [T1112]\n    mbc:\n      - Operating System::Registry::Delete Registry Value [C0036.007]\n    examples:\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x4041A0\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegDeleteValue\n        - api: advapi32.RegDeleteKeyValue\n        - api: ZwDeleteValueKey\n        - api: NtDeleteValueKey\n        - api: RtlDeleteRegistryValue\n        - api: SHDeleteValue\n        - api: SHRegDeleteUSValue\n        - api: Microsoft.Win32.RegistryKey::DeleteValue\n"
+      },
+      {
+        "id": "22",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "query environment variable",
+        "description": "host-interaction/environment-variable",
+        "authors": [
+          "michael.hunhoff@mandiant.com",
+          "@_re_fox"
+        ],
+        "match_data": [
+          "api: ExpandEnvironmentStrings"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: query environment variable\n    namespace: host-interaction/environment-variable\n    authors:\n      - michael.hunhoff@mandiant.com\n      - \"@_re_fox\"\n    scopes:\n      static: function\n      dynamic: call\n    att&ck:\n      - Discovery::System Information Discovery [T1082]\n    mbc:\n      - Discovery::System Information Discovery [E1082]\n    examples:\n      - Practical Malware Analysis Lab 14-02.exe_:0x401880\n      - 0761142efbda6c4b1e801223de723578:0x65483490\n  features:\n    - or:\n      - api: kernel32.GetEnvironmentVariable\n      - api: kernel32.GetEnvironmentStrings\n      - api: kernel32.ExpandEnvironmentStrings\n      - api: msvcr90.getenv\n      - api: msvcrt.getenv\n      - api: System.Environment::GetEnvironmentVariable\n      - api: System.Environment::GetEnvironmentVariables\n      - api: System.Environment::ExpandEnvironmentVariables\n"
+      },
+      {
+        "id": "23",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "query or enumerate registry key",
+        "description": "host-interaction/registry",
+        "authors": [
+          "michael.hunhoff@mandiant.com"
+        ],
+        "match_data": [
+          "api: RegOpenKeyTransacted",
+          "api: RegOpenKeyEx",
+          "api: RegEnumKeyEx"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: query or enumerate registry key\n    namespace: host-interaction/registry\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att&ck:\n      - Discovery::Query Registry [T1012]\n    mbc:\n      - Operating System::Registry::Query Registry Key [C0036.005]\n    examples:\n      - 493167E85E45363D09495D0841C30648:0x404930\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x402608\n  features:\n    - and:\n      - optional:\n        - match: create or open registry key\n      - or:\n        - api: advapi32.RegEnumKey\n        - api: advapi32.RegEnumKeyEx\n        - api: advapi32.RegQueryInfoKeyA\n        - api: ZwQueryKey\n        - api: ZwEnumerateKey\n        - api: NtQueryKey\n        - api: NtEnumerateKey\n        - api: RtlCheckRegistryKey\n        - api: SHEnumKeyEx\n        - api: SHQueryInfoKey\n        - api: SHRegEnumUSKey\n        - api: SHRegQueryInfoUSKey\n        - api: Microsoft.Win32.RegistryKey::GetSubKeyNames\n        - api: Microsoft.Win32.RegistryKey::OpenBaseKey\n        - api: Microsoft.Win32.RegistryKey::OpenRemoteBaseKey\n        - api: Microsoft.Win32.RegistryKey::OpenSubKey\n"
+      },
+      {
+        "id": "24",
+        "format": "SIG_FORMAT_CAPA",
+        "name": "check OS version",
+        "description": "host-interaction/os/version",
+        "authors": [
+          "michael.hunhoff@mandiant.com",
+          "johnk3r"
+        ],
+        "match_data": [
+          "Windows XP",
+          "Windows Vista / Windows Server 2008",
+          "Windows 2000"
+        ],
+        "rule_src": "rule:\n  meta:\n    name: check OS version\n    namespace: host-interaction/os/version\n    authors:\n      - michael.hunhoff@mandiant.com\n      - johnk3r\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic features\n    att&ck:\n      - Discovery::System Information Discovery [T1082]\n    mbc:\n      - Discovery::System Information Discovery [E1082]\n    examples:\n      - 493167E85E45363D09495D0841C30648:0x401000\n  features:\n    - and:\n      - match: get OS version\n      - or:\n        - and:\n          - instruction:\n            - mnemonic: cmp\n            - number: 5 = Windows 2000\n          - optional:\n            - instruction:\n              - mnemonic: cmp\n              - or:\n                - number: 0\n                - number: 1 = Windows XP\n                - number: 2 = Windows XP 64-bit / Windows Server 2003 / Windows Server 2003 R2\n        - and:\n          - instruction:\n            - mnemonic: cmp\n            - number: 6 = Windows Vista / Windows Server 2008\n          - optional:\n            - instruction:\n              - mnemonic: cmp\n              - or:\n                - number: 0\n                - number: 1 = Windows Server 2008 R2 / Windows 7\n                - number: 2 = Windows Server 2012 / Windows 8\n                - number: 3 = Windows Server 2012 R2 / Windows 8.1\n        - and:\n          - instruction:\n            - mnemonic: cmp\n            - number: 10 = Windows Server 2016 / Windows Server 2019 / Windows 10\n          - optional:\n            - instruction:\n              - mnemonic: cmp\n              - number: 0\n"
+      },
+      {
+        "id": "static_pe_pdbpath",
+        "name": "static_pe_pdbpath",
+        "description": "The PE file contains a PDB path",
+        "match_data": [
+          "wevtutil.pdb"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "antidebug_setunhandledexceptionfilter",
+        "name": "antidebug_setunhandledexceptionfilter",
+        "description": "SetUnhandledExceptionFilter detected (possible anti-debug)",
+        "match_data": [
+          "Process software.exe"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "language_check_registry",
+        "name": "language_check_registry",
+        "description": "Checks system language via registry key (possible geofencing)",
+        "match_data": [
+          "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Nls\\CustomLocale\\en-US",
+          "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Nls\\ExtendedLocale\\en-US"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "packer_unknown_pe_section_name",
+        "name": "packer_unknown_pe_section_name",
+        "description": "The binary contains an unknown PE section name indicative of packing",
+        "match_data": [
+          "fothk",
+          ".didat"
+        ],
+        "severity": "IMPACT_SEVERITY_LOW"
+      },
+      {
+        "id": "pe_compile_timestomping",
+        "name": "pe_compile_timestomping",
+        "description": "Binary compilation timestomping detected",
+        "match_data": [
+          "Compilation timestamp is in the future"
+        ],
+        "severity": "IMPACT_SEVERITY_MEDIUM"
+      },
+      {
+        "id": "509",
+        "description": "Reads software policies",
+        "match_data": [
+          "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO",
+        "refs": [
+          {
+            "ref": "#registry_keys_opened",
+            "value": "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers"
+          }
+        ]
+      },
+      {
+        "id": "206",
+        "description": "Performs DNS lookups",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "refs": [
+          {
+            "ref": "#dns_lookups",
+            "value": "DNS query: dns.google"
+          }
+        ]
+      },
+      {
+        "id": "653",
+        "description": "Sample file is different than original file name gathered from version info",
+        "match_data": [
+          "OriginalFilenamewevtutil.exej% vs software.exe"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO",
+        "refs": [
+          {
+            "ref": "#memory_dumps",
+            "value": "software.exe, 00000002.00000002.3328559539.00007FF657434000.00000002.00000001.01000000.00000003.sdmp"
+          },
+          {
+            "ref": "#memory_dumps",
+            "value": "software.exe, 00000002.00000000.3220112303.00007FF657437000.00000002.00000001.01000000.00000003.sdmp"
+          }
+        ]
+      },
+      {
+        "id": "411",
+        "description": "PE file contains a mix of data directories often seen in goodware",
+        "match_data": [
+          "data directory type: IMAGE_DIRECTORY_ENTRY_IMPORT",
+          "data directory type: IMAGE_DIRECTORY_ENTRY_RESOURCE",
+          "data directory type: IMAGE_DIRECTORY_ENTRY_BASERELOC",
+          "data directory type: IMAGE_DIRECTORY_ENTRY_DEBUG",
+          "data directory type: IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG",
+          "data directory type: IMAGE_DIRECTORY_ENTRY_IAT"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "715",
+        "description": "Classification label",
+        "match_data": [
+          "clean2.winEXE@2/0@6/0"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "626",
+        "description": "Sample tries to load a library which is not present or installed on the analysis machine, adding the library might reveal more behavior",
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "229",
+        "description": "Spawns processes",
+        "match_data": [
+          "C:\\Users\\user\\Desktop\\software.exe \"C:\\Users\\user\\Desktop\\software.exe\"",
+          "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "419",
+        "description": "PE file has a high image base, often used for DLLs",
+        "match_data": [
+          "Image base 0x140000000 > 0x60000000"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "406",
+        "description": "Contains modern PE file flags such as dynamic base (ASLR) or NX",
+        "match_data": [
+          "HIGH_ENTROPY_VA, DYNAMIC_BASE, NX_COMPAT, GUARD_CF, TERMINAL_SERVER_AWARE"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "187",
+        "description": "Tries to load missing DLLs",
+        "match_data": [
+          "bcrypt.dll",
+          "kernel.appcore.dll"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "95",
+        "description": "Creates mutexes",
+        "match_data": [
+          "\\Sessions\\1\\BaseNamedObjects\\Local\\SM0:6552:120:WilError_03"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "416",
+        "description": "PE file contains a valid data directory to section mapping",
+        "match_data": [
+          "Data directory: IMAGE_DIRECTORY_ENTRY_IMPORT is in: .rdata",
+          "Data directory: IMAGE_DIRECTORY_ENTRY_RESOURCE is in: .rsrc",
+          "Data directory: IMAGE_DIRECTORY_ENTRY_BASERELOC is in: .reloc",
+          "Data directory: IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG is in: .rdata",
+          "Data directory: IMAGE_DIRECTORY_ENTRY_IAT is in: .rdata"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "203",
+        "description": "Binary contains paths to debug symbols",
+        "match_data": [
+          "wevtutil.pdbOGPS source: software.exe",
+          "wevtutil.pdb source: software.exe"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "1462688494",
+        "description": "Sigma detected: Potential Defense Evasion Via Binary Rename",
+        "match_data": [
+          "Data: CommandLine: \"C:\\Users\\user\\Desktop\\software.exe\", Company: Microsoft Corporation, CurrentDirectory: C:\\Users\\user\\Desktop\\, Description: Windows Event Log Utility, FileVersion: 10.0.26100.7019 "
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "199",
+        "description": "PE file contains sections with non-standard names",
+        "match_data": [
+          "section name: fothk",
+          "section name: .didat"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "412",
+        "description": "PE file contains a debug data directory",
+        "match_data": [
+          "data directory type: IMAGE_DIRECTORY_ENTRY_DEBUG"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "234",
+        "description": "Binary contains a suspicious time stamp",
+        "match_data": [
+          "0xE878E2B5 [Tue Aug  4 15:01:09 2093 UTC]"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "206",
+        "description": "Performs DNS lookups",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "refs": [
+          {
+            "ref": "#dns_lookups",
+            "value": "DNS query: windows.msn.com"
+          },
+          {
+            "ref": "#dns_lookups",
+            "value": "DNS query: dns.google"
+          }
+        ]
+      },
+      {
+        "id": "653",
+        "description": "Sample file is different than original file name gathered from version info",
+        "match_data": [
+          "OriginalFilenamewevtutil.exej% vs file.exe"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO",
+        "refs": [
+          {
+            "ref": "#memory_dumps",
+            "value": "file.exe, 00000002.00000000.3760670905.00007FF6E4947000.00000002.00000001.01000000.00000003.sdmp"
+          },
+          {
+            "ref": "#memory_dumps",
+            "value": "file.exe, 00000002.00000002.3894323410.00007FF6E4944000.00000002.00000001.01000000.00000003.sdmp"
+          }
+        ]
+      },
+      {
+        "id": "715",
+        "description": "Classification label",
+        "match_data": [
+          "clean2.winEXE@2/0@10/0"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "229",
+        "description": "Spawns processes",
+        "match_data": [
+          "C:\\Users\\user\\Desktop\\file.exe \"C:\\Users\\user\\Desktop\\file.exe\"",
+          "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "95",
+        "description": "Creates mutexes",
+        "match_data": [
+          "\\Sessions\\1\\BaseNamedObjects\\Local\\SM0:7740:120:WilError_03"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "203",
+        "description": "Binary contains paths to debug symbols",
+        "match_data": [
+          "wevtutil.pdbOGPS source: file.exe",
+          "wevtutil.pdb source: file.exe"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      },
+      {
+        "id": "1462688494",
+        "description": "Sigma detected: Potential Defense Evasion Via Binary Rename",
+        "match_data": [
+          "Data: CommandLine: \"C:\\Users\\user\\Desktop\\file.exe\", Company: Microsoft Corporation, CurrentDirectory: C:\\Users\\user\\Desktop\\, Description: Windows Event Log Utility, FileVersion: 10.0.26100.7019 (Win"
+        ],
+        "severity": "IMPACT_SEVERITY_INFO"
+      }
+    ],
+    "memory_dumps": [
+      {
+        "file_name": "5360.dmp",
+        "process": "C:\\Users\\Bruno\\Desktop\\software.exe",
+        "size": "54337536",
+        "base_address": "2147352576"
+      },
+      {
+        "file_name": "00000002.00000002.3327819308.00007FF657433000.00000004.00000001.01000000.00000003.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\software.exe",
+        "size": "4096",
+        "base_address": "140696002703360",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1408"
+      },
+      {
+        "file_name": "00000002.00000000.3219830601.00007FF657434000.00000002.00000001.01000000.00000003.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\software.exe",
+        "size": "8192",
+        "base_address": "140696002707456",
+        "stage": "MEM_STAGE_NEW",
+        "process_id": "1408"
+      },
+      {
+        "file_name": "00000002.00000002.3320609636.00000224FB5F4000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\software.exe",
+        "size": "94208",
+        "base_address": "2357859401728",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1408"
+      },
+      {
+        "file_name": "00000002.00000002.3327533435.00007FF657426000.00000002.00000001.01000000.00000003.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\software.exe",
+        "size": "53248",
+        "base_address": "140696002650112",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1408"
+      },
+      {
+        "file_name": "00000002.00000000.3219775551.00007FF657433000.00000008.00000001.01000000.00000003.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\software.exe",
+        "size": "4096",
+        "base_address": "140696002703360",
+        "stage": "MEM_STAGE_NEW",
+        "process_id": "1408"
+      },
+      {
+        "file_name": "00000002.00000002.3320735577.00000224FB830000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\software.exe",
+        "size": "12288",
+        "base_address": "2357861744640",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1408"
+      },
+      {
+        "file_name": "00000002.00000002.3320349825.00000224FB570000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\software.exe",
+        "size": "4096",
+        "base_address": "2357858861056",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1408"
+      },
+      {
+        "file_name": "00000002.00000002.3320609636.00000224FB5F0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\software.exe",
+        "size": "12288",
+        "base_address": "2357859385344",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1408"
+      },
+      {
+        "file_name": "00000002.00000002.3328559539.00007FF657434000.00000002.00000001.01000000.00000003.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\software.exe",
+        "size": "20480",
+        "base_address": "140696002707456",
+        "stage": "MEM_STAGE_EXIT",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "653"
+          }
+        ],
+        "process_id": "1408"
+      },
+      {
+        "file_name": "00000002.00000000.3219232244.00007FF6573F0000.00000002.00000001.01000000.00000003.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\software.exe",
+        "size": "4096",
+        "base_address": "140696002428928",
+        "stage": "MEM_STAGE_NEW",
+        "process_id": "1408"
+      },
+      {
+        "file_name": "00000002.00000000.3219707527.00007FF657426000.00000002.00000001.01000000.00000003.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\software.exe",
+        "size": "53248",
+        "base_address": "140696002650112",
+        "stage": "MEM_STAGE_NEW",
+        "process_id": "1408"
+      },
+      {
+        "file_name": "00000002.00000002.3297107831.00000059BE67B000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\software.exe",
+        "size": "20480",
+        "base_address": "385446555648",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1408"
+      },
+      {
+        "file_name": "00000002.00000002.3324824909.00007FF6573F1000.00000020.00000001.01000000.00000003.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\software.exe",
+        "size": "212992",
+        "base_address": "140696002433024",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1408"
+      },
+      {
+        "file_name": "00000002.00000000.3220059679.00007FF657436000.00000008.00000001.01000000.00000003.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\software.exe",
+        "size": "4096",
+        "base_address": "140696002715648",
+        "stage": "MEM_STAGE_NEW",
+        "process_id": "1408"
+      },
+      {
+        "file_name": "00000002.00000002.3324540586.00007FF6573F0000.00000002.00000001.01000000.00000003.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\software.exe",
+        "size": "4096",
+        "base_address": "140696002428928",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1408"
+      },
+      {
+        "file_name": "00000002.00000002.3318849112.00000059BE77F000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\software.exe",
+        "size": "4096",
+        "base_address": "385447620608",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1408"
+      },
+      {
+        "file_name": "00000002.00000002.3320735577.00000224FB834000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\software.exe",
+        "size": "4096",
+        "base_address": "2357861761024",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1408"
+      },
+      {
+        "file_name": "00000002.00000000.3219337354.00007FF6573F1000.00000020.00000001.01000000.00000003.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\software.exe",
+        "size": "212992",
+        "base_address": "140696002433024",
+        "stage": "MEM_STAGE_NEW",
+        "process_id": "1408"
+      },
+      {
+        "file_name": "00000002.00000002.3297528124.00000059BE6FF000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\software.exe",
+        "size": "4096",
+        "base_address": "385447096320",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1408"
+      },
+      {
+        "file_name": "00000002.00000000.3220112303.00007FF657437000.00000002.00000001.01000000.00000003.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\software.exe",
+        "size": "8192",
+        "base_address": "140696002719744",
+        "stage": "MEM_STAGE_NEW",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "653"
+          }
+        ],
+        "process_id": "1408"
+      },
+      {
+        "file_name": "00000002.00000002.3320288683.00000224FB440000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\software.exe",
+        "size": "8192",
+        "base_address": "2357857615872",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1408"
+      },
+      {
+        "file_name": "00000002.00000002.3320152870.00000224FB380000.00000004.00000020.00040000.00000004.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\software.exe",
+        "size": "4096",
+        "base_address": "2357856829440",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "1408"
+      },
+      {
+        "file_name": "00000002.00000002.3893969340.00007FF6E4936000.00000002.00000001.01000000.00000003.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\file.exe",
+        "size": "53248",
+        "base_address": "140698373545984",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "7744"
+      },
+      {
+        "file_name": "00000002.00000000.3760339574.00007FF6E4944000.00000002.00000001.01000000.00000003.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\file.exe",
+        "size": "8192",
+        "base_address": "140698373603328",
+        "stage": "MEM_STAGE_NEW",
+        "process_id": "7744"
+      },
+      {
+        "file_name": "00000002.00000000.3760670905.00007FF6E4947000.00000002.00000001.01000000.00000003.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\file.exe",
+        "size": "8192",
+        "base_address": "140698373615616",
+        "stage": "MEM_STAGE_NEW",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "653"
+          }
+        ],
+        "process_id": "7744"
+      },
+      {
+        "file_name": "00000002.00000000.3760613547.00007FF6E4946000.00000008.00000001.01000000.00000003.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\file.exe",
+        "size": "4096",
+        "base_address": "140698373611520",
+        "stage": "MEM_STAGE_NEW",
+        "process_id": "7744"
+      },
+      {
+        "file_name": "00000002.00000002.3871146041.0000005C306BB000.00000004.00000010.00020000.00000000.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\file.exe",
+        "size": "20480",
+        "base_address": "395949355008",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "7744"
+      },
+      {
+        "file_name": "00000002.00000002.3891185112.000001C5BAEA4000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\file.exe",
+        "size": "4096",
+        "base_address": "1948756099072",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "7744"
+      },
+      {
+        "file_name": "00000002.00000002.3894246785.00007FF6E4943000.00000004.00000001.01000000.00000003.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\file.exe",
+        "size": "4096",
+        "base_address": "140698373599232",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "7744"
+      },
+      {
+        "file_name": "00000002.00000002.3888630803.000001C5BAAE0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\file.exe",
+        "size": "4096",
+        "base_address": "1948752150528",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "7744"
+      },
+      {
+        "file_name": "00000002.00000002.3894323410.00007FF6E4944000.00000002.00000001.01000000.00000003.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\file.exe",
+        "size": "20480",
+        "base_address": "140698373603328",
+        "stage": "MEM_STAGE_EXIT",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "653"
+          }
+        ],
+        "process_id": "7744"
+      },
+      {
+        "file_name": "00000002.00000002.3888864380.000001C5BAB40000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\file.exe",
+        "size": "12288",
+        "base_address": "1948752543744",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "7744"
+      },
+      {
+        "file_name": "00000002.00000002.3891113763.000001C5BAD10000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\file.exe",
+        "size": "4096",
+        "base_address": "1948754444288",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "7744"
+      },
+      {
+        "file_name": "00000002.00000002.3886023222.000001C5BAA20000.00000004.00000020.00040000.00000004.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\file.exe",
+        "size": "4096",
+        "base_address": "1948751364096",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "7744"
+      },
+      {
+        "file_name": "00000002.00000002.3891185112.000001C5BAEA0000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\file.exe",
+        "size": "12288",
+        "base_address": "1948756082688",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "7744"
+      },
+      {
+        "file_name": "00000002.00000002.3888864380.000001C5BAB44000.00000004.00000020.00020000.00000000.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\file.exe",
+        "size": "90112",
+        "base_address": "1948752560128",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "7744"
+      },
+      {
+        "file_name": "00000002.00000000.3759787578.00007FF6E4943000.00000008.00000001.01000000.00000003.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\file.exe",
+        "size": "4096",
+        "base_address": "140698373599232",
+        "stage": "MEM_STAGE_NEW",
+        "process_id": "7744"
+      },
+      {
+        "file_name": "00000002.00000002.3892117086.00007FF6E4900000.00000002.00000001.01000000.00000003.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\file.exe",
+        "size": "4096",
+        "base_address": "140698373324800",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "7744"
+      },
+      {
+        "file_name": "00000002.00000000.3759658056.00007FF6E4936000.00000002.00000001.01000000.00000003.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\file.exe",
+        "size": "53248",
+        "base_address": "140698373545984",
+        "stage": "MEM_STAGE_NEW",
+        "process_id": "7744"
+      },
+      {
+        "file_name": "00000002.00000000.3759189786.00007FF6E4901000.00000020.00000001.01000000.00000003.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\file.exe",
+        "size": "212992",
+        "base_address": "140698373328896",
+        "stage": "MEM_STAGE_NEW",
+        "process_id": "7744"
+      },
+      {
+        "file_name": "00000002.00000000.3759123198.00007FF6E4900000.00000002.00000001.01000000.00000003.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\file.exe",
+        "size": "4096",
+        "base_address": "140698373324800",
+        "stage": "MEM_STAGE_NEW",
+        "process_id": "7744"
+      },
+      {
+        "file_name": "00000002.00000002.3892153746.00007FF6E4901000.00000020.00000001.01000000.00000003.sdmp",
+        "process": "C:\\Users\\user\\Desktop\\file.exe",
+        "size": "212992",
+        "base_address": "140698373328896",
+        "stage": "MEM_STAGE_EXIT",
+        "process_id": "7744"
+      }
+    ],
+    "processes_terminated": [
+      "C:\\Users\\user\\Desktop\\software.exe",
+      "C:\\Windows\\System32\\conhost.exe",
+      "C:\\Users\\user\\Desktop\\file.exe"
+    ],
+    "processes_tree": [
+      {
+        "process_id": "5360",
+        "name": "\"C:\\Users\\<USER>\\Desktop\\software.exe\""
+      },
+      {
+        "process_id": "1408",
+        "name": "\"C:\\Users\\user\\Desktop\\software.exe\"",
+        "children": [
+          {
+            "process_id": "6552",
+            "name": "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1",
+            "files_opened": [
+              "C:\\Users\\user\\Desktop\\software.exe",
+              "C:\\Users\\user\\SystemResources\\software.exe.mun",
+              "C:\\Windows\\Globalization\\Sorting\\sortdefault.nls",
+              "C:\\Windows\\SYSTEM32\\CoreMessaging.dll",
+              "C:\\Windows\\SYSTEM32\\CoreUIComponents.dll",
+              "C:\\Windows\\SYSTEM32\\TextShaping.dll",
+              "C:\\Windows\\SYSTEM32\\dwmapi.dll",
+              "C:\\Windows\\SYSTEM32\\textinputframework.dll",
+              "C:\\Windows\\SYSTEM32\\windows.staterepositorycore.dll",
+              "C:\\Windows\\SYSTEM32\\wintypes.dll",
+              "C:\\Windows\\System32\\conhost.exe",
+              "C:\\Windows\\System32\\en-US\\user32.dll.mui",
+              "C:\\Windows\\SystemResources\\user32.dll.mun",
+              "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.22621.2361_none_2712ced57382f843",
+              "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.22621.2361_none_2712ced57382f843\\comctl32.DLL",
+              "C:\\Windows\\system32\\CRYPTBASE.DLL",
+              "C:\\Windows\\system32\\IMM32.DLL",
+              "C:\\Windows\\system32\\conhost.exe",
+              "C:\\Windows\\system32\\en-US\\conhost.exe.mui",
+              "C:\\Windows\\system32\\rpcss.dll",
+              "C:\\Windows\\system32\\uxtheme.dll",
+              "C:\\Windows\\system32\\uxtheme.dll.Config"
+            ]
+          }
+        ],
+        "files_opened": [
+          "C:\\Users\\user\\Desktop\\en-US\\software.exe.mui",
+          "C:\\Users\\user\\Desktop\\en\\software.exe.mui",
+          "C:\\Windows\\SYSTEM32\\bcrypt.dll",
+          "C:\\Windows\\SYSTEM32\\kernel.appcore.dll",
+          "C:\\Windows\\SYSTEM32\\ole32.dll",
+          "C:\\Windows\\System32\\en-US\\KERNELBASE.dll.mui"
+        ],
+        "files_written": [
+          "\\Device\\ConDrv\\\\Connect"
+        ]
+      }
+    ],
+    "tags": [
+      "OBFUSCATED"
+    ],
+    "mbc": [
+      {
+        "id": "C0036.001",
+        "objective": "Operating System",
+        "behavior": "Registry",
+        "method": "Set Registry Key",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "0"
+          }
+        ]
+      },
+      {
+        "id": "C0017",
+        "objective": "Process",
+        "behavior": "Create Process",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "1"
+          }
+        ]
+      },
+      {
+        "id": "C0052",
+        "objective": "File System",
+        "behavior": "Writes File",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "4"
+          }
+        ]
+      },
+      {
+        "id": "E1083",
+        "objective": "Discovery",
+        "behavior": "File and Directory Discovery",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "6"
+          }
+        ]
+      },
+      {
+        "id": "C0017.003",
+        "objective": "Process",
+        "behavior": "Create Process",
+        "method": "Create Suspended Process",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "7"
+          }
+        ]
+      },
+      {
+        "id": "C0029",
+        "objective": "Cryptography",
+        "behavior": "Cryptographic Hash",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "8"
+          }
+        ]
+      },
+      {
+        "id": "C0051",
+        "objective": "File System",
+        "behavior": "Read File",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "14"
+          }
+        ]
+      },
+      {
+        "id": "C0049",
+        "objective": "File System",
+        "behavior": "Get File Attributes",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "16"
+          }
+        ]
+      },
+      {
+        "id": "E1059",
+        "objective": "Execution",
+        "behavior": "Command and Scripting Interpreter",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "17"
+          }
+        ]
+      },
+      {
+        "id": "E1083",
+        "objective": "Discovery",
+        "behavior": "File and Directory Discovery",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "18"
+          }
+        ]
+      },
+      {
+        "id": "C0036.002",
+        "objective": "Operating System",
+        "behavior": "Registry",
+        "method": "Delete Registry Key",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "19"
+          }
+        ]
+      },
+      {
+        "id": "C0036.006",
+        "objective": "Operating System",
+        "behavior": "Registry",
+        "method": "Query Registry Value",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "20"
+          }
+        ]
+      },
+      {
+        "id": "C0036.007",
+        "objective": "Operating System",
+        "behavior": "Registry",
+        "method": "Delete Registry Value",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "21"
+          }
+        ]
+      },
+      {
+        "id": "E1082",
+        "objective": "Discovery",
+        "behavior": "System Information Discovery",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "22"
+          }
+        ]
+      },
+      {
+        "id": "C0036.005",
+        "objective": "Operating System",
+        "behavior": "Registry",
+        "method": "Query Registry Key",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "23"
+          }
+        ]
+      },
+      {
+        "id": "E1082",
+        "objective": "Discovery",
+        "behavior": "System Information Discovery",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "24"
+          }
+        ]
+      },
+      {
+        "id": "OC0006"
+      },
+      {
+        "id": "C0002"
+      },
+      {
+        "id": "OB0001"
+      },
+      {
+        "id": "OB0002"
+      },
+      {
+        "id": "OB0006"
+      },
+      {
+        "id": "F0001"
+      },
+      {
+        "id": "F0005"
+      },
+      {
+        "id": "F0005.004"
+      }
+    ],
+    "files_opened": [
+      "C:\\Users\\<USER>\\Desktop\\software.exe",
+      "C:\\Users\\user\\Desktop\\en-US\\software.exe.mui",
+      "C:\\Users\\user\\Desktop\\en\\software.exe.mui",
+      "C:\\Users\\user\\Desktop\\software.exe",
+      "C:\\Users\\user\\SystemResources\\software.exe.mun",
+      "C:\\Windows\\Globalization\\Sorting\\sortdefault.nls",
+      "C:\\Windows\\SYSTEM32\\CoreMessaging.dll",
+      "C:\\Windows\\SYSTEM32\\CoreUIComponents.dll",
+      "C:\\Windows\\SYSTEM32\\TextShaping.dll",
+      "C:\\Windows\\SYSTEM32\\bcrypt.dll",
+      "C:\\Windows\\SYSTEM32\\dwmapi.dll",
+      "C:\\Windows\\SYSTEM32\\kernel.appcore.dll",
+      "C:\\Windows\\SYSTEM32\\ole32.dll",
+      "C:\\Windows\\SYSTEM32\\textinputframework.dll",
+      "C:\\Windows\\SYSTEM32\\windows.staterepositorycore.dll",
+      "C:\\Windows\\SYSTEM32\\wintypes.dll",
+      "C:\\Windows\\System32\\conhost.exe",
+      "C:\\Windows\\System32\\en-US\\KERNELBASE.dll.mui",
+      "C:\\Windows\\System32\\en-US\\user32.dll.mui",
+      "C:\\Windows\\SystemResources\\user32.dll.mun",
+      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.22621.2361_none_2712ced57382f843",
+      "C:\\Windows\\WinSxS\\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.22621.2361_none_2712ced57382f843\\comctl32.DLL",
+      "C:\\Windows\\system32\\CRYPTBASE.DLL",
+      "C:\\Windows\\system32\\IMM32.DLL",
+      "C:\\Windows\\system32\\conhost.exe",
+      "C:\\Windows\\system32\\en-US\\conhost.exe.mui",
+      "C:\\Windows\\system32\\rpcss.dll",
+      "C:\\Windows\\system32\\uxtheme.dll",
+      "C:\\Windows\\system32\\uxtheme.dll.Config",
+      "C:\\Users\\user\\Desktop\\en-US\\file.exe.mui",
+      "C:\\Users\\user\\Desktop\\en\\file.exe.mui",
+      "C:\\Users\\user\\Desktop\\file.exe",
+      "C:\\Users\\user\\SystemResources\\file.exe.mun"
+    ],
+    "registry_keys_opened": [
+      "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize\\DisableUmpdBufferSizeCheck",
+      "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize\\DisableMetaFiles",
+      "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\GRE_Initialize",
+      "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\OLEAUT",
+      "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\LanguageOverlay\\OverlayPackages\\en-US",
+      "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\AppModel\\Lookaside\\machine",
+      "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\OLE",
+      "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\MUI\\Settings",
+      "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Segment Heap",
+      "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\OLE\\Tracing",
+      "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Ole",
+      "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\AppModel\\Lookaside\\user",
+      "HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows\\Safer\\CodeIdentifiers",
+      "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Ole\\FeatureDevelopmentProperties",
+      "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager"
+    ],
+    "verdict_confidence": 98,
+    "verdicts": [
+      "CLEAN"
+    ],
+    "dns_lookups": [
+      {
+        "hostname": "windows.msn.com-ion.edgesuite.net"
+      },
+      {
+        "hostname": "a1672.dscr.akamai.net",
+        "resolved_ips": [
+          "23.195.81.59",
+          "23.195.81.73"
+        ]
+      }
+    ],
+    "mitre_attack_techniques": [
+      {
+        "id": "T1129",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "parse PE header",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "3"
+          }
+        ]
+      },
+      {
+        "id": "T1083",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "check if file exists",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "6"
+          }
+        ]
+      },
+      {
+        "id": "T1027",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "hash data via BCrypt",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "8"
+          }
+        ]
+      },
+      {
+        "id": "T1070.001",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "clear Windows event logs",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "11"
+          }
+        ]
+      },
+      {
+        "id": "T1134",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "modify access privileges",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "15"
+          }
+        ]
+      },
+      {
+        "id": "T1059",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "accept command line arguments",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "17"
+          }
+        ]
+      },
+      {
+        "id": "T1083",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "get file size",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "18"
+          }
+        ]
+      },
+      {
+        "id": "T1112",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "delete registry key",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "19"
+          }
+        ]
+      },
+      {
+        "id": "T1012",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "query or enumerate registry value",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "20"
+          }
+        ]
+      },
+      {
+        "id": "T1112",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "delete registry value",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "21"
+          }
+        ]
+      },
+      {
+        "id": "T1082",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "query environment variable",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "22"
+          }
+        ]
+      },
+      {
+        "id": "T1012",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "query or enumerate registry key",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "23"
+          }
+        ]
+      },
+      {
+        "id": "T1082",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "check OS version",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "24"
+          }
+        ]
+      },
+      {
+        "id": "T1071",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "The PE file contains a PDB path",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "static_pe_pdbpath"
+          }
+        ]
+      },
+      {
+        "id": "T1070.006",
+        "severity": "IMPACT_SEVERITY_MEDIUM",
+        "signature_description": "Binary compilation timestomping detected",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "pe_compile_timestomping"
+          }
+        ]
+      },
+      {
+        "id": "T1070",
+        "severity": "IMPACT_SEVERITY_MEDIUM",
+        "signature_description": "Binary compilation timestomping detected",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "pe_compile_timestomping"
+          }
+        ]
+      },
+      {
+        "id": "T1027",
+        "severity": "IMPACT_SEVERITY_LOW",
+        "signature_description": "The binary contains an unknown PE section name indicative of packing",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "packer_unknown_pe_section_name"
+          }
+        ]
+      },
+      {
+        "id": "T1027.002",
+        "severity": "IMPACT_SEVERITY_LOW",
+        "signature_description": "The binary contains an unknown PE section name indicative of packing",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "packer_unknown_pe_section_name"
+          }
+        ]
+      },
+      {
+        "id": "T1070.006",
+        "severity": "IMPACT_SEVERITY_INFO",
+        "signature_description": "Binary contains a suspicious time stamp",
+        "refs": [
+          {
+            "ref": "#signature_matches",
+            "value": "234"
+          }
+        ]
+      }
+    ],
+    "sigma_analysis_results": [
+      {
+        "match_context": [
+          {
+            "values": {
+              "Product": "Microsoft\\xae Windows\\xae Operating System",
+              "CurrentDirectory": "C:\\Users\\Bruno\\Desktop\\",
+              "OriginalFileName": "wevtutil.exe",
+              "Hashes": "SHA1=5ED01C9C1B242EB2EDDA86FAB0F27793D9091DD3,MD5=2BABE79C35853B32AC4B39B8539BAC42,SHA256=3C4C4FE2FC5590A6AF5E5F73B7277DA8785695E6A131D255943A88E43CDD2A6A,IMPHASH=9D0B0164498DEE3DA72DF328E7AE8C0B",
+              "Description": "Windows Event Log Utility",
+              "FileVersion": "10.0.26100.7019 (WinBuild.160101.0800)",
+              "ParentCommandLine": "C:\\Windows\\Explorer.EXE",
+              "CommandLine": "\"C:\\Users\\Bruno\\Desktop\\software.exe\"",
+              "EventID": "1",
+              "ParentImage": "C:\\Windows\\explorer.exe",
+              "IntegrityLevel": "High",
+              "Image": "C:\\Users\\Bruno\\Desktop\\software.exe",
+              "Company": "Microsoft Corporation"
+            }
+          }
+        ],
+        "rule_level": "medium",
+        "rule_id": "686a5b6d5e098e507256a7207e9e4a237bb378c824f67f13ee0402525833b257",
+        "rule_source": "Sigma Integrated Rule Set (GitHub)",
+        "rule_title": "Potential Defense Evasion Via Binary Rename",
+        "rule_description": "Detects the execution of a renamed binary often used by attackers or malware leveraging new Sysmon OriginalFileName datapoint.",
+        "rule_author": "Matthew Green @mgreen27, Ecco, James Pemberton @4A616D6573, oscd.community, Andreas Hunkeler (@Karneades)"
+      }
+    ],
+    "processes_created": [
+      "\"C:\\Users\\<USER>\\Desktop\\software.exe\"",
+      "\"C:\\Users\\user\\Desktop\\software.exe\"",
+      "C:\\Windows\\System32\\conhost.exe C:\\Windows\\system32\\conhost.exe 0xffffffff -ForceV1",
+      "\"C:\\Users\\user\\Desktop\\file.exe\""
+    ],
+    "attack_techniques": {
+      "T1129": [
+        {
+          "severity": "INFO",
+          "description": "parse PE header",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "3"
+            }
+          ]
+        }
+      ],
+      "T1083": [
+        {
+          "severity": "INFO",
+          "description": "check if file exists",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "6"
+            }
+          ]
+        },
+        {
+          "severity": "INFO",
+          "description": "get file size",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "18"
+            }
+          ]
+        }
+      ],
+      "T1027": [
+        {
+          "severity": "INFO",
+          "description": "hash data via BCrypt",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "8"
+            }
+          ]
+        },
+        {
+          "severity": "LOW",
+          "description": "The binary contains an unknown PE section name indicative of packing",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "packer_unknown_pe_section_name"
+            }
+          ]
+        }
+      ],
+      "T1070.001": [
+        {
+          "severity": "INFO",
+          "description": "clear Windows event logs",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "11"
+            }
+          ]
+        }
+      ],
+      "T1134": [
+        {
+          "severity": "INFO",
+          "description": "modify access privileges",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "15"
+            }
+          ]
+        }
+      ],
+      "T1059": [
+        {
+          "severity": "INFO",
+          "description": "accept command line arguments",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "17"
+            }
+          ]
+        }
+      ],
+      "T1112": [
+        {
+          "severity": "INFO",
+          "description": "delete registry key",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "19"
+            }
+          ]
+        },
+        {
+          "severity": "INFO",
+          "description": "delete registry value",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "21"
+            }
+          ]
+        }
+      ],
+      "T1012": [
+        {
+          "severity": "INFO",
+          "description": "query or enumerate registry value",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "20"
+            }
+          ]
+        },
+        {
+          "severity": "INFO",
+          "description": "query or enumerate registry key",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "23"
+            }
+          ]
+        }
+      ],
+      "T1082": [
+        {
+          "severity": "INFO",
+          "description": "query environment variable",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "22"
+            }
+          ]
+        },
+        {
+          "severity": "INFO",
+          "description": "check OS version",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "24"
+            }
+          ]
+        }
+      ],
+      "T1071": [
+        {
+          "severity": "INFO",
+          "description": "The PE file contains a PDB path",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "static_pe_pdbpath"
+            }
+          ]
+        }
+      ],
+      "T1070.006": [
+        {
+          "severity": "MEDIUM",
+          "description": "Binary compilation timestomping detected",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "pe_compile_timestomping"
+            }
+          ]
+        },
+        {
+          "severity": "INFO",
+          "description": "Binary contains a suspicious time stamp",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "234"
+            }
+          ]
+        }
+      ],
+      "T1070": [
+        {
+          "severity": "MEDIUM",
+          "description": "Binary compilation timestomping detected",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "pe_compile_timestomping"
+            }
+          ]
+        }
+      ],
+      "T1027.002": [
+        {
+          "severity": "LOW",
+          "description": "The binary contains an unknown PE section name indicative of packing",
+          "refs": [
+            {
+              "ref": "#signature_matches",
+              "value": "packer_unknown_pe_section_name"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

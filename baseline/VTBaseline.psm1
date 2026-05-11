@@ -16,10 +16,14 @@
         return
     }
 
+    $loadedNames = @()
     foreach ($info in $infos) {
         try {
             $k = (Get-Secret -Name $info.Name -AsPlainText -ErrorAction Stop).Trim()
-            if (-not [string]::IsNullOrWhiteSpace($k)) { $VTKeys += $k }
+            if (-not [string]::IsNullOrWhiteSpace($k) -and $VTKeys -notcontains $k) {
+                $VTKeys += $k
+                $loadedNames += $info.Name
+            }
         } catch {
             Write-Host "[WARN] Could not load $($info.Name) from vault." -ForegroundColor Yellow
         }
@@ -30,7 +34,7 @@
         return
     }
 
-    Write-Host "Loaded $($VTKeys.Count) VT API key(s) ($(($infos | ForEach-Object Name) -join ', ')). Rotating with 15s spacing per key (~$($VTKeys.Count * 4) req/min combined)." -ForegroundColor DarkCyan
+    Write-Host "Loaded $($VTKeys.Count) VT API key(s) ($($loadedNames -join ', ')). Rotating with 15s spacing per key (~$($VTKeys.Count * 4) req/min combined)." -ForegroundColor DarkCyan
 
     # Per-key last-call timestamps - using script scope so nested function can update them
     $script:VTMinDelayMs = 15000  # 4 req/min = 15s minimum spacing per key

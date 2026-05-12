@@ -39,41 +39,88 @@
     # Per-key last-call timestamps - using script scope so nested function can update them
     $script:VTMinDelayMs = 15000  # 4 req/min = 15s minimum spacing per key
     $script:VTKeyLastCall = @{}
+    # Per-key quota-exhausted cooldowns (set when a key returns 429)
+    $script:VTKeyDisabledUntil = @{}
     for ($j = 0; $j -lt $VTKeys.Count; $j++) {
-        $script:VTKeyLastCall[$j] = [DateTime]::MinValue
+        $script:VTKeyLastCall[$j]       = [DateTime]::MinValue
+        $script:VTKeyDisabledUntil[$j] = [DateTime]::MinValue
     }
 
     function Invoke-VTRequest {
         param([string]$Uri, [string]$Method = "Get")
 
-        # Find the key whose cooldown has expired, or the one closest to ready
-        $now           = [DateTime]::UtcNow
-        $chosenIdx     = -1
-        $earliestReady = [DateTime]::MaxValue
+        # One attempt per key; on 429 we disable that key and rotate to another.
+        for ($attempt = 0; $attempt -lt $VTKeys.Count; $attempt++) {
+            $now           = [DateTime]::UtcNow
+            $chosenIdx     = -1
+            $earliestReady = [DateTime]::MaxValue
+            $activeCount   = 0
 
-        for ($k = 0; $k -lt $VTKeys.Count; $k++) {
-            $readyAt = $script:VTKeyLastCall[$k].AddMilliseconds($script:VTMinDelayMs)
-            if ($readyAt -le $now) {
-                $chosenIdx = $k
-                break
+            for ($k = 0; $k -lt $VTKeys.Count; $k++) {
+                if ($script:VTKeyDisabledUntil[$k] -gt $now) { continue }
+                $activeCount++
+                $readyAt = $script:VTKeyLastCall[$k].AddMilliseconds($script:VTMinDelayMs)
+                if ($readyAt -le $now) {
+                    $chosenIdx = $k
+                    break
+                }
+                if ($readyAt -lt $earliestReady) {
+                    $earliestReady = $readyAt
+                    $chosenIdx     = $k
+                }
             }
-            if ($readyAt -lt $earliestReady) {
-                $earliestReady = $readyAt
-                $chosenIdx = $k
+
+            if ($activeCount -eq 0) {
+                $next = ($script:VTKeyDisabledUntil.Values | Measure-Object -Minimum).Minimum
+                throw "VT_ALL_KEYS_EXHAUSTED: every key 429'd; earliest re-enable $($next.ToString('yyyy-MM-dd HH:mm:ss')) UTC"
+            }
+
+            $waitMs = ($script:VTKeyLastCall[$chosenIdx].AddMilliseconds($script:VTMinDelayMs) - [DateTime]::UtcNow).TotalMilliseconds
+            if ($waitMs -gt 0) {
+                $waitSec = [Math]::Round($waitMs / 1000, 1)
+                Write-Host "    [Rate Limit] Key $($chosenIdx + 1) cooling down - waiting ${waitSec}s..." -ForegroundColor DarkGray
+                Start-Sleep -Milliseconds ([Math]::Ceiling($waitMs))
+            }
+
+            $script:VTKeyLastCall[$chosenIdx] = [DateTime]::UtcNow
+            $Headers = @{ "x-apikey" = $VTKeys[$chosenIdx]; "Content-Type" = "application/json" }
+
+            try {
+                return Invoke-RestMethod -Uri $Uri -Headers $Headers -Method $Method
+            } catch {
+                $code = $null
+                try { $code = $_.Exception.Response.StatusCode.value__ } catch {}
+                if ($code -ne 429) { throw }  # non-429: bubble up to caller (404 etc.)
+
+                # 429 on this key only. Parse Retry-After if present, else assume daily quota until UTC midnight.
+                $retryAfterSec = $null
+                try {
+                    $ra = $_.Exception.Response.Headers.RetryAfter
+                    if ($ra) {
+                        if ($ra.Delta -and $ra.Delta.TotalSeconds -gt 0) {
+                            $retryAfterSec = [int]$ra.Delta.TotalSeconds
+                        } elseif ($ra.Date) {
+                            $retryAfterSec = [int](($ra.Date - [DateTimeOffset]::UtcNow).TotalSeconds)
+                        }
+                    }
+                } catch {}
+                if (-not $retryAfterSec) {
+                    try { $retryAfterSec = [int]$_.Exception.Response.Headers['Retry-After'] } catch {}
+                }
+                $disabledUntil = if ($retryAfterSec -and $retryAfterSec -gt 0) {
+                    [DateTime]::UtcNow.AddSeconds($retryAfterSec)
+                } else {
+                    [DateTime]::UtcNow.Date.AddDays(1)  # assume daily quota → next UTC midnight
+                }
+                if ($disabledUntil -gt $script:VTKeyDisabledUntil[$chosenIdx]) {
+                    $script:VTKeyDisabledUntil[$chosenIdx] = $disabledUntil
+                }
+                Write-Host "    [Rate Limit] Key $($chosenIdx + 1) hit 429; disabled until $($disabledUntil.ToString('yyyy-MM-dd HH:mm:ss')) UTC. Rotating to next key..." -ForegroundColor Yellow
+                # loop continues with another key
             }
         }
 
-        $waitMs = ($script:VTKeyLastCall[$chosenIdx].AddMilliseconds($script:VTMinDelayMs) - [DateTime]::UtcNow).TotalMilliseconds
-        if ($waitMs -gt 0) {
-            $waitSec = [Math]::Round($waitMs / 1000, 1)
-            Write-Host "    [Rate Limit] Key $($chosenIdx + 1) cooling down - waiting ${waitSec}s..." -ForegroundColor DarkGray
-            Start-Sleep -Milliseconds ([Math]::Ceiling($waitMs))
-        }
-
-        $script:VTKeyLastCall[$chosenIdx] = [DateTime]::UtcNow
-        $Headers = @{ "x-apikey" = $VTKeys[$chosenIdx]; "Content-Type" = "application/json" }
-
-        return Invoke-RestMethod -Uri $Uri -Headers $Headers -Method $Method
+        throw "VT_ALL_KEYS_EXHAUSTED: retry budget exhausted while attempting $Uri"
     }
 
     # --- FOLDER CONFIGURATION ---
@@ -181,8 +228,8 @@
                 $code = $null
                 try { $code = $_.Exception.Response.StatusCode.value__ } catch {}
 
-                if ($code -eq 429) {
-                    Write-Host "  [!] VT Quota Exceeded (429). Stopping." -ForegroundColor Red
+                if ($_.Exception.Message -like 'VT_ALL_KEYS_EXHAUSTED*') {
+                    Write-Host "  [!] $($_.Exception.Message)" -ForegroundColor Red
                     $script:QuotaHit = $true
                     return
                 } elseif ($code -eq 404) {
@@ -209,8 +256,8 @@
             } catch {
                 $code = $null
                 try { $code = $_.Exception.Response.StatusCode.value__ } catch {}
-                if ($code -eq 429) {
-                    Write-Host "  [!] VT Quota Exceeded (429). Stopping." -ForegroundColor Red
+                if ($_.Exception.Message -like 'VT_ALL_KEYS_EXHAUSTED*') {
+                    Write-Host "  [!] $($_.Exception.Message)" -ForegroundColor Red
                     $script:QuotaHit = $true
                 }
                 else { Write-Host "  [ERROR] Behaviors HTTP $code - $($_.Exception.Message)" -ForegroundColor Red }
@@ -263,10 +310,39 @@
         if ($script:QuotaHit) { break }
         if ($missingHashes.Contains($fileHash)) { continue }
 
-        $svMain = Join-Path $mainSignedVerified "$fileHash.json"
-        $uvMain = Join-Path $mainUnverified     "$fileHash.json"
-        $uwMain = Join-Path $mainUnsignedWin    "$fileHash.json"
-        if ((Test-Path $svMain) -or (Test-Path $uvMain) -or (Test-Path $uwMain)) { continue }
+        # Locate existing main report (if any) and the matching behaviors folder
+        $existingBehPath = $null
+        foreach ($pair in @(
+            @($mainSignedVerified, $behaviorsSignedVerified),
+            @($mainUnverified,     $behaviorsUnverified),
+            @($mainUnsignedWin,    $behaviorsUnsignedWin)
+        )) {
+            if (Test-Path (Join-Path $pair[0] "$fileHash.json")) {
+                $existingBehPath = $pair[1]
+                break
+            }
+        }
+
+        if ($existingBehPath) {
+            # Main already cached - only fetch behaviors if missing
+            $behFile = Join-Path $existingBehPath "$fileHash.json"
+            if (Test-Path $behFile) { continue }
+            try {
+                $beh = Invoke-VTRequest -Uri "https://www.virustotal.com/api/v3/files/$fileHash/behaviour_summary"
+                $beh | ConvertTo-Json -Depth 10 | Set-Content $behFile
+                Write-Host "  [OK] $fileHash behaviors (main was cached)" -ForegroundColor Green
+            } catch {
+                $code = $null
+                try { $code = $_.Exception.Response.StatusCode.value__ } catch {}
+                if ($_.Exception.Message -like 'VT_ALL_KEYS_EXHAUSTED*') {
+                    Write-Host "  [!] $($_.Exception.Message)" -ForegroundColor Red
+                    $script:QuotaHit = $true
+                } else {
+                    Write-Host "  [WARN] Behaviors unavailable for $fileHash (HTTP $code)" -ForegroundColor DarkGray
+                }
+            }
+            continue
+        }
 
         try {
             $vtData  = Invoke-VTRequest -Uri "https://www.virustotal.com/api/v3/files/$fileHash"
@@ -291,8 +367,8 @@
         } catch {
             $code = $null
             try { $code = $_.Exception.Response.StatusCode.value__ } catch {}
-            if ($code -eq 429) {
-                Write-Host "  [!] VT Quota Exceeded (429). Stopping." -ForegroundColor Red
+            if ($_.Exception.Message -like 'VT_ALL_KEYS_EXHAUSTED*') {
+                Write-Host "  [!] $($_.Exception.Message)" -ForegroundColor Red
                 $script:QuotaHit = $true
             } elseif ($code -eq 404) {
                 Write-Host "  [404] $fileHash not in VT." -ForegroundColor DarkGray

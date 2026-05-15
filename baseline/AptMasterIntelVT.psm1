@@ -276,7 +276,7 @@ function Invoke-AptActorCsv {
 function Get-AptMasterIntelVTAll {
     [CmdletBinding()]
     param(
-        [string]$AptRoot = "apt\APTs"
+        [string]$AptRoot = "apt"
     )
 
     if (-not (Test-Path $AptRoot)) {
@@ -285,25 +285,50 @@ function Get-AptMasterIntelVTAll {
     }
     if (-not (Initialize-AptVTRotator)) { return }
 
-    $mainBase      = "output-baseline\VirusTotal-main\apt-master-intel"
-    $behaviorsBase = "output-baseline\VirusTotal-behaviors\apt-master-intel"
-    New-Item -ItemType Directory -Path $mainBase      -Force | Out-Null
-    New-Item -ItemType Directory -Path $behaviorsBase -Force | Out-Null
+    $mainBaseRoot      = "output-baseline\VirusTotal-main\apt-master-intel"
+    $behaviorsBaseRoot = "output-baseline\VirusTotal-behaviors\apt-master-intel"
+    New-Item -ItemType Directory -Path $mainBaseRoot      -Force | Out-Null
+    New-Item -ItemType Directory -Path $behaviorsBaseRoot -Force | Out-Null
 
     $missing = Initialize-AptMissingHashTracker
     Build-AptVTLocalIndex
     $script:AptVTQuotaHit = $false
 
-    $csvFiles = Get-ChildItem -Path $AptRoot -Recurse -Filter "*_Master_Intel.csv" -File -ErrorAction SilentlyContinue
-    if (-not $csvFiles -or $csvFiles.Count -eq 0) {
-        Write-Host "[WARN] No *_Master_Intel.csv files found under $AptRoot." -ForegroundColor Yellow
-        return
-    }
-    Write-Host "Found $($csvFiles.Count) master intel CSV(s) under $AptRoot." -ForegroundColor DarkCyan
+    # Two-pass: APTs subtree, then Malware Families subtree.
+    # Each gets its own output bucket under apt-master-intel\.
+    $passes = @(
+        @{ Source = (Join-Path $AptRoot 'APTs');             Bucket = 'APTs' },
+        @{ Source = (Join-Path $AptRoot 'Malware Families'); Bucket = 'Malware Families' }
+    )
 
-    foreach ($csv in $csvFiles) {
+    foreach ($pass in $passes) {
         if ($script:AptVTQuotaHit) { break }
-        Invoke-AptActorCsv -CsvFile $csv -MainBase $mainBase -BehaviorsBase $behaviorsBase -Missing $missing
+        $src    = $pass.Source
+        $bucket = $pass.Bucket
+
+        if (-not (Test-Path $src)) {
+            Write-Host "[SKIP] $src not present - skipping $bucket pass." -ForegroundColor DarkGray
+            continue
+        }
+
+        $csvFiles = Get-ChildItem -Path $src -Recurse -Filter "*_Master_Intel.csv" -File -ErrorAction SilentlyContinue
+        if (-not $csvFiles -or $csvFiles.Count -eq 0) {
+            Write-Host "[WARN] No *_Master_Intel.csv files found under $src." -ForegroundColor Yellow
+            continue
+        }
+
+        $mainBase      = Join-Path $mainBaseRoot      $bucket
+        $behaviorsBase = Join-Path $behaviorsBaseRoot $bucket
+        New-Item -ItemType Directory -Path $mainBase      -Force | Out-Null
+        New-Item -ItemType Directory -Path $behaviorsBase -Force | Out-Null
+
+        Write-Host ""
+        Write-Host "=== Pass: $bucket ($($csvFiles.Count) CSV(s) under $src) ===" -ForegroundColor Cyan
+
+        foreach ($csv in $csvFiles) {
+            if ($script:AptVTQuotaHit) { break }
+            Invoke-AptActorCsv -CsvFile $csv -MainBase $mainBase -BehaviorsBase $behaviorsBase -Missing $missing
+        }
     }
 
     if ($script:AptVTQuotaHit) {
@@ -316,7 +341,7 @@ function Get-AptMasterIntelVTAll {
 function Get-AptMasterIntelVTByActor {
     [CmdletBinding()]
     param(
-        [string]$AptRoot = "apt\APTs",
+        [string]$AptRoot = "apt",
         [string]$ActorName
     )
 
@@ -338,7 +363,6 @@ function Get-AptMasterIntelVTByActor {
 
     if (-not $csvFiles -or $csvFiles.Count -eq 0) {
         Write-Host "[WARN] No master intel CSV found matching '$pattern' under $AptRoot." -ForegroundColor Yellow
-        # Suggest similar names
         $all = Get-ChildItem -Path $AptRoot -Recurse -Filter "*_Master_Intel.csv" -File -ErrorAction SilentlyContinue |
                ForEach-Object { $_.BaseName -replace '_Master_Intel$','' }
         if ($all) {
@@ -353,17 +377,26 @@ function Get-AptMasterIntelVTByActor {
 
     if (-not (Initialize-AptVTRotator)) { return }
 
-    $mainBase      = "output-baseline\VirusTotal-main\apt-master-intel"
-    $behaviorsBase = "output-baseline\VirusTotal-behaviors\apt-master-intel"
-    New-Item -ItemType Directory -Path $mainBase      -Force | Out-Null
-    New-Item -ItemType Directory -Path $behaviorsBase -Force | Out-Null
+    $mainBaseRoot      = "output-baseline\VirusTotal-main\apt-master-intel"
+    $behaviorsBaseRoot = "output-baseline\VirusTotal-behaviors\apt-master-intel"
+    New-Item -ItemType Directory -Path $mainBaseRoot      -Force | Out-Null
+    New-Item -ItemType Directory -Path $behaviorsBaseRoot -Force | Out-Null
 
     $missing = Initialize-AptMissingHashTracker
     Build-AptVTLocalIndex
     $script:AptVTQuotaHit = $false
 
+    # Per-CSV bucket: first directory segment under $AptRoot
+    # (e.g. 'APTs' or 'Malware Families') determines output subfolder.
+    $aptRootResolved = (Resolve-Path $AptRoot).Path
     foreach ($csv in $csvFiles) {
         if ($script:AptVTQuotaHit) { break }
+        $rel    = $csv.FullName.Substring($aptRootResolved.Length).TrimStart('\','/')
+        $bucket = ($rel -split '[\\/]' | Select-Object -First 1)
+        $mainBase      = Join-Path $mainBaseRoot      $bucket
+        $behaviorsBase = Join-Path $behaviorsBaseRoot $bucket
+        New-Item -ItemType Directory -Path $mainBase      -Force | Out-Null
+        New-Item -ItemType Directory -Path $behaviorsBase -Force | Out-Null
         Invoke-AptActorCsv -CsvFile $csv -MainBase $mainBase -BehaviorsBase $behaviorsBase -Missing $missing
     }
 

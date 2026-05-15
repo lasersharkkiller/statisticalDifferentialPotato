@@ -11,8 +11,10 @@ function Get-MaliciousDifferentialAnalysis {
     param (
         [string]$SearchPath = "apt",
         [string]$GlobalResolutionPath = "output\Global_Hash_Resolution.csv",
-        [string]$BaselineRootPath = "output-baseline\VirusTotal-main",
-        [string]$BaselineBehavePath = "output-baseline\VirusTotal-behaviors",
+        [ValidateSet('All','Windows','Linux')]
+        [string]$Platform = 'All',
+        [string[]]$BaselinePaths,
+        [string[]]$BaselineBehavePaths,
         [string]$MaliciousStoragePath = "output-baseline\VirusTotal-main\malicious",
         [string]$BehaviorsStoragePath = "output-baseline\VirusTotal-behaviors\malicious",
         # Central location for the ignore list
@@ -21,14 +23,21 @@ function Get-MaliciousDifferentialAnalysis {
         [int]$ThrottleLimit = 4   # Keeps concurrent VT requests manageable with retries
     )
 
+    # Baseline roots reflect the new layout. NSRL + localBaseline together form the
+    # "known-good" corpus; -Platform optionally restricts to one OS family.
+    if (-not $BaselinePaths -or $BaselinePaths.Count -eq 0) {
+        $BaselinePaths       = Get-PlatformBaselineRoots -BasePath 'output-baseline\VirusTotal-main'      -Platform $Platform
+        $BaselineBehavePaths = Get-PlatformBaselineRoots -BasePath 'output-baseline\VirusTotal-behaviors' -Platform $Platform
+    }
+
     # --- 1. SETUP & PATH RESOLUTION ---
     $CurrentDir = Get-Location
     function Get-Abs ($p) { if([System.IO.Path]::IsPathRooted($p)){return $p} return Join-Path $CurrentDir $p }
 
     $SearchPath           = Get-Abs $SearchPath
     $GlobalResolutionPath = Get-Abs $GlobalResolutionPath
-    $BaselineRootPath     = Get-Abs $BaselineRootPath
-    $BaselineBehavePath   = Get-Abs $BaselineBehavePath
+    $BaselinePaths        = @($BaselinePaths       | ForEach-Object { Get-Abs $_ })
+    $BaselineBehavePaths  = @($BaselineBehavePaths | ForEach-Object { Get-Abs $_ })
     $MaliciousStoragePath = Get-Abs $MaliciousStoragePath
     $BehaviorsStoragePath = Get-Abs $BehaviorsStoragePath
     $MissingHashesPath    = Get-Abs $MissingHashesPath
@@ -62,21 +71,40 @@ function Get-MaliciousDifferentialAnalysis {
     # --- 2. WORKER BLOCK (Runs inside Child Process) ---
     $WorkerBlock = {
         param (
-            $TargetFile, $VTApi, $GlobalResolutionPath, 
-            $BaselineRootPath, $BaselineBehavePath, 
+            $TargetFile, $VTApi, $GlobalResolutionPath,
+            $BaselinePaths, $BaselineBehavePaths,
             $MaliciousStoragePath, $BehaviorsStoragePath, $MinDetections,
             $MissingHashArray # Passed from parent
         )
 
         # Helper Functions
         function Get-BehaviorAttributes ($Path) {
-            if (-not (Test-Path $Path)) { return $null }
+            if (-not $Path -or -not (Test-Path $Path)) { return $null }
             try {
                 $json = Get-Content $Path -Raw | ConvertFrom-Json
-                if ($json.data -is [array]) { return $json.data[0].attributes } else { return $json.data.attributes } 
+                if ($json.data -is [array]) { return $json.data[0].attributes } else { return $json.data.attributes }
             } catch { return $null }
         }
         function Add-Hit($dict, $map, $key, $c) { if(!$dict[$key]){$dict[$key]=0}; $dict[$key]++; if(!$map[$key]){$map[$key]=@()}; $map[$key]+=$c }
+
+        # Build hash -> file lookup indexes from baseline roots (recursive).
+        # Used in place of direct Join-Path checks now that the layout is nested.
+        $BaseMainIndex = @{}
+        foreach ($root in $BaselinePaths) {
+            if (Test-Path $root) {
+                Get-ChildItem -Path $root -Recurse -File -Filter "*.json" -ErrorAction SilentlyContinue | ForEach-Object {
+                    $BaseMainIndex[$_.BaseName] = $_
+                }
+            }
+        }
+        $BaseBehIndex = @{}
+        foreach ($root in $BaselineBehavePaths) {
+            if (Test-Path $root) {
+                Get-ChildItem -Path $root -Recurse -File -Filter "*.json" -ErrorAction SilentlyContinue | ForEach-Object {
+                    $BaseBehIndex[$_.BaseName] = $_.FullName
+                }
+            }
+        }
 
         $CsvPath = $TargetFile.FullName
         $TargetDir = $TargetFile.DirectoryName
@@ -187,8 +215,8 @@ function Get-MaliciousDifferentialAnalysis {
 
                 # Behavior Download
                 $bFile = Join-Path $BehaviorsStoragePath "$RealSHA256.json"
-                $bBase = Join-Path $BaselineBehavePath "$RealSHA256.json"
-                if (-not (Test-Path $bFile) -and -not (Test-Path $bBase) -and -not $QuotaExhausted) {
+                $bBaseExists = $BaseBehIndex.ContainsKey($RealSHA256)
+                if (-not (Test-Path $bFile) -and -not $bBaseExists -and -not $QuotaExhausted) {
                     $retryDelays = @(15, 30, 60)
                     foreach ($delay in @(0) + $retryDelays) {
                         if ($delay -gt 0) { Write-Host "[$BaseName] VT Rate Limit (behaviors) -- sleeping ${delay}s"; Start-Sleep -Seconds $delay }
@@ -225,7 +253,7 @@ function Get-MaliciousDifferentialAnalysis {
         $Maps = @{ WinAPI=@{}; Elf=@{}; Sigma=@{}; Yara=@{}; Cert=@{}; Tags=@{}; Mitre=@{}; Mutex=@{}; Reg=@{}; Proc=@{}; MemUrls=@{}; MemDomains=@{}; IdsRules=@{} }
 
         $BaseTotal = 0
-        $BaseFiles = Get-ChildItem -Path $BaselineRootPath -File -Filter "*.json"
+        $BaseFiles = $BaseMainIndex.Values
         foreach ($file in $BaseFiles) {
             $BaseTotal++
             try {
@@ -237,7 +265,8 @@ function Get-MaliciousDifferentialAnalysis {
                 if($a.tags){foreach($t in $a.tags){Add-Hit $Base.Tags $Maps.Tags $t $null}}
                 $sig=$a.signature_info; if($sig){$s=if($sig.signers){$sig.signers}elseif($sig.product){$sig.product}else{"Unsigned"};if($s -is [array]){$s=$s -join ", "};$v=if($sig.verified){"Verified"}else{"Unverified"};Add-Hit $Base.Cert $Maps.Cert "$s ($v)" $null}
                 
-                $bAttr = Get-BehaviorAttributes (Join-Path $BaselineBehavePath "$($file.BaseName).json")
+                $bBasePath = $BaseBehIndex[$file.BaseName]
+                $bAttr = Get-BehaviorAttributes $bBasePath
                 if ($bAttr) {
                     if($bAttr.mitre_attack_techniques){foreach($m in $bAttr.mitre_attack_techniques){Add-Hit $Base.Mitre $Maps.Mitre "$($m.id): $($m.signature_description)" $null}}
                     if($bAttr.mutexes_created){foreach($m in $bAttr.mutexes_created){Add-Hit $Base.Mutex $Maps.Mutex $m $null}}
@@ -255,7 +284,9 @@ function Get-MaliciousDifferentialAnalysis {
         # Analyze Target Hashes
         foreach ($HashSHA256 in $ProcessedSHA256) {
             $file = Join-Path $MaliciousStoragePath "$($HashSHA256).json"
-            if (-not (Test-Path $file)) { $file = Join-Path $BaselineRootPath "$($HashSHA256).json" }
+            if (-not (Test-Path $file) -and $BaseMainIndex.ContainsKey($HashSHA256)) {
+                $file = $BaseMainIndex[$HashSHA256].FullName
+            }
             if (-not (Test-Path $file)) { continue }
 
             try {
@@ -280,7 +311,9 @@ function Get-MaliciousDifferentialAnalysis {
                 $sig=$a.signature_info; if($sig){$s=if($sig.signers){$sig.signers}elseif($sig.product){$sig.product}else{"Unsigned"};if($s -is [array]){$s=$s -join ", "};$v=if($sig.verified){"Verified"}else{"Unverified"};Add-Hit $Targ.Cert $Maps.Cert "$s ($v)" $ctx}
                 
                 $bPath = Join-Path $BehaviorsStoragePath "$($HashSHA256).json"
-                if(-not(Test-Path $bPath)){ $bPath = Join-Path $BaselineBehavePath "$($HashSHA256).json" }
+                if (-not (Test-Path $bPath) -and $BaseBehIndex.ContainsKey($HashSHA256)) {
+                    $bPath = $BaseBehIndex[$HashSHA256]
+                }
                 $bAttr = Get-BehaviorAttributes $bPath
                 if ($bAttr) {
                     if($bAttr.mitre_attack_techniques){foreach($m in $bAttr.mitre_attack_techniques){Add-Hit $Targ.Mitre $Maps.Mitre "$($m.id): $($m.signature_description)" $ctx}}
@@ -355,7 +388,7 @@ function Get-MaliciousDifferentialAnalysis {
         
         # Start Job
         Write-Host " [Queue] $($File.BaseName)" -ForegroundColor Yellow
-        $j = Start-Job -ScriptBlock $WorkerBlock -ArgumentList $File, $VTApi, $GlobalResolutionPath, $BaselineRootPath, $BaselineBehavePath, $MaliciousStoragePath, $BehaviorsStoragePath, $MinDetections, $MissingHashes
+        $j = Start-Job -ScriptBlock $WorkerBlock -ArgumentList $File, $VTApi, $GlobalResolutionPath, $BaselinePaths, $BaselineBehavePaths, $MaliciousStoragePath, $BehaviorsStoragePath, $MinDetections, $MissingHashes
         $Jobs += $j
     }
 

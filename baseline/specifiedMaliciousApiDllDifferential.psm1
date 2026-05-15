@@ -7,12 +7,15 @@ function Get-SpecifiedApiDllDifferentialAnalysis {
     param (
         [Parameter(Mandatory=$false)]
         [string]$TargetHashList,
-        
+
         [string]$BasePath = ".\output-baseline\VirusTotal-main",
+        [ValidateSet('All','Windows','Linux')]
+        [string]$Platform = 'All',
         [string]$JsonExportPath = ".\baseline\TargetedAPIDifferentialAnalysis.json"
     )
 
     $MaliciousPath = Join-Path -Path $BasePath -ChildPath "malicious"
+    $BaselineRoots = Get-PlatformBaselineRoots -BasePath $BasePath -Platform $Platform
     
     # Ensure export directory exists
     $ExportDir = Split-Path -Path $JsonExportPath -Parent
@@ -94,15 +97,20 @@ function Get-SpecifiedApiDllDifferentialAnalysis {
 
     # --- 4. ANALYZE BASELINE ---
     Write-Host " Scanning Baseline dataset..." -NoNewline
-    if (Test-Path $BasePath) {
-        # Get files in root ONLY (using -File prevents recursion)
-        $BaseFiles = Get-ChildItem -Path $BasePath -File -Filter "*.json"
-        $BaseData  = Get-ApiCounts -FileList $BaseFiles
-        Write-Host " Done ($($BaseData.Total) files)." -ForegroundColor Green
-    } else {
-        Write-Error "Baseline folder not found at $BasePath"
+    $BaseFiles = @()
+    foreach ($root in $BaselineRoots) {
+        if (Test-Path $root) {
+            $BaseFiles += Get-ChildItem -Path $root -Recurse -File -Filter "*.json"
+        } else {
+            Write-Host "`n  [WARN] Baseline root not found, skipping: $root" -ForegroundColor DarkYellow -NoNewline
+        }
+    }
+    if ($BaseFiles.Count -eq 0) {
+        Write-Error "No baseline JSON files found under any of: $($BaselineRoots -join '; ')"
         return
     }
+    $BaseData = Get-ApiCounts -FileList $BaseFiles
+    Write-Host " Done ($($BaseData.Total) files)." -ForegroundColor Green
 
     # --- 5. CALCULATE RARITY ---
     Write-Host " Calculating Baseline Rarity..." -ForegroundColor DarkCyan

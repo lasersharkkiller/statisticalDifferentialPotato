@@ -7,10 +7,13 @@
 function Get-MaliciousApiDllDifferentialAnalysis {
     param (
         [string]$BasePath = ".\output-baseline\VirusTotal-main",
+        [ValidateSet('All','Windows','Linux')]
+        [string]$Platform = 'All',
         [string]$JsonExportPath = ".\baseline\APIDifferentialAnalysis.json"
     )
 
     $MaliciousPath = Join-Path -Path $BasePath -ChildPath "malicious"
+    $BaselineRoots = Get-PlatformBaselineRoots -BasePath $BasePath -Platform $Platform
     
     # Ensure export directory exists
     $ExportDir = Split-Path -Path $JsonExportPath -Parent
@@ -56,9 +59,15 @@ function Get-MaliciousApiDllDifferentialAnalysis {
     Write-Host " Done ($($MalData.Total) files)." -ForegroundColor Green
 
     Write-Host " Scanning Baseline dataset..." -NoNewline
-    # Get files in root ONLY (using -File prevents recursion)
-    $BaseFiles = Get-ChildItem -Path $BasePath -File -Filter "*.json"
-    $BaseData  = Get-ApiCounts -FileList $BaseFiles
+    $BaseFiles = @()
+    foreach ($root in $BaselineRoots) {
+        if (Test-Path $root) {
+            $BaseFiles += Get-ChildItem -Path $root -Recurse -File -Filter "*.json"
+        } else {
+            Write-Host "`n  [WARN] Baseline root not found, skipping: $root" -ForegroundColor DarkYellow -NoNewline
+        }
+    }
+    $BaseData = Get-ApiCounts -FileList $BaseFiles
     Write-Host " Done ($($BaseData.Total) files)." -ForegroundColor Green
 
     # 3. Calculate Rarity Logic

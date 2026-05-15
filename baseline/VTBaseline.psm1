@@ -1,12 +1,68 @@
-﻿function Get-VTBaseline {
+function Get-NSRLOsSlug {
+    param([string]$OsName)
+    if ([string]::IsNullOrWhiteSpace($OsName)) { return $null }
+    $slug = $OsName -replace ' Version \S+(\s+X64)?$', ''
+    $slug = $slug -replace ' LTS$', ''
+    $slug = $slug -replace '\s+', '-'
+    return $slug
+}
+
+function Get-PlatformBaselineRoots {
+    # Returns the list of directories that make up the "known-good" corpus
+    # for differential analysis, filtered by platform.
+    #
+    # All     -> NSRL/ (all OSes) + localBaseline/ (all sigs)
+    # Windows -> NSRL/Windows-*/  + localBaseline/{SignedVerified,unsignedWin,unverified,drivers}/
+    # Linux   -> NSRL/<non-Windows>/ + localBaseline/unsignedLinux/
+    #
+    # NSRL OS subfolders are auto-discovered; classification by slug prefix
+    # (Windows-* vs everything else) so new OSes work without code changes.
     param(
+        [string]$BasePath = "output-baseline\VirusTotal-main",
+        [ValidateSet('All','Windows','Linux')]
+        [string]$Platform = 'All'
+    )
+
+    $nsrlRoot  = Join-Path $BasePath 'NSRL'
+    $localRoot = Join-Path $BasePath 'localBaseline'
+
+    if ($Platform -eq 'All') {
+        return @($nsrlRoot, $localRoot)
+    }
+
+    $roots = @()
+    if (Test-Path $nsrlRoot) {
+        Get-ChildItem -Path $nsrlRoot -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+            $isWin = ($_.Name -match '^Windows')
+            if (($Platform -eq 'Windows' -and $isWin) -or ($Platform -eq 'Linux' -and -not $isWin)) {
+                $roots += $_.FullName
+            }
+        }
+    }
+    $sigs = if ($Platform -eq 'Windows') { @('SignedVerified','unsignedWin','unverified','drivers') }
+            else                          { @('unsignedLinux') }
+    foreach ($sig in $sigs) {
+        $p = Join-Path $localRoot $sig
+        if (Test-Path $p) { $roots += $p }
+    }
+    return $roots
+}
+
+function Get-VTBaseline {
+    [CmdletBinding()]
+    param(
+        [ValidateSet('All','NSRL','NSRLOs','LocalBaseline','Malicious')]
+        [string]$Mode = 'All',
+        [string]$OsFilter,
         [string]$AttributionPattern = "equifax"
     )
 
+    if ($Mode -eq 'NSRLOs' -and [string]::IsNullOrWhiteSpace($OsFilter)) {
+        Write-Error "Mode 'NSRLOs' requires -OsFilter to be specified."
+        return
+    }
+
     # --- API SETUP ---
-    # Dynamically discover every VT_API_Key_* secret in the vault so new keys
-    # (VT_API_Key_4, VT_API_Key_5, ...) auto-join the rotation without edits.
-    # Secrets are sorted by the trailing number so rotation order stays stable.
     $VTKeys = @()
     try {
         $infos = Get-SecretInfo -Name 'VT_API_Key_*' -ErrorAction Stop |
@@ -34,22 +90,48 @@
         return
     }
 
-    Write-Host "Loaded $($VTKeys.Count) VT API key(s) ($($loadedNames -join ', ')). Rotating with 15s spacing per key (~$($VTKeys.Count * 4) req/min combined)." -ForegroundColor DarkCyan
+    Write-Host ""
+    Write-Host "Available VT API keys:" -ForegroundColor DarkCyan
+    for ($i = 0; $i -lt $VTKeys.Count; $i++) {
+        $k  = $VTKeys[$i]
+        $fp = $k.Substring(0,6) + '...' + $k.Substring($k.Length-4)
+        Write-Host ("  {0,2}) {1,-16}  {2}" -f ($i + 1), $loadedNames[$i], $fp) -ForegroundColor DarkCyan
+    }
+    Write-Host ("  {0,2}) ALL keys (default)" -f ($VTKeys.Count + 1)) -ForegroundColor DarkCyan
+    Write-Host ""
+    $keyChoice = (Read-Host "Which key(s) to use? (comma-separated numbers, '$($VTKeys.Count + 1)' or 'all' for all; Enter=all)").Trim()
 
-    # Per-key last-call timestamps - using script scope so nested function can update them
-    $script:VTMinDelayMs = 15000  # 4 req/min = 15s minimum spacing per key
-    $script:VTKeyLastCall = @{}
-    # Per-key quota-exhausted cooldowns (set when a key returns 429)
+    $useAll = [string]::IsNullOrWhiteSpace($keyChoice) -or
+              $keyChoice -ieq 'all' -or
+              $keyChoice -eq ($VTKeys.Count + 1).ToString()
+
+    if (-not $useAll) {
+        $selectedIdxs = @($keyChoice -split '[,\s]+' |
+            Where-Object { $_ -match '^\d+$' } |
+            ForEach-Object { [int]$_ - 1 } |
+            Where-Object { $_ -ge 0 -and $_ -lt $VTKeys.Count } |
+            Sort-Object -Unique)
+        if ($selectedIdxs.Count -eq 0) {
+            Write-Host "[WARN] No valid keys selected from '$keyChoice'; using ALL keys." -ForegroundColor Yellow
+        } else {
+            $VTKeys      = @($selectedIdxs | ForEach-Object { $VTKeys[$_] })
+            $loadedNames = @($selectedIdxs | ForEach-Object { $loadedNames[$_] })
+        }
+    }
+
+    Write-Host "Using $($VTKeys.Count) VT API key(s) ($($loadedNames -join ', ')). Rotating with 15s spacing per key (~$($VTKeys.Count * 4) req/min combined)." -ForegroundColor DarkCyan
+
+    $script:VTMinDelayMs       = 15000
+    $script:VTKeyLastCall      = @{}
     $script:VTKeyDisabledUntil = @{}
     for ($j = 0; $j -lt $VTKeys.Count; $j++) {
-        $script:VTKeyLastCall[$j]       = [DateTime]::MinValue
+        $script:VTKeyLastCall[$j]      = [DateTime]::MinValue
         $script:VTKeyDisabledUntil[$j] = [DateTime]::MinValue
     }
 
     function Invoke-VTRequest {
         param([string]$Uri, [string]$Method = "Get")
 
-        # One attempt per key; on 429 we disable that key and rotate to another.
         for ($attempt = 0; $attempt -lt $VTKeys.Count; $attempt++) {
             $now           = [DateTime]::UtcNow
             $chosenIdx     = -1
@@ -90,9 +172,8 @@
             } catch {
                 $code = $null
                 try { $code = $_.Exception.Response.StatusCode.value__ } catch {}
-                if ($code -ne 429) { throw }  # non-429: bubble up to caller (404 etc.)
+                if ($code -ne 429) { throw }
 
-                # 429 on this key only. Parse Retry-After if present, else assume daily quota until UTC midnight.
                 $retryAfterSec = $null
                 try {
                     $ra = $_.Exception.Response.Headers.RetryAfter
@@ -110,51 +191,82 @@
                 $disabledUntil = if ($retryAfterSec -and $retryAfterSec -gt 0) {
                     [DateTime]::UtcNow.AddSeconds($retryAfterSec)
                 } else {
-                    [DateTime]::UtcNow.Date.AddDays(1)  # assume daily quota → next UTC midnight
+                    [DateTime]::UtcNow.Date.AddDays(1)
                 }
                 if ($disabledUntil -gt $script:VTKeyDisabledUntil[$chosenIdx]) {
                     $script:VTKeyDisabledUntil[$chosenIdx] = $disabledUntil
                 }
                 Write-Host "    [Rate Limit] Key $($chosenIdx + 1) hit 429; disabled until $($disabledUntil.ToString('yyyy-MM-dd HH:mm:ss')) UTC. Rotating to next key..." -ForegroundColor Yellow
-                # loop continues with another key
             }
         }
 
         throw "VT_ALL_KEYS_EXHAUSTED: retry budget exhausted while attempting $Uri"
     }
 
-    # --- FOLDER CONFIGURATION ---
-    $mainBase      = "output-baseline\VirusTotal-main"
-    $behaviorsBase = "output-baseline\VirusTotal-behaviors"
+    # --- MODE FLAGS ---
+    $doProcs     = ($Mode -in @('All','LocalBaseline'))
+    $doNSRL      = ($Mode -in @('All','NSRL','NSRLOs'))
+    $doMalicious = ($Mode -in @('All','Malicious'))
+    $doDrivers   = ($Mode -in @('All','LocalBaseline'))
+    Write-Host "Mode: $Mode  (procs=$doProcs nsrl=$doNSRL malicious=$doMalicious drivers=$doDrivers$(if($OsFilter){"  osFilter=$OsFilter"}))" -ForegroundColor DarkCyan
 
-    # Known-good signed/verified
-    $mainSignedVerified      = Join-Path $mainBase      "SignedVerified"
-    $behaviorsSignedVerified = Join-Path $behaviorsBase "SignedVerified"
-    # Unsigned Windows
-    $mainUnsignedWin       = Join-Path $mainBase      "unsignedWin"
-    $behaviorsUnsignedWin  = Join-Path $behaviorsBase "unsignedWin"
-    # Unsigned Linux
-    $mainUnsignedLinux       = Join-Path $mainBase      "unsignedLinux"
-    $behaviorsUnsignedLinux  = Join-Path $behaviorsBase "unsignedLinux"
-    # Unverified
-    $mainUnverified     = Join-Path $mainBase      "unverified"
-    $behaviorsUnverified = Join-Path $behaviorsBase "unverified"
-    # Drivers
-    $mainDrivers        = Join-Path $mainBase      "drivers"
-    $behaviorsDrivers   = Join-Path $behaviorsBase "drivers"
-    # Malicious (kept strictly separate from known-good)
-    $mainMalicious      = Join-Path $mainBase      "malicious"
-    $behaviorsMalicious = Join-Path $behaviorsBase "malicious"
+    # --- PATH CONFIG ---
+    $mainBase = "output-baseline\VirusTotal-main"
+    $behBase  = "output-baseline\VirusTotal-behaviors"
+    $localMain     = Join-Path $mainBase 'localBaseline'
+    $localBeh      = Join-Path $behBase  'localBaseline'
+    $maliciousMain = Join-Path $mainBase 'malicious'
+    $maliciousBeh  = Join-Path $behBase  'malicious'
+    $nsrlMain      = Join-Path $mainBase 'NSRL'
+    $nsrlBeh       = Join-Path $behBase  'NSRL'
 
-    foreach ($path in @(
-        $mainSignedVerified, $behaviorsSignedVerified,
-        $mainUnsignedWin, $behaviorsUnsignedWin,
-        $mainUnsignedLinux, $behaviorsUnsignedLinux,
-        $mainUnverified, $behaviorsUnverified,
-        $mainDrivers, $behaviorsDrivers,
-        $mainMalicious, $behaviorsMalicious
-    )) {
-        New-Item -ItemType Directory -Path $path -Force | Out-Null
+    foreach ($p in @($localMain, $localBeh, $maliciousMain, $maliciousBeh, $nsrlMain, $nsrlBeh)) {
+        New-Item -ItemType Directory -Path $p -Force | Out-Null
+    }
+
+    # --- WARN IF OLD-LAYOUT FILES STILL EXIST ---
+    $stale = @()
+    foreach ($base in @($mainBase, $behBase)) {
+        foreach ($sig in @('SignedVerified','unsignedWin','unsignedLinux','unverified','drivers')) {
+            $p = Join-Path $base $sig
+            if (Test-Path $p) {
+                $c = (Get-ChildItem -Path $p -Filter "*.json" -File -ErrorAction SilentlyContinue).Count
+                if ($c -gt 0) { $stale += "$p ($c files)" }
+            }
+        }
+    }
+    if ($stale.Count -gt 0) {
+        Write-Host "[WARN] Old-layout cached files detected - run tools\Migrate-NSRLToPerOS.ps1 -Apply first:" -ForegroundColor Yellow
+        foreach ($s in $stale) { Write-Host "       $s" -ForegroundColor Yellow }
+    }
+
+    # --- BUILD NSRL HASH -> OS MAP (used for NSRL-overrules-localBaseline routing) ---
+    $hashToOs = @{}
+    $nsrlCsvPath = "NSRL\nsrl_reduced.csv"
+    if (Test-Path $nsrlCsvPath) {
+        Import-Csv $nsrlCsvPath | ForEach-Object {
+            if ($_.Hash -and $_.OsName) { $hashToOs[$_.Hash.ToLowerInvariant()] = $_.OsName }
+        }
+        Write-Host "Loaded NSRL map: $($hashToOs.Count) hash->OS entries." -ForegroundColor DarkGray
+    } else {
+        Write-Host "[WARN] NSRL\nsrl_reduced.csv not found - NSRL routing disabled; everything goes to localBaseline." -ForegroundColor Yellow
+    }
+
+    function Get-DestPaths {
+        param([string]$Hash, [string]$Sig)
+        $key = $Hash.ToLowerInvariant()
+        if ($hashToOs.ContainsKey($key)) {
+            $slug = Get-NSRLOsSlug $hashToOs[$key]
+            return @{
+                Main = Join-Path $nsrlMain (Join-Path $slug $Sig)
+                Beh  = Join-Path $nsrlBeh  (Join-Path $slug $Sig)
+            }
+        } else {
+            return @{
+                Main = Join-Path $localMain $Sig
+                Beh  = Join-Path $localBeh  $Sig
+            }
+        }
     }
 
     # --- LOAD MISSING HASHES TRACKER ---
@@ -171,34 +283,40 @@
         }
     }
 
-    # --- LOAD BASELINES ---
-    $unverifiedProcsBaseline    = Get-Content output\unverifiedProcsBaseline.json    | ConvertFrom-Json
-    $unsignedWinProcsBaseline   = Get-Content output\unsignedWinProcsBaseline.json   | ConvertFrom-Json
-    $unsignedLinuxProcsBaseline = Get-Content output\unsignedLinuxProcsBaseline.json | ConvertFrom-Json
-    $signedVerifiedProcsBaseline = Get-Content output\signedVerifiedProcsBaseline.json | ConvertFrom-Json
-    $maliciousProcsBaseline     = Get-Content output\maliciousProcsBaseline.json     | ConvertFrom-Json
-    $driversBaseline            = Get-Content output\driversBaseline.json            | ConvertFrom-Json
-
-    # --- LOAD NSRL CSV ---
-    # Windows: VT signature_info checked at lookup time → SignedVerified or unsignedWin
-    # Linux:   always unsignedLinux (no Authenticode)
-    $nsrlWindowsHashes = [System.Collections.Generic.List[string]]::new()
-    $nsrlLinuxHashes   = [System.Collections.Generic.List[string]]::new()
-    $nsrlCsvPath = "NSRL\nsrl_reduced.csv"
-    if (Test-Path $nsrlCsvPath) {
-        Import-Csv $nsrlCsvPath | ForEach-Object {
-            if (-not $_.Hash) { return }
-            if ($_.OsName -like '*Windows*') { $nsrlWindowsHashes.Add($_.Hash) }
-            else                             { $nsrlLinuxHashes.Add($_.Hash)   }
-        }
-        Write-Host "Loaded NSRL: $($nsrlWindowsHashes.Count) Windows, $($nsrlLinuxHashes.Count) Linux." -ForegroundColor DarkGray
-    } else {
-        Write-Host "[WARN] NSRL\nsrl_reduced.csv not found - skipping NSRL section." -ForegroundColor Yellow
+    # --- LOAD PROCS BASELINES (only needed if doProcs/doMalicious/doDrivers) ---
+    $unverifiedProcsBaseline    = @()
+    $unsignedWinProcsBaseline   = @()
+    $unsignedLinuxProcsBaseline = @()
+    $signedVerifiedProcsBaseline = @()
+    $maliciousProcsBaseline     = @()
+    $driversBaseline            = @()
+    if ($doProcs) {
+        if (Test-Path output\unverifiedProcsBaseline.json)     { $unverifiedProcsBaseline     = Get-Content output\unverifiedProcsBaseline.json     | ConvertFrom-Json }
+        if (Test-Path output\unsignedWinProcsBaseline.json)    { $unsignedWinProcsBaseline    = Get-Content output\unsignedWinProcsBaseline.json    | ConvertFrom-Json }
+        if (Test-Path output\unsignedLinuxProcsBaseline.json)  { $unsignedLinuxProcsBaseline  = Get-Content output\unsignedLinuxProcsBaseline.json  | ConvertFrom-Json }
+        if (Test-Path output\signedVerifiedProcsBaseline.json) { $signedVerifiedProcsBaseline = Get-Content output\signedVerifiedProcsBaseline.json | ConvertFrom-Json }
+    }
+    if ($doMalicious -and (Test-Path output\maliciousProcsBaseline.json)) {
+        $maliciousProcsBaseline = Get-Content output\maliciousProcsBaseline.json | ConvertFrom-Json
+    }
+    if ($doDrivers -and (Test-Path output\driversBaseline.json)) {
+        $driversBaseline = Get-Content output\driversBaseline.json | ConvertFrom-Json
     }
 
-    # ---------------------------------------------------------
-    # HELPER: Process-Hash
-    # ---------------------------------------------------------
+    # --- BUILD NSRL ENTRY LISTS (with OsName per hash for slug routing) ---
+    $nsrlWindowsEntries = New-Object System.Collections.Generic.List[object]
+    $nsrlLinuxEntries   = New-Object System.Collections.Generic.List[object]
+    if ($doNSRL -and (Test-Path $nsrlCsvPath)) {
+        Import-Csv $nsrlCsvPath | ForEach-Object {
+            if (-not $_.Hash) { return }
+            $entry = [pscustomobject]@{ Hash = $_.Hash; OsName = $_.OsName }
+            if ($_.OsName -like '*Windows*') { $nsrlWindowsEntries.Add($entry) }
+            else                              { $nsrlLinuxEntries.Add($entry)   }
+        }
+        Write-Host "NSRL queue: $($nsrlWindowsEntries.Count) Windows, $($nsrlLinuxEntries.Count) Linux." -ForegroundColor DarkGray
+    }
+
+    # --- HELPER: Process-Hash ---
     function Process-Hash {
         param(
             [string]$Hash,
@@ -206,18 +324,19 @@
             [string]$BehaviorsPath
         )
 
-        $mainFile   = Join-Path $MainPath     "$Hash.json"
-        $behaveFile = Join-Path $BehaviorsPath "$Hash.json"
-
-        # Skip if already confirmed missing from VT
         if ($missingHashes.Contains($Hash)) {
             Write-Host "  [SKIP] $Hash is in MissingHashes.csv - known 404." -ForegroundColor DarkGray
             return
         }
 
+        $mainFile   = Join-Path $MainPath      "$Hash.json"
+        $behaveFile = Join-Path $BehaviorsPath "$Hash.json"
+
         if ((Test-Path $mainFile) -and (Test-Path $behaveFile)) { return }
 
-        # 1. Main VT Report
+        if (-not (Test-Path $MainPath))      { New-Item -ItemType Directory -Path $MainPath      -Force | Out-Null }
+        if (-not (Test-Path $BehaviorsPath)) { New-Item -ItemType Directory -Path $BehaviorsPath -Force | Out-Null }
+
         if (-not (Test-Path $mainFile)) {
             Write-Host "  Main report missing for $Hash. Querying VirusTotal..." -ForegroundColor Yellow
             try {
@@ -246,7 +365,6 @@
 
         if ($script:QuotaHit) { return }
 
-        # 2. Behaviors Report
         if (-not (Test-Path $behaveFile)) {
             Write-Host "  Behaviors report missing for $Hash. Querying VirusTotal..." -ForegroundColor Yellow
             try {
@@ -265,145 +383,154 @@
         }
     }
 
-    # --- PROCESSING LOOPS ---
+    # --- PROCESSING ---
     $script:QuotaHit = $false
 
-    # 1. Unverified Baseline
-    Write-Host "`nIterating Through Unverified Baseline..." -ForegroundColor DarkCyan
-    foreach ($proc in $unverifiedProcsBaseline) {
-        if ($script:QuotaHit) { break }
-        $fileHash = $proc.value[2]
-        if (-not $fileHash) { continue }
-        Process-Hash -Hash $fileHash -MainPath $mainUnverified -BehaviorsPath $behaviorsUnverified
-    }
-
-    # 2. Windows Unsigned Baseline
-    Write-Host "`nIterating Through Windows Unsigned Baseline..." -ForegroundColor DarkCyan
-    foreach ($proc in $unsignedWinProcsBaseline) {
-        if ($script:QuotaHit) { break }
-        $fileHash = $proc.value[2]
-        if (-not $fileHash) { continue }
-        Process-Hash -Hash $fileHash -MainPath $mainUnsignedWin -BehaviorsPath $behaviorsUnsignedWin
-    }
-
-    # 3. Linux Unsigned Baseline
-    Write-Host "`nIterating Through Linux Unsigned Baseline..." -ForegroundColor DarkCyan
-    foreach ($proc in $unsignedLinuxProcsBaseline) {
-        if ($script:QuotaHit) { break }
-        $fileHash = $proc.value[2]
-        if (-not $fileHash) { continue }
-        Process-Hash -Hash $fileHash -MainPath $mainUnsignedLinux -BehaviorsPath $behaviorsUnsignedLinux
-    }
-
-    # 4. Signed Verified Baseline
-    Write-Host "`nIterating Through SignedVerified Baseline..." -ForegroundColor DarkCyan
-    foreach ($proc in $signedVerifiedProcsBaseline) {
-        if ($script:QuotaHit) { break }
-        $fileHash = $proc.value[2]
-        if (-not $fileHash) { continue }
-        Process-Hash -Hash $fileHash -MainPath $mainSignedVerified -BehaviorsPath $behaviorsSignedVerified
-    }
-
-    # 4b. NSRL Windows - VT signature check routes to SignedVerified, unverified, or unsignedWin
-    Write-Host "`nIterating Through NSRL Windows Hashes..." -ForegroundColor DarkCyan
-    foreach ($fileHash in $nsrlWindowsHashes) {
-        if ($script:QuotaHit) { break }
-        if ($missingHashes.Contains($fileHash)) { continue }
-
-        # Locate existing main report (if any) and the matching behaviors folder
-        $existingBehPath = $null
-        foreach ($pair in @(
-            @($mainSignedVerified, $behaviorsSignedVerified),
-            @($mainUnverified,     $behaviorsUnverified),
-            @($mainUnsignedWin,    $behaviorsUnsignedWin)
-        )) {
-            if (Test-Path (Join-Path $pair[0] "$fileHash.json")) {
-                $existingBehPath = $pair[1]
-                break
-            }
+    if ($doProcs) {
+        Write-Host "`nIterating Through Unverified Baseline..." -ForegroundColor DarkCyan
+        foreach ($proc in $unverifiedProcsBaseline) {
+            if ($script:QuotaHit) { break }
+            $h = $proc.value[2]; if (-not $h) { continue }
+            $p = Get-DestPaths -Hash $h -Sig 'unverified'
+            Process-Hash -Hash $h -MainPath $p.Main -BehaviorsPath $p.Beh
         }
 
-        if ($existingBehPath) {
-            # Main already cached - only fetch behaviors if missing
-            $behFile = Join-Path $existingBehPath "$fileHash.json"
-            if (Test-Path $behFile) { continue }
+        Write-Host "`nIterating Through Windows Unsigned Baseline..." -ForegroundColor DarkCyan
+        foreach ($proc in $unsignedWinProcsBaseline) {
+            if ($script:QuotaHit) { break }
+            $h = $proc.value[2]; if (-not $h) { continue }
+            $p = Get-DestPaths -Hash $h -Sig 'unsignedWin'
+            Process-Hash -Hash $h -MainPath $p.Main -BehaviorsPath $p.Beh
+        }
+
+        Write-Host "`nIterating Through Linux Unsigned Baseline..." -ForegroundColor DarkCyan
+        foreach ($proc in $unsignedLinuxProcsBaseline) {
+            if ($script:QuotaHit) { break }
+            $h = $proc.value[2]; if (-not $h) { continue }
+            $p = Get-DestPaths -Hash $h -Sig 'unsignedLinux'
+            Process-Hash -Hash $h -MainPath $p.Main -BehaviorsPath $p.Beh
+        }
+
+        Write-Host "`nIterating Through SignedVerified Baseline..." -ForegroundColor DarkCyan
+        foreach ($proc in $signedVerifiedProcsBaseline) {
+            if ($script:QuotaHit) { break }
+            $h = $proc.value[2]; if (-not $h) { continue }
+            $p = Get-DestPaths -Hash $h -Sig 'SignedVerified'
+            Process-Hash -Hash $h -MainPath $p.Main -BehaviorsPath $p.Beh
+        }
+    }
+
+    if ($doNSRL) {
+        Write-Host "`nIterating Through NSRL Windows Hashes$(if($OsFilter){" (filter: $OsFilter)"})..." -ForegroundColor DarkCyan
+        foreach ($entry in $nsrlWindowsEntries) {
+            if ($script:QuotaHit) { break }
+            $h  = $entry.Hash
+            $os = $entry.OsName
+            if ($Mode -eq 'NSRLOs' -and $os -ne $OsFilter) { continue }
+            if ($missingHashes.Contains($h)) { continue }
+
+            $slug = Get-NSRLOsSlug $os
+            $sigOrder = @('SignedVerified','unverified','unsignedWin')
+
+            $existingBehPath = $null
+            foreach ($sig in $sigOrder) {
+                if (Test-Path (Join-Path (Join-Path $nsrlMain (Join-Path $slug $sig)) "$h.json")) {
+                    $existingBehPath = Join-Path $nsrlBeh (Join-Path $slug $sig)
+                    break
+                }
+            }
+
+            if ($existingBehPath) {
+                $behFile = Join-Path $existingBehPath "$h.json"
+                if (Test-Path $behFile) { continue }
+                if (-not (Test-Path $existingBehPath)) { New-Item -ItemType Directory -Path $existingBehPath -Force | Out-Null }
+                try {
+                    $beh = Invoke-VTRequest -Uri "https://www.virustotal.com/api/v3/files/$h/behaviour_summary"
+                    $beh | ConvertTo-Json -Depth 10 | Set-Content $behFile
+                    Write-Host "  [OK] $h behaviors (main was cached)" -ForegroundColor Green
+                } catch {
+                    $code = $null; try { $code = $_.Exception.Response.StatusCode.value__ } catch {}
+                    if ($_.Exception.Message -like 'VT_ALL_KEYS_EXHAUSTED*') {
+                        Write-Host "  [!] $($_.Exception.Message)" -ForegroundColor Red
+                        $script:QuotaHit = $true
+                    } else {
+                        Write-Host "  [WARN] Behaviors unavailable for $h (HTTP $code)" -ForegroundColor DarkGray
+                    }
+                }
+                continue
+            }
+
             try {
-                $beh = Invoke-VTRequest -Uri "https://www.virustotal.com/api/v3/files/$fileHash/behaviour_summary"
-                $beh | ConvertTo-Json -Depth 10 | Set-Content $behFile
-                Write-Host "  [OK] $fileHash behaviors (main was cached)" -ForegroundColor Green
+                $vtData      = Invoke-VTRequest -Uri "https://www.virustotal.com/api/v3/files/$h"
+                $sigInfo     = $vtData.data.attributes.signature_info
+                $sigVerified = if ($sigInfo) { $sigInfo.verified } else { $null }
+                $destSig = if ([string]::IsNullOrEmpty($sigVerified)) { 'unsignedWin' }
+                           elseif ($sigVerified -eq 'Signed')          { 'SignedVerified' }
+                           else                                         { 'unverified' }
+                $destMain = Join-Path $nsrlMain (Join-Path $slug $destSig)
+                $destBeh  = Join-Path $nsrlBeh  (Join-Path $slug $destSig)
+                if (-not (Test-Path $destMain)) { New-Item -ItemType Directory -Path $destMain -Force | Out-Null }
+                if (-not (Test-Path $destBeh))  { New-Item -ItemType Directory -Path $destBeh  -Force | Out-Null }
+                $vtData | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $destMain "$h.json")
+                Write-Host "  [OK] $h -> NSRL/$slug/$destSig" -ForegroundColor Green
+
+                try {
+                    $beh = Invoke-VTRequest -Uri "https://www.virustotal.com/api/v3/files/$h/behaviour_summary"
+                    $beh | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $destBeh "$h.json")
+                } catch {
+                    if ($_.Exception.Message -like 'VT_ALL_KEYS_EXHAUSTED*') {
+                        Write-Host "  [!] $($_.Exception.Message)" -ForegroundColor Red
+                        $script:QuotaHit = $true
+                    } else {
+                        Write-Host "  [WARN] Behaviors unavailable for $h" -ForegroundColor DarkGray
+                    }
+                }
             } catch {
-                $code = $null
-                try { $code = $_.Exception.Response.StatusCode.value__ } catch {}
+                $code = $null; try { $code = $_.Exception.Response.StatusCode.value__ } catch {}
                 if ($_.Exception.Message -like 'VT_ALL_KEYS_EXHAUSTED*') {
                     Write-Host "  [!] $($_.Exception.Message)" -ForegroundColor Red
                     $script:QuotaHit = $true
+                } elseif ($code -eq 404) {
+                    Write-Host "  [404] $h not in VT." -ForegroundColor DarkGray
+                    [void]$missingHashes.Add($h)
+                    [PSCustomObject]@{ Hash = $h; DateChecked = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ") } |
+                        Export-Csv -Path $missingHashesPath -Append -NoTypeInformation
                 } else {
-                    Write-Host "  [WARN] Behaviors unavailable for $fileHash (HTTP $code)" -ForegroundColor DarkGray
+                    Write-Host "  [ERROR] HTTP $code - $($_.Exception.Message)" -ForegroundColor Red
                 }
             }
-            continue
         }
 
-        try {
-            $vtData  = Invoke-VTRequest -Uri "https://www.virustotal.com/api/v3/files/$fileHash"
-            $sigInfo    = $vtData.data.attributes.signature_info
-            $sigVerified = if ($sigInfo) { $sigInfo.verified } else { $null }
-            $destMain, $destBeh, $label = if ([string]::IsNullOrEmpty($sigVerified)) {
-                $mainUnsignedWin,    $behaviorsUnsignedWin,    'unsignedWin'
-            } elseif ($sigVerified -eq "Signed") {
-                $mainSignedVerified, $behaviorsSignedVerified, 'SignedVerified'
-            } else {
-                $mainUnverified,     $behaviorsUnverified,     'unverified'
-            }
-
-            $vtData | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $destMain "$fileHash.json")
-            Write-Host "  [OK] $fileHash -> $label" -ForegroundColor Green
-
-            try {
-                $beh = Invoke-VTRequest -Uri "https://www.virustotal.com/api/v3/files/$fileHash/behaviour_summary"
-                $beh | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $destBeh "$fileHash.json")
-            } catch { Write-Host "  [WARN] Behaviors unavailable for $fileHash" -ForegroundColor DarkGray }
-
-        } catch {
-            $code = $null
-            try { $code = $_.Exception.Response.StatusCode.value__ } catch {}
-            if ($_.Exception.Message -like 'VT_ALL_KEYS_EXHAUSTED*') {
-                Write-Host "  [!] $($_.Exception.Message)" -ForegroundColor Red
-                $script:QuotaHit = $true
-            } elseif ($code -eq 404) {
-                Write-Host "  [404] $fileHash not in VT." -ForegroundColor DarkGray
-                [void]$missingHashes.Add($fileHash)
-                [PSCustomObject]@{ Hash = $fileHash; DateChecked = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ") } |
-                    Export-Csv -Path $missingHashesPath -Append -NoTypeInformation
-            } else {
-                Write-Host "  [ERROR] HTTP $code - $($_.Exception.Message)" -ForegroundColor Red
-            }
+        Write-Host "`nIterating Through NSRL Linux Hashes$(if($OsFilter){" (filter: $OsFilter)"})..." -ForegroundColor DarkCyan
+        foreach ($entry in $nsrlLinuxEntries) {
+            if ($script:QuotaHit) { break }
+            $h  = $entry.Hash
+            $os = $entry.OsName
+            if ($Mode -eq 'NSRLOs' -and $os -ne $OsFilter) { continue }
+            $slug = Get-NSRLOsSlug $os
+            $destMain = Join-Path $nsrlMain (Join-Path $slug 'unsignedLinux')
+            $destBeh  = Join-Path $nsrlBeh  (Join-Path $slug 'unsignedLinux')
+            Process-Hash -Hash $h -MainPath $destMain -BehaviorsPath $destBeh
         }
     }
 
-    # 4c. NSRL Linux - always unsignedLinux (no Authenticode signing on Linux)
-    Write-Host "`nIterating Through NSRL Linux Hashes..." -ForegroundColor DarkCyan
-    foreach ($fileHash in $nsrlLinuxHashes) {
-        if ($script:QuotaHit) { break }
-        Process-Hash -Hash $fileHash -MainPath $mainUnsignedLinux -BehaviorsPath $behaviorsUnsignedLinux
+    if ($doMalicious) {
+        Write-Host "`nIterating Through Malicious Baseline..." -ForegroundColor DarkCyan
+        foreach ($proc in $maliciousProcsBaseline) {
+            if ($script:QuotaHit) { break }
+            $h = $proc.value[2]; if (-not $h) { continue }
+            Process-Hash -Hash $h -MainPath $maliciousMain -BehaviorsPath $maliciousBeh
+        }
     }
 
-    # 5. Malicious Baseline (written to separate \malicious subfolder - never mixed with known-good)
-    Write-Host "`nIterating Through Malicious Baseline..." -ForegroundColor DarkCyan
-    foreach ($proc in $maliciousProcsBaseline) {
-        if ($script:QuotaHit) { break }
-        $fileHash = $proc.value[2]
-        if (-not $fileHash) { continue }
-        Process-Hash -Hash $fileHash -MainPath $mainMalicious -BehaviorsPath $behaviorsMalicious
-    }
-
-    # 6. Drivers Baseline
-    Write-Host "`nIterating Through Drivers Baseline..." -ForegroundColor DarkCyan
-    foreach ($proc in $driversBaseline) {
-        if ($script:QuotaHit) { break }
-        $fileHash = $proc.value[2]
-        if (-not $fileHash) { continue }
-        Process-Hash -Hash $fileHash -MainPath $mainDrivers -BehaviorsPath $behaviorsDrivers
+    if ($doDrivers) {
+        Write-Host "`nIterating Through Drivers Baseline..." -ForegroundColor DarkCyan
+        foreach ($proc in $driversBaseline) {
+            if ($script:QuotaHit) { break }
+            $h = $proc.value[2]; if (-not $h) { continue }
+            $p = Get-DestPaths -Hash $h -Sig 'drivers'
+            Process-Hash -Hash $h -MainPath $p.Main -BehaviorsPath $p.Beh
+        }
     }
 
     if ($script:QuotaHit) {
@@ -413,4 +540,4 @@
     }
 }
 
-Export-ModuleMember -Function Get-VTBaseline
+Export-ModuleMember -Function Get-VTBaseline, Get-NSRLOsSlug, Get-PlatformBaselineRoots

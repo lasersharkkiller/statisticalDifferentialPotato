@@ -1,0 +1,218 @@
+{
+    "data":  {
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1083",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get common file path",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "1"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1497.001",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "reference anti-VM strings targeting VirtualBox",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "4"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "signature_matches":  [
+                                           {
+                                               "id":  "0",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "resolve function by parsing PE exports",
+                                               "description":  "load-code/pe",
+                                               "authors":  [
+                                                               "sara-rn"
+                                                           ],
+                                               "match_data":  [
+                                                                  "mnemonic: movzx",
+                                                                  "loop"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: resolve function by parsing PE exports\n    namespace: load-code/pe\n    authors:\n      - sara-rn\n    scopes:\n      static: function\n      dynamic: unsupported  # requires characteristic, offset, mnemonic features\n    examples:\n      - 73CE04892E5F39EC82B00C02FC04C70F:0x406BA1\n  features:\n    - and:\n      - os: windows\n      - or:\n        - characteristic: loop\n        - mnemonic: movzx\n      - and:\n        - offset: 0x3C = IMAGE_DOS_HEADER.PE.e_lfanew\n        - or:\n          - and:\n            - arch: i386\n            - offset: 0x78 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n          - and:\n            - arch: amd64\n            - offset: 0x88 = offset to IMAGE_DATA_DIRECTORY[IMAGE_DIRECTORY_ENTRY_EXPORT]\n        - 3 or more:\n          - offset: 0x14 = IMAGE_EXPORT_DIRECTORY.NumberOfFunctions\n          - offset: 0x24 = IMAGE_EXPORT_DIRECTORY.AddressOfNameOrdinals\n          - offset: 0x20 = IMAGE_EXPORT_DIRECTORY.AddressOfNames\n          - offset: 0x18 = IMAGE_EXPORT_DIRECTORY.NumberOfNames\n          - offset: 0x1C = IMAGE_EXPORT_DIRECTORY.AddressOfFunctions\n      - optional:\n        - or:\n          - api: LoadLibrary\n          - api: strcmp\n"
+                                           },
+                                           {
+                                               "id":  "1",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get common file path",
+                                               "description":  "host-interaction/file-system",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetTempFileName",
+                                                                  "api: GetWindowsDirectory",
+                                                                  "api: GetTempPath"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get common file path\n    namespace: host-interaction/file-system\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::File and Directory Discovery [T1083]\n    mbc:\n      - Discovery::File and Directory Discovery [E1083]\n    examples:\n      - Practical Malware Analysis Lab 03-02.dll_:0x10003415\n      - 972B219F18379907A045431303F4DA7D:0x404887\n  features:\n    - or:\n      - api: kernel32.GetTempPath\n      - api: kernel32.GetTempFileName\n      - api: kernel32.GetSystemDirectory\n      - api: kernel32.GetWindowsDirectory\n      - api: kernel32.GetSystemWow64Directory\n      - api: GetAllUsersProfileDirectory\n      - api: GetAppContainerFolderPath\n      - api: GetCurrentDirectory\n      - api: GetDefaultUserProfileDirectory\n      - api: GetProfilesDirectory\n      - api: GetUserProfileDirectory\n      - api: SHGetFolderPathAndSubDir\n      - api: shell32.SHGetFolderPath\n      - api: shell32.SHGetFolderLocation\n      - api: shell32.SHGetKnownFolderPath\n      - api: shell32.SHGetSpecialFolderPath\n      - api: shell32.SHGetSpecialFolderLocation\n      - api: System.IO.Directory::GetCurrentDirectory\n      - api: System.Environment::GetFolderPath\n      - property/read: System.Environment::SystemDirectory\n      - property/read: System.Environment::CurrentDirectory\n"
+                                           },
+                                           {
+                                               "id":  "2",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "contains PDB path",
+                                               "description":  "executable/pe/pdb",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "regex: /:\\\\.*\\.pdb/"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: contains PDB path\n    namespace: executable/pe/pdb\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    examples:\n      - 464EF2CA59782CE697BC329713698CCC  # level32.exe\n  features:\n    - string: /:\\\\.*\\.pdb/\n"
+                                           },
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "linked against ZLIB",
+                                               "description":  "linking/static/zlib",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "regex: /inflate .* Copyright/"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: linked against ZLIB\n    namespace: linking/static/zlib\n    authors:\n      - william.ballenthin@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    mbc:\n      - Data::Compression Library [C0060]\n    examples:\n      - 6cc148363200798a12091b97a17181a1\n  features:\n    - or:\n      - string: /deflate .* Copyright/\n      - string: /inflate .* Copyright/\n"
+                                           },
+                                           {
+                                               "id":  "4",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "reference anti-VM strings targeting VirtualBox",
+                                               "description":  "anti-analysis/anti-vm/vm-detection",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "regex: /Oracle Corporation/i"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: reference anti-VM strings targeting VirtualBox\n    namespace: anti-analysis/anti-vm/vm-detection\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    att\u0026ck:\n      - Defense Evasion::Virtualization/Sandbox Evasion::System Checks [T1497.001]\n    mbc:\n      - Anti-Behavioral Analysis::Virtual Machine Detection [B0009]\n    references:\n      - https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/AntiVM/VirtualBox.cpp\n    examples:\n      - al-khaser_x86.exe_\n  features:\n    - or:\n      - string: /VBOX/i\n      - string: /VEN_VBOX/i\n      - string: /VirtualBox/i\n      - string: /06/23/99/i\n      - string: /HARDWARE\\\\ACPI\\\\DSDT\\\\VBOX__/i\n      - string: /HARDWARE\\\\ACPI\\\\FADT\\\\VBOX__/i\n      - string: /HARDWARE\\\\ACPI\\\\RSDT\\\\VBOX__/i\n      - string: /SOFTWARE\\\\Oracle\\\\VirtualBox Guest Additions/i\n      - string: /SYSTEM\\\\(ControlSet\\d{3}|CurrentControlSet)\\\\Services\\\\VBoxGuest/i\n      - string: /SYSTEM\\\\(ControlSet\\d{3}|CurrentControlSet)\\\\Services\\\\VBoxMouse/i\n      - string: /SYSTEM\\\\(ControlSet\\d{3}|CurrentControlSet)\\\\Services\\\\VBoxService/i\n      - string: /SYSTEM\\\\(ControlSet\\d{3}|CurrentControlSet)\\\\Services\\\\VBoxSF/i\n      - string: /SYSTEM\\\\(ControlSet\\d{3}|CurrentControlSet)\\\\Services\\\\VBoxVideo/i\n      - string: /VBoxMouse\\.sys/i\n      - string: /VBoxGuest\\.sys/i\n      - string: /VBoxSF\\.sys/i\n      - string: /VBoxVideo\\.sys/i\n      - string: /vboxdisp\\.dll/i\n      - string: /vboxhook\\.dll/i\n      - string: /vboxmrxnp\\.dll/i\n      - string: /vboxogl\\.dll/i\n      - string: /vboxoglarrayspu\\.dll/i\n      - string: /vboxoglcrutil\\.dll/i\n      - string: /vboxoglerrorspu\\.dll/i\n      - string: /vboxoglfeedbackspu\\.dll/i\n      - string: /vboxoglpackspu\\.dll/i\n      - string: /vboxoglpassthroughspu\\.dll/i\n      - string: /vboxservice\\.exe/i\n      - string: /vboxtray\\.exe/i\n      - string: /VBoxControl\\.exe/i\n      - string: /oracle\\\\virtualbox guest additions\\\\/i\n      - string: /\\\\\\\\\\.\\\\VBoxMiniRdrDN/i\n      - string: /\\\\\\\\\\.\\\\VBoxGuest/i\n      - string: /\\\\\\\\\\.\\\\pipe\\\\VBoxMiniRdDN/i\n      - string: /\\\\\\\\\\.\\\\VBoxTrayIPC/i\n      - string: /\\\\\\\\\\.\\\\pipe\\\\VBoxTrayIPC/i\n      - string: /VBoxTrayToolWndClass/i\n      - string: /VBoxTrayToolWnd/i\n      - string: /vboxvideo/i\n      - string: /VBoxVideoW8/i\n      - string: /VBoxWddm/i\n      - string: /PCI\\\\VEN_80EE\u0026DEV_CAFE/i\n      - string: /82801FB/i\n      - string: /82441FX/i\n      - string: /82371SB/i\n      - string: /OpenHCD/i\n      - string: /ACPIBus_BUS_0/i\n      - string: /PCI_BUS_0/i\n      - string: /PNP_BUS_0/i\n      - string: /Oracle Corporation/i\n      - string: /VBoxWdd/i\n      - string: /VBoxS/i\n        description: VirtualBox Shared Folders\n      - string: /VBoxMouse/i\n        description: VirtualBox Guest Mouse\n      - string: /VBoxGuest/i\n        description: VirtualBox Guest Driver\n      - string: /VBoxVBoxVBox/i\n      - string: /innotek GmbH/i\n      - string: /drivers\\\\vboxdrv/i\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/AntiVM/VirtualBox.cpp"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "6",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "check HTTP status code",
+                                               "description":  "communication/http/client",
+                                               "authors":  [
+                                                               "@mr-tz"
+                                                           ],
+                                               "match_data":  [
+                                                                  "mnemonic: cmp",
+                                                                  "OK",
+                                                                  "HTTP_QUERY_STATUS_CODE"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: check HTTP status code\n    namespace: communication/http/client\n    authors:\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: unsupported  # requires mnemonic features\n    mbc:\n      - Communication::HTTP Communication::Read Header [C0002.014]\n    examples:\n      - 54ac78733552a62d1d05ea4ba3fc604bb49fe000d7fc948da45335b726e64d75:0x10001a20\n      - Practical Malware Analysis Lab 03-02.dll_:0x10004452\n  features:\n    - and:\n      - os: windows\n      - or:\n        - number: 0x20000013 = HTTP_QUERY_FLAG_NUMBER | HTTP_QUERY_STATUS_CODE\n        - number: 0x13 = HTTP_QUERY_STATUS_CODE\n      - optional:\n        - api: atoi\n        - api: wininet.HttpQueryInfo\n      - instruction:\n        - and:\n          - or:\n            - mnemonic: cmp\n            - mnemonic: test\n          - or:\n            - number: 200 = OK\n            - number: 400 = Bad Request\n            - number: 401 = Unauthorized\n            - number: 403 = Forbidden\n            - number: 404 = Not Found\n"
+                                           },
+                                           {
+                                               "id":  "7",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "read .ini file",
+                                               "description":  "host-interaction/file-system/read",
+                                               "authors":  [
+                                                               "@_re_fox",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: GetPrivateProfileString"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: read .ini file\n    namespace: host-interaction/file-system/read\n    authors:\n      - \"@_re_fox\"\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - File System::Read File [C0051]\n    examples:\n      - 1d8fd13c890060464019c0f07b928b1a:0x401070\n      - E6234FB98F17201C232F4502015B47B3:0x701312FA\n  features:\n    - and:\n      - or:\n        - api: GetPrivateProfileInt\n        - api: GetPrivateProfileString\n        - api: GetPrivateProfileStruct\n        - api: GetPrivateProfileSection\n        - api: GetPrivateProfileSectionNames\n      - optional:\n        - string: /\\.ini/i\n        - api: GetFullPathName\n"
+                                           }
+                                       ],
+                 "mbc":  [
+                             {
+                                 "id":  "E1083",
+                                 "objective":  "Discovery",
+                                 "behavior":  "File and Directory Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "1"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0060",
+                                 "objective":  "Data",
+                                 "behavior":  "Compression Library",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "3"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0009",
+                                 "objective":  "Anti-Behavioral Analysis",
+                                 "behavior":  "Virtual Machine Detection",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "4"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0002.014",
+                                 "objective":  "Communication",
+                                 "behavior":  "HTTP Communication",
+                                 "method":  "Read Header",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "6"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0051",
+                                 "objective":  "File System",
+                                 "behavior":  "Read File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "7"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "attack_techniques":  {
+                                           "T1083":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get common file path",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "1"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1497.001":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "reference anti-VM strings targeting VirtualBox",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "4"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ]
+                                       }
+             }
+}

@@ -1,0 +1,392 @@
+{
+    "data":  {
+                 "mbc":  [
+                             {
+                                 "id":  "E1082",
+                                 "objective":  "Discovery",
+                                 "behavior":  "System Information Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "14"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "signature_matches":  [
+                                           {
+                                               "id":  "0",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "compiled to the .NET platform",
+                                               "description":  "runtime/dotnet",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: compiled to the .NET platform\n    namespace: runtime/dotnet\n    authors:\n      - william.ballenthin@mandiant.com\n    scopes:\n      static: file\n      dynamic: file\n    examples:\n      - b9f5bd514485fb06da39beff051b9fdc\n  features:\n    - or:\n      - format: dotnet\n      - import: mscoree._CorExeMain\n      - import: mscoree._corexemain\n      - import: mscoree._CorDllMain\n      - import: mscoree._cordllmain\n"
+                                           },
+                                           {
+                                               "id":  "1",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get session user name",
+                                               "description":  "host-interaction/session",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Security.Principal.WindowsIdentity::GetCurrent"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get session user name\n    namespace: host-interaction/session\n    authors:\n      - moritz.raabe@mandiant.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::System Owner/User Discovery [T1033]\n      - Discovery::Account Discovery [T1087]\n    examples:\n      - Practical Malware Analysis Lab 14-01.exe_:0x401285\n  features:\n    - or:\n      - api: advapi32.GetUserName\n      - api: secur32.GetUserNameEx\n      - basic block:\n        - and:\n          # - match: get session information (see #463)\n          - api: wtsapi32.WTSQuerySessionInformation\n          - number: 5 = WTSUserName\n      - call:\n        - and:\n          - api: wtsapi32.WTSQuerySessionInformation\n          - number: 5 = WTSUserName\n      - api: System.Security.Principal.WindowsIdentity::GetCurrent\n      - property/read: System.Environment::UserName\n"
+                                           },
+                                           {
+                                               "id":  "2",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "manipulate unmanaged memory in .NET",
+                                               "description":  "host-interaction/memory",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "class: System.Runtime.InteropServices.Marshal"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: manipulate unmanaged memory in .NET\n    namespace: host-interaction/memory\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: unsupported  # requires class features\n  features:\n    - or:\n      - class: System.Runtime.InteropServices.Marshal\n"
+                                           },
+                                           {
+                                               "id":  "4",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get domain controller name",
+                                               "description":  "host-interaction/network/domain : Looks for calls to Windows APIs that can be used to determine the name of the domain controller for a Windows domain that a computer is connected to.",
+                                               "authors":  [
+                                                               "awillia2@cisco.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: DsGetDcName",
+                                                                  "api: NetApiBufferFree"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get domain controller name\n    namespace: host-interaction/network/domain\n    authors:\n      - awillia2@cisco.com\n    description: Looks for calls to Windows APIs that can be used to determine the name of the domain controller for a Windows domain that a computer is connected to.\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::System Network Configuration Discovery [T1016]\n    references:\n      - https://docs.microsoft.com/en-us/windows/win32/api/lmaccess/nf-lmaccess-netgetdcname\n      - https://docs.microsoft.com/en-us/windows/win32/api/dsgetdc/nf-dsgetdc-dsgetdcnamea\n      - https://chuongdong.com/reverse%20engineering/2021/05/23/MountLockerRansomware/\n    examples:\n      - 3808f21e56dede99bc914d90aeabe47a:0x140007144\n  features:\n    - and:\n      - or:\n        - api: NetGetDCName\n        - api: DsGetDcName\n      - optional:\n        - api: NetApiBufferFree\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://docs.microsoft.com/en-us/windows/win32/api/lmaccess/nf-lmaccess-netgetdcname"
+                                                            },
+                                                            {
+                                                                "ref":  "https://docs.microsoft.com/en-us/windows/win32/api/dsgetdc/nf-dsgetdc-dsgetdcnamea"
+                                                            },
+                                                            {
+                                                                "ref":  "https://chuongdong.com/reverse%20engineering/2021/05/23/MountLockerRansomware/"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "5",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "unmanaged call",
+                                               "description":  "runtime : managed code calls unmanaged (native) code, often seen in .NET",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "rule_src":  "rule:\n  meta:\n    name: unmanaged call\n    namespace: runtime\n    authors:\n      - michael.hunhoff@mandiant.com\n    description: managed code calls unmanaged (native) code, often seen in .NET\n    scopes:\n      static: function\n      dynamic: unsupported\n  features:\n    - or:\n      - characteristic: unmanaged call\n      - match: unmanaged call via dynamic PInvoke in .NET\n      - api: System.Runtime.InteropServices.Marshal::GetDelegateForFunctionPointer\n"
+                                           },
+                                           {
+                                               "id":  "6",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "manipulate network credentials in .NET",
+                                               "description":  "communication/authentication",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Net.NetworkCredential::ctor"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: manipulate network credentials in .NET\n    namespace: communication/authentication\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n  features:\n    - and:\n      - api: System.Net.NetworkCredential::ctor\n"
+                                           },
+                                           {
+                                               "id":  "7",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "invoke .NET assembly method",
+                                               "description":  "load-code/dotnet",
+                                               "authors":  [
+                                                               "anushka.virgaonkar@mandiant.com",
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Reflection.ConstructorInfo::Invoke",
+                                                                  "api: System.Type::InvokeMember"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: invoke .NET assembly method\n    namespace: load-code/dotnet\n    authors:\n      - anushka.virgaonkar@mandiant.com\n      - mehunhoff@google.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Defense Evasion::Reflective Code Loading [T1620]\n  features:\n    - and:\n      - format: dotnet\n      - optional:\n        - api: System.Reflection.Module::GetMethod\n        - api: System.Reflection.Module::GetMethodImpl\n        - api: System.Reflection.Module::GetMethods\n        - api: System.Reflection.Module::ResolveMethod\n        - api: System.Type::GetMethod\n        - api: System.Type::GetMethodImpl\n        - api: System.Type::GetMethods\n      - or:\n        - api: System.Delegate::DynamicInvoke\n        - api: System.Delegate::DynamicInvokeImpl\n        - api: System.Type::InvokeMember\n        - api: System.Reflection.MethodInfo::Invoke\n        - api: System.Reflection.MethodBase::Invoke\n        - api: System.Reflection.ConstructorInfo::Invoke\n"
+                                           },
+                                           {
+                                               "id":  "8",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get domain information",
+                                               "description":  "host-interaction/network/domain : Detect collection of Windows domain information",
+                                               "authors":  [
+                                                               "awillia2@cisco.com",
+                                                               "anushka.virgaonkar@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.DirectoryServices.ActiveDirectory.Domain::GetComputerDomain",
+                                                                  "api: DsRoleGetPrimaryDomainInformation"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get domain information\n    namespace: host-interaction/network/domain\n    authors:\n      - awillia2@cisco.com\n      - anushka.virgaonkar@mandiant.com\n      - michael.hunhoff@mandiant.com\n    description: Detect collection of Windows domain information\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Network Configuration Discovery [T1016]\n    examples:\n      - 9B7CCAA2AE6A5B96E3110EBCBC4311F6:0x1001C184\n  features:\n    - or:\n      - api: netapi32.DsRoleGetPrimaryDomainInformation\n      - api: System.DirectoryServices.ActiveDirectory.Domain::GetComputerDomain\n      - property/read: System.Net.NetworkInformation.IPGlobalProperties::DomainName\n"
+                                           },
+                                           {
+                                               "id":  "9",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "allocate unmanaged memory in .NET",
+                                               "description":  "host-interaction/memory",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Runtime.InteropServices.Marshal::AllocHGlobal"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: allocate unmanaged memory in .NET\n    namespace: host-interaction/memory\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n  features:\n    - or:\n      - api: System.Runtime.InteropServices.Marshal::AllocHGlobal\n"
+                                           },
+                                           {
+                                               "id":  "10",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "access .NET resource",
+                                               "description":  "executable/resource",
+                                               "authors":  [
+                                                               "@mr-tz"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Resources.ResourceManager::ctor"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: access .NET resource\n    namespace: executable/resource\n    authors:\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: span of calls\n    examples:\n      - 387f15043f0198fd3a637b0758c2b6dde9ead795c3ed70803426fc355731b173:0x06000084\n  features:\n    - and:\n      - format: dotnet\n      - or:\n        - api: System.Resources.ResourceManager::ctor\n        - api: System.Reflection.Assembly::GetManifestResourceStream\n"
+                                           },
+                                           {
+                                               "id":  "12",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "impersonate user",
+                                               "description":  "host-interaction/user",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "99.elad.levi@gmail.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: LogonUser"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: impersonate user\n    namespace: host-interaction/user\n    authors:\n      - michael.hunhoff@mandiant.com\n      - 99.elad.levi@gmail.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Privilege Escalation::Access Token Manipulation::Token Impersonation/Theft [T1134.001]\n  features:\n    - or:\n      - api: advapi32.LogonUser\n      - and:\n        - api: userenv.LoadUserProfile\n        - optional:\n          - api: advapi32.GetUserName\n          - api: advapi32.GetUserNameEx\n      - and:\n        - api: advapi32.OpenProcessToken\n        - or:\n          - api: advapi32.DuplicateToken\n          - api: advapi32.DuplicateTokenEx\n        - api: advapi32.CreateProcessWithToken\n        - optional:\n          - match: acquire debug privileges\n          - match: enumerate processes\n"
+                                           },
+                                           {
+                                               "id":  "13",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "find data using regex in .NET",
+                                               "description":  "data-manipulation/regex",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: System.Text.RegularExpressions.Regex::Match",
+                                                                  "api: System.Text.RegularExpressions.Regex::ctor"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: find data using regex in .NET\n    namespace: data-manipulation/regex\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n  features:\n    - or:\n      - api: System.Text.RegularExpressions.Regex::Matches\n      - api: System.Text.RegularExpressions.Regex::Match\n      - api: System.Text.RegularExpressions.Regex::IsMatch\n      - api: System.Text.RegularExpressions.Regex::EnumerateMatches\n      - api: System.Text.RegularExpressions.Regex::Replace\n      - api: System.Text.RegularExpressions.Regex::Split\n      - api: System.Text.RegularExpressions.Regex::ctor\n"
+                                           },
+                                           {
+                                               "id":  "14",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get hostname",
+                                               "description":  "host-interaction/os/hostname",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "joakim@intezer.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "property: System.Environment::MachineName"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get hostname\n    namespace: host-interaction/os/hostname\n    authors:\n      - moritz.raabe@mandiant.com\n      - joakim@intezer.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Information Discovery [T1082]\n    mbc:\n      - Discovery::System Information Discovery [E1082]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x4052A0\n      - 7351f8a40c5450557b24622417fc478d:0x405438\n  features:\n    - or:\n      - api: kernel32.GetComputerName\n      - api: kernel32.GetComputerNameEx\n      - api: GetComputerObjectName\n      - api: ws2_32.gethostname\n      - api: gethostname\n      - property/read: System.Environment::MachineName\n"
+                                           }
+                                       ],
+                 "verdicts":  [
+                                  "UNKNOWN_VERDICT"
+                              ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1033",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get session user name",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "1"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1087",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get session user name",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "1"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1016",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get domain controller name",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "4"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1620",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "invoke .NET assembly method",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "7"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1016",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get domain information",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "8"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1134.001",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "impersonate user",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "12"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get hostname",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "14"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "processes_tree":  [
+                                        {
+                                            "process_id":  "2684",
+                                            "name":  "%CONHOST% \"1847393305-18402967451692838844566652171-9923532801862501311-635866540234281460"
+                                        },
+                                        {
+                                            "process_id":  "2900",
+                                            "name":  "wmiadap.exe /F /T /R"
+                                        },
+                                        {
+                                            "process_id":  "2940",
+                                            "name":  "%windir%\\system32\\wbem\\wmiprvse.exe"
+                                        },
+                                        {
+                                            "process_id":  "2616",
+                                            "name":  "%SANDBOX_DLL_LOADER_AMD64% %SAMPLEPATH% 483"
+                                        }
+                                    ],
+                 "processes_terminated":  [
+                                              "wmiadap.exe /F /T /R",
+                                              "%windir%\\System32\\svchost.exe -k WerSvcGroup"
+                                          ],
+                 "attack_techniques":  {
+                                           "T1033":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get session user name",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "1"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1087":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get session user name",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "1"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1016":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get domain controller name",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "4"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get domain information",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "8"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1620":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "invoke .NET assembly method",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "7"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1134.001":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "impersonate user",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "12"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1082":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get hostname",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "14"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ]
+                                       }
+             }
+}

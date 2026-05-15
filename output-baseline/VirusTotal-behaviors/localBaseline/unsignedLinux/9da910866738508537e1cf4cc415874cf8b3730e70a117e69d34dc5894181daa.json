@@ -1,0 +1,764 @@
+{
+    "data":  {
+                 "signature_matches":  [
+                                           {
+                                               "id":  "0",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create thread",
+                                               "description":  "host-interaction/thread/create",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "joakim@intezer.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: pthread_create"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create thread\n    namespace: host-interaction/thread/create\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n      - joakim@intezer.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: span of calls\n    mbc:\n      - Process::Create Thread [C0038]\n    examples:\n      - 946A99F36A46D335DEC080D9A4371940:0x10001DA0\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x408020\n  features:\n    - or:\n      - and:\n        - os: windows\n        - or:\n          - api: kernel32.CreateThread\n          - api: _beginthread\n          - api: _beginthreadex\n          - api: PsCreateSystemThread\n          - api: SHCreateThread\n          - api: SHCreateThreadWithHandle\n          - api: kernel32.CreateRemoteThread\n          - api: kernel32.CreateRemoteThreadEx\n          - api: RtlCreateUserThread\n          - api: ntdll.NtCreateThread\n          - api: ntdll.NtCreateThreadEx\n          - api: ntdll.ZwCreateThread\n          - api: ntdll.ZwCreateThreadEx\n      - and:\n        - or:\n          - os: linux\n          - os: android\n        - api: pthread_create\n      - and:\n        - api: System.Threading.Thread::Start\n        - optional:\n          - api: System.Threading.Thread::ctor\n"
+                                           },
+                                           {
+                                               "id":  "2",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create raw socket",
+                                               "description":  "communication/socket",
+                                               "authors":  [
+                                                               "blas.kojusner@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "SOCK_RAW",
+                                                                  "AF_INET",
+                                                                  "api: socket"
+                                                              ],
+                                               "rule_src":  "# generated using capa explorer for IDA Pro\nrule:\n  meta:\n    name: create raw socket\n    namespace: communication/socket\n    authors:\n      - blas.kojusner@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - Communication::Socket Communication::Create Socket [C0001.003]\n    references:\n      - https://learn.microsoft.com/en-us/windows/win32/winsock/tcp-ip-raw-sockets-2\n      - https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-socket\n      - https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsasocketa\n    examples:\n      - 10EBCF8C20403457A08762200015B151:0x140001000\n  features:\n    - and:\n      - or:\n        - api: socket\n        - api: ws2_32.#23 = socket\n        - api: ws2_32.WSASocket\n        - api: ws2_32.#82 = WSASocketA\n        - api: ws2_32.#83 = WSASocketW\n      - or:\n        - number: 2 = AF_INET\n        - number: 23 = AF_INET6\n      - number: 3 = SOCK_RAW\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://learn.microsoft.com/en-us/windows/win32/winsock/tcp-ip-raw-sockets-2"
+                                                            },
+                                                            {
+                                                                "ref":  "https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-socket"
+                                                            },
+                                                            {
+                                                                "ref":  "https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsasocketa"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "3",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "write and execute a file",
+                                               "description":  "communication/c2/file-transfer",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "host-interaction/process/create",
+                                                                  "api: fprintf",
+                                                                  "api: fwrite"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: write and execute a file\n    namespace: communication/c2/file-transfer\n    maec/malware-category: launcher\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Execution::Install Additional Program [B0023]\n    examples:\n      - 9324D1A8AE37A36AE560C37448C9705A:0x403A40\n      - Practical Malware Analysis Lab 01-04.exe_:0x4011FC\n  features:\n    - and:\n      - match: host-interaction/file-system/write\n      - match: host-interaction/process/create\n"
+                                           },
+                                           {
+                                               "id":  "4",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "execute command",
+                                               "description":  "host-interaction/process/create",
+                                               "authors":  [
+                                                               "@mr-tz"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: system"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: execute command\n    namespace: host-interaction/process/create\n    authors:\n      - \"@mr-tz\"\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Process::Create Process [C0017]\n    examples:\n      - e353d3fbfb5c3738a77a622adff9a416:0x401626\n  features:\n    - or:\n      - api: system\n      - api: _system\n      - api: wsystem\n      - api: _wsystem\n"
+                                           },
+                                           {
+                                               "id":  "5",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get current PID on Linux",
+                                               "description":  "host-interaction/process",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: getpid",
+                                                                  "api: getppid"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get current PID on Linux\n    namespace: host-interaction/process\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n  features:\n    - and:\n      - or:\n        - os: linux\n        - os: android\n      - or:\n        - api: getpid\n        - api: getppid\n"
+                                           },
+                                           {
+                                               "id":  "6",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "delete file on Linux",
+                                               "description":  "host-interaction/file-system/delete",
+                                               "authors":  [
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: unlink"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: delete file on Linux\n    namespace: host-interaction/file-system/delete\n    authors:\n      - mehunhoff@google.com\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - File System::Delete File [C0047]\n  features:\n    - and:\n      - or:\n        - os: linux\n        - os: android\n      - or:\n        - api: unlink\n        - api: unlinkat\n"
+                                           },
+                                           {
+                                               "id":  "8",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "get kernel version",
+                                               "description":  "host-interaction/os/version",
+                                               "authors":  [
+                                                               "joakim@intezer.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: uname"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: get kernel version\n    namespace: host-interaction/os/version\n    authors:\n      - joakim@intezer.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Discovery::System Information Discovery [T1082]\n    examples:\n      - 7351f8a40c5450557b24622417fc478d:0x405438\n  features:\n    - and:\n      - os: linux\n      - or:\n        - api: uname\n        - and:\n          - api: system\n          - string: \"uname\"\n"
+                                           },
+                                           {
+                                               "id":  "9",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "receive data on socket",
+                                               "description":  "communication/socket/receive",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "joakim@intezer.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: recvfrom"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: receive data on socket\n    namespace: communication/socket/receive\n    authors:\n      - moritz.raabe@mandiant.com\n      - joakim@intezer.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Communication::Socket Communication::Receive Data [C0001.006]\n    examples:\n      - Practical Malware Analysis Lab 01-01.dll_:0x10001010\n  features:\n    - or:\n      - api: recv\n      - api: ws2_32.recv\n      - api: ws2_32.#16 = recv\n      - api: ws2_32.recvfrom\n      - api: ws2_32.#17 = recvfrom\n      - api: ws2_32.WSARecv\n      - api: ws2_32.#71 = WSARecv\n      - api: ws2_32.WSARecvDisconnect\n      - api: ws2_32.#72 = WSARecvDisconnect\n      - api: ws2_32.WSARecvEx\n      - api: ws2_32.WSARecvFrom\n      - api: ws2_32.#73 = WSARecvFrom\n      - api: ws2_32.WSARecvMsg\n      - api: recvmsg\n      - api: System.Net.Sockets.Socket::Receive\n      - api: System.Net.Sockets.Socket::ReceiveAsync\n      - api: System.Net.Sockets.Socket::ReceiveFrom\n      - api: System.Net.Sockets.Socket::ReceiveFromAsync\n      - api: System.Net.Sockets.Socket::ReceiveMessageFrom\n      - api: System.Net.Sockets.Socket::ReceiveMessageFromAsync\n      - api: System.Net.Sockets.Socket::BeginReceive\n      - api: System.Net.Sockets.Socket::BeginReceiveFrom\n      - api: System.Net.Sockets.Socket::BeginReceiveMessageFrom\n      - api: System.Net.Sockets.Socket::EndReceive\n      - api: System.Net.Sockets.Socket::EndReceiveFrom\n      - api: System.Net.Sockets.Socket::EndReceiveMessageFrom\n"
+                                           },
+                                           {
+                                               "id":  "10",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create process on Linux",
+                                               "description":  "host-interaction/process/create",
+                                               "authors":  [
+                                                               "joakim@intezer.com",
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: fork",
+                                                                  "api: popen"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create process on Linux\n    namespace: host-interaction/process/create\n    authors:\n      - joakim@intezer.com\n      - mehunhoff@google.com\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - Process::Create Process [C0017]\n    examples:\n      - 7351f8a40c5450557b24622417fc478d:0x40236D\n  features:\n    - and:\n      - or:\n        - os: linux\n        - os: android\n      - or:\n        - api: execve\n        - and:\n          - match: execute syscall\n          - arch: aarch64\n          - number: 0xdd = execve\n        - api: execl\n        - api: execlp\n        - api: execle\n        - api: execv\n        - api: execvp\n        - api: execvpe\n        - api: posix_spawn\n        - api: posix_spawnp\n        - api: popen\n        - api: fork\n"
+                                           },
+                                           {
+                                               "id":  "11",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "link function at runtime on Linux",
+                                               "description":  "linking/runtime-linking",
+                                               "authors":  [
+                                                               "joakim@intezer.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: dlsym"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: link function at runtime on Linux\n    namespace: linking/runtime-linking\n    authors:\n      - joakim@intezer.com\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Execution::Shared Modules [T1129]\n  features:\n    - and:\n      - or:\n        - os: linux\n        - os: android\n      - or:\n        - api: dlsym\n        - api: dlvsym\n"
+                                           },
+                                           {
+                                               "id":  "12",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "communicate with kernel module via Netlink socket on Linux",
+                                               "description":  "host-interaction/kernel : Netlink is used to transfer information between the kernel and user-space processes (https://man7.org/linux/man-pages/man7/netlink.7.html)",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "AF_NETLINK",
+                                                                  "api: socket"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: communicate with kernel module via Netlink socket on Linux\n    namespace: host-interaction/kernel\n    authors:\n      - michael.hunhoff@mandiant.com\n    description: Netlink is used to transfer information between the kernel and user-space processes (https://man7.org/linux/man-pages/man7/netlink.7.html)\n    scopes:\n      static: basic block\n      dynamic: call\n  features:\n    - and:\n      - os: linux\n      - api: socket\n      - number: 0x10 = AF_NETLINK\n"
+                                           },
+                                           {
+                                               "id":  "13",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "read file on Linux",
+                                               "description":  "host-interaction/file-system/read",
+                                               "authors":  [
+                                                               "joakim@intezer.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: fscanf",
+                                                                  "api: open",
+                                                                  "create or open file"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: read file on Linux\n    namespace: host-interaction/file-system/read\n    authors:\n      - joakim@intezer.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - File System::Read File [C0051]\n    examples:\n      - 7351f8a40c5450557b24622417fc478d:0x4059AD\n  features:\n    - and:\n      - or:\n        - os: linux\n        - os: android\n      - optional:\n        - match: create or open file\n      - or:\n        - api: fgetc\n        - api: fgets\n        - api: getc\n        - api: getchar\n        - api: read\n        - api: getline\n        - api: getdelim\n        - api: fgetwc\n        - api: getwc\n        - api: fscanf\n        - api: vfscanf\n        - api: fread\n"
+                                           },
+                                           {
+                                               "id":  "14",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "contain obfuscated stackstrings",
+                                               "description":  "anti-analysis/obfuscation/string/stackstring",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "stack string"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: contain obfuscated stackstrings\n    namespace: anti-analysis/obfuscation/string/stackstring\n    authors:\n      - moritz.raabe@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: unsupported\n    att\u0026ck:\n      - Defense Evasion::Obfuscated Files or Information::Indicator Removal from Tools [T1027.005]\n    mbc:\n      - Anti-Static Analysis::Executable Code Obfuscation::Argument Obfuscation [B0032.020]\n      - Anti-Static Analysis::Executable Code Obfuscation::Stack Strings [B0032.017]\n    examples:\n      - Practical Malware Analysis Lab 16-03.exe_:0x4013D0\n  features:\n    - characteristic: stack string\n"
+                                           },
+                                           {
+                                               "id":  "15",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "send data on socket",
+                                               "description":  "communication/socket/send",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "joakim@intezer.com",
+                                                               "anushka.virgaonkar@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: sendto"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: send data on socket\n    namespace: communication/socket/send\n    authors:\n      - moritz.raabe@mandiant.com\n      - joakim@intezer.com\n      - anushka.virgaonkar@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Communication::Socket Communication::Send Data [C0001.007]\n    examples:\n      - Practical Malware Analysis Lab 01-01.dll_:0x10001010\n  features:\n    - or:\n      - api: send\n      - api: ws2_32.send\n      - api: ws2_32.#19 = send\n      - api: ws2_32.sendto\n      - api: ws2_32.#20 = sendto\n      - api: ws2_32.WSASend\n      - api: ws2_32.#76 = WSASend\n      - api: ws2_32.WSASendMsg\n      - api: ws2_32.WSASendTo\n      - api: ws2_32.#78 = WSASendTo\n      - api: System.Net.Sockets.Socket::Send\n      - api: System.Net.Sockets.Socket::SendAsync\n      - api: System.Net.Sockets.Socket::SendTo\n      - api: System.Net.Sockets.Socket::SendToAsync\n      - api: System.Net.Sockets.UdpClient::Send\n"
+                                           },
+                                           {
+                                               "id":  "16",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create reverse shell on Linux",
+                                               "description":  "communication/c2/shell",
+                                               "authors":  [
+                                                               "joakim@intezer.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "host-interaction/process/create",
+                                                                  "duplicate stdin and stdout",
+                                                                  "STDOUT"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create reverse shell on Linux\n    namespace: communication/c2/shell\n    authors:\n      - joakim@intezer.com\n    scopes:\n      static: function\n      dynamic: span of calls\n    att\u0026ck:\n      - Execution::Command and Scripting Interpreter::Unix Shell [T1059.004]\n    mbc:\n      - Impact::Remote Access::Reverse Shell [B0022.001]\n    examples:\n      - 7351f8a40c5450557b24622417fc478d:0x40231E\n  features:\n    - and:\n      - os: linux\n      - match: duplicate stdin and stdout\n      - match: host-interaction/process/create\n"
+                                           },
+                                           {
+                                               "id":  "17",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "query environment variable",
+                                               "description":  "host-interaction/environment-variable",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "@_re_fox"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: getenv"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: query environment variable\n    namespace: host-interaction/environment-variable\n    authors:\n      - michael.hunhoff@mandiant.com\n      - \"@_re_fox\"\n    scopes:\n      static: function\n      dynamic: call\n    att\u0026ck:\n      - Discovery::System Information Discovery [T1082]\n    mbc:\n      - Discovery::System Information Discovery [E1082]\n    examples:\n      - Practical Malware Analysis Lab 14-02.exe_:0x401880\n      - 0761142efbda6c4b1e801223de723578:0x65483490\n  features:\n    - or:\n      - api: kernel32.GetEnvironmentVariable\n      - api: kernel32.GetEnvironmentStrings\n      - api: kernel32.ExpandEnvironmentStrings\n      - api: msvcr90.getenv\n      - api: msvcrt.getenv\n      - api: System.Environment::GetEnvironmentVariable\n      - api: System.Environment::GetEnvironmentVariables\n      - api: System.Environment::ExpandEnvironmentVariables\n"
+                                           },
+                                           {
+                                               "id":  "18",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "set current directory",
+                                               "description":  "host-interaction/file-system",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: chdir"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: set current directory\n    namespace: host-interaction/file-system\n    authors:\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n  features:\n    - or:\n      - api: System.IO.Directory::SetCurrentDirectory\n      - api: kernel32.SetCurrentDirectory\n      - api: chdir\n      - api: fchdir\n"
+                                           },
+                                           {
+                                               "id":  "19",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "receive data",
+                                               "description":  "communication : all known techniques for receiving data from a potential C2 server",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "receive data on socket",
+                                                                  "api: recvfrom"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: receive data\n    namespace: communication\n    authors:\n      - william.ballenthin@mandiant.com\n    description: all known techniques for receiving data from a potential C2 server\n    scopes:\n      static: function\n      dynamic: span of calls\n    mbc:\n      - Command and Control::C2 Communication::Receive Data [B0030.002]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13145D60\n  features:\n    - or:\n      - match: receive data on socket\n      - match: read data from Internet\n      - match: download URL\n"
+                                           },
+                                           {
+                                               "id":  "21",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "write file on Linux",
+                                               "description":  "host-interaction/file-system/write",
+                                               "authors":  [
+                                                               "joakim@intezer.com",
+                                                               "mehunhoff@google.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: fputc",
+                                                                  "api: fprintf",
+                                                                  "api: fwrite"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: write file on Linux\n    namespace: host-interaction/file-system/write\n    authors:\n      - joakim@intezer.com\n      - mehunhoff@google.com\n    scopes:\n      static: instruction\n      dynamic: call\n    mbc:\n      - File System::Writes File [C0052]\n    examples:\n      - 7351f8a40c5450557b24622417fc478d:0x401E14\n  features:\n    - and:\n      - or:\n        - os: linux\n        - os: android\n      - or:\n        - api: fputc\n        - api: fputs\n        - api: putc\n        - api: write\n        - api: fputwc\n        - api: putwc\n        - api: fputws\n        - api: fwrite\n        - api: putwchar\n        - api: dprintf\n        - api: vdprintf\n        - api: fprintf\n        - api: vfprintf\n"
+                                           },
+                                           {
+                                               "id":  "22",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create UDP socket",
+                                               "description":  "communication/socket/udp/send",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "joakim@intezer.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "AF_INET",
+                                                                  "protocol (default)",
+                                                                  "api: socket"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create UDP socket\n    namespace: communication/socket/udp/send\n    authors:\n      - moritz.raabe@mandiant.com\n      - joakim@intezer.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - Communication::Socket Communication::Create UDP Socket [C0001.010]\n    references:\n      - https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-socket\n      - https://man7.org/linux/man-pages/man2/socket.2.html\n  features:\n    - or:\n      - and:\n        - number: 2 = AF_INET\n        - number: 2 = SOCK_DGRAM\n        - or:\n          - number: 0 = protocol (default)\n          - number: 17 = IPPROTO_UDP\n        - or:\n          - api: socket\n          - api: ws2_32.socket\n          - api: ws2_32.#23 = socket\n          - api: ws2_32.WSASocket\n          - api: ws2_32.#82 = WSASocketA\n          - api: ws2_32.#83 = WSASocketW\n          - api: System.Net.Sockets.Socket::ctor\n      - api: System.Net.Sockets.UdpClient::ctor\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-socket"
+                                                            },
+                                                            {
+                                                                "ref":  "https://man7.org/linux/man-pages/man2/socket.2.html"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "23",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "reference anti-VM strings targeting VMWare",
+                                               "description":  "anti-analysis/anti-vm/vm-detection",
+                                               "authors":  [
+                                                               "michael.hunhoff@mandiant.com",
+                                                               "@johnk3r"
+                                                           ],
+                                               "match_data":  [
+                                                                  "regex: /VMWare/i"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: reference anti-VM strings targeting VMWare\n    namespace: anti-analysis/anti-vm/vm-detection\n    authors:\n      - michael.hunhoff@mandiant.com\n      - \"@johnk3r\"\n    scopes:\n      static: file\n      dynamic: file\n    att\u0026ck:\n      - Defense Evasion::Virtualization/Sandbox Evasion::System Checks [T1497.001]\n    mbc:\n      - Anti-Behavioral Analysis::Virtual Machine Detection [B0009]\n    references:\n      - https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/AntiVM/VMWare.cpp\n    examples:\n      - al-khaser_x86.exe_\n      - b83480162ede09d4aa6d4850f9faa0a4c3834152752fd04cfdb22d647aa1f825:0x17D80\n  features:\n    - or:\n      - string: /VMWare/i\n      - string: /VMTools/i\n      - string: /SOFTWARE\\\\VMware, Inc\\.\\\\VMware Tools/i\n      - string: /vmnet\\.sys/i\n      - string: /vmmouse\\.sys/i\n      - string: /vmusb\\.sys/i\n      - string: /vm3dmp\\.sys/i\n      - string: /vmci\\.sys/i\n      - string: /vmhgfs\\.sys/i\n      - string: /vmmemctl\\.sys/i\n      - string: /vmx86\\.sys/i\n      - string: /vmrawdsk\\.sys/i\n      - string: /vmusbmouse\\.sys/i\n      - string: /vmkdb\\.sys/i\n      - string: /vmnetuserif\\.sys/i\n      - string: /vmnetadapter\\.sys/i\n      - string: /\\\\\\\\\\.\\\\HGFS/i\n      - string: /\\\\\\\\\\.\\\\vmci/i\n      - string: /vmtoolsd\\.exe/i\n      - string: /vmwaretray\\.exe/i\n      - string: /vmwareuser\\.exe/i\n      - string: /VGAuthService\\.exe/i\n      - string: /vmacthlp\\.exe/i\n      - string: /vmci/i\n        description: VMWare VMCI Bus Driver\n      - string: /vmhgfs/i\n        description: VMWare Host Guest Control Redirector\n      - string: /vmmouse/i\n      - string: /vmmemctl/i\n        description: VMWare Guest Memory Controller Driver\n      - string: /vmusb/i\n      - string: /vmusbmouse/i\n      - string: /vmx_svga/i\n      - string: /vmxnet/i\n      - string: /vmx86/i\n      - string: /VMwareVMware/i\n      - string: /vmGuestLib\\.dll/i\n      - string: /Applications\\\\VMwareHostOpen\\.exe/i\n      - string: /vm3dgl\\.dll/i\n      - string: /vmdum\\.dll/i\n      - string: /vm3dver\\.dll/i\n      - string: /vmtray\\.dll/i\n      - string: /VMToolsHook\\.dll/i\n      - string: /vmmousever\\.dll/i\n      - string: /VmGuestLibJava\\.dll/i\n      - string: /vmscsi\\.sys/i\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://github.com/LordNoteworthy/al-khaser/blob/master/al-khaser/AntiVM/VMWare.cpp"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "24",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "create TCP socket",
+                                               "description":  "communication/socket/tcp",
+                                               "authors":  [
+                                                               "william.ballenthin@mandiant.com",
+                                                               "joakim@intezer.com",
+                                                               "anushka.virgaonkar@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "SOCK_STREAM",
+                                                                  "api: socket",
+                                                                  "AF_INET"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: create TCP socket\n    namespace: communication/socket/tcp\n    authors:\n      - william.ballenthin@mandiant.com\n      - joakim@intezer.com\n      - anushka.virgaonkar@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: basic block\n      dynamic: call\n    mbc:\n      - Communication::Socket Communication::Create TCP Socket [C0001.011]\n    references:\n      - https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-socket\n      - https://man7.org/linux/man-pages/man2/socket.2.html\n    examples:\n      - Practical Malware Analysis Lab 01-01.dll_:0x10001010\n  features:\n    - or:\n      - and:\n        - or:\n          - number: 0 = protocol (default)\n          - number: 6 = IPPROTO_TCP\n        - number: 1 = SOCK_STREAM\n        - number: 2 = AF_INET\n        - or:\n          - api: socket\n          - api: ws2_32.socket\n          - api: ws2_32.#23 = socket\n          - api: ws2_32.WSASocket\n          - api: ws2_32.#82 = WSASocketA\n          - api: ws2_32.#83 = WSASocketW\n          - api: System.Net.Sockets.Socket::ctor\n      - property/read: System.Net.Sockets.TcpClient::Client\n",
+                                               "refs":  [
+                                                            {
+                                                                "ref":  "https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-socket"
+                                                            },
+                                                            {
+                                                                "ref":  "https://man7.org/linux/man-pages/man2/socket.2.html"
+                                                            }
+                                                        ]
+                                           },
+                                           {
+                                               "id":  "25",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "convert IP address from string",
+                                               "description":  "communication/ip",
+                                               "authors":  [
+                                                               "@mr-tz"
+                                                           ],
+                                               "match_data":  [
+                                                                  "api: inet_pton"
+                                                              ],
+                                               "rule_src":  "# generated using capa explorer for IDA Pro\nrule:\n  meta:\n    name: convert IP address from string\n    namespace: communication/ip\n    authors:\n      - \"@mr-tz\"\n    scopes:\n      static: basic block\n      dynamic: call\n    examples:\n      - 0796F1C1EA0A142FC1EB7109A44C86CB:0x405D20\n  features:\n    - and:\n      - api: inet_pton\n      - optional:\n        - or:\n          - number: 2 = AF_INET\n          - number: 23 = AF_INET6\n"
+                                           },
+                                           {
+                                               "id":  "26",
+                                               "format":  "SIG_FORMAT_CAPA",
+                                               "name":  "set registry value",
+                                               "description":  "host-interaction/registry/create",
+                                               "authors":  [
+                                                               "moritz.raabe@mandiant.com",
+                                                               "michael.hunhoff@mandiant.com"
+                                                           ],
+                                               "match_data":  [
+                                                                  "regex: /reg(|.exe)/i",
+                                                                  "host-interaction/process/create",
+                                                                  "api: system"
+                                                              ],
+                                               "rule_src":  "rule:\n  meta:\n    name: set registry value\n    namespace: host-interaction/registry/create\n    authors:\n      - moritz.raabe@mandiant.com\n      - michael.hunhoff@mandiant.com\n    scopes:\n      static: function\n      dynamic: call\n    mbc:\n      - Operating System::Registry::Set Registry Key [C0036.001]\n    examples:\n      - BFB9B5391A13D0AFD787E87AB90F14F5:0x13147AF0\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x40433E\n      - B5F85C26D7AA5A1FB4AF5821B6B5AB9B:0x40415E\n      - 98c37c3c23bbfb362dac7754c6ba48e75cf24d73bc963a4cdfca557b9e016909:0x40294D\n  features:\n    - or:\n      - and:\n        - optional:\n          - match: create or open registry key\n        - or:\n          - api: advapi32.RegSetValue\n          - api: advapi32.RegSetValueEx\n          - api: advapi32.RegSetKeyValue\n          - api: ZwSetValueKey\n          - api: NtSetValueKey\n          - api: RtlWriteRegistryValue\n          - api: SHSetValue\n          - api: SHRegSetPath\n          - api: SHRegSetValue\n          - api: SHRegSetUSValue\n          - api: SHRegWriteUSValue\n          - api: Microsoft.Win32.RegistryKey::SetValue\n          - api: Microsoft.Win32.Registry::SetValue\n      - and:\n        - match: host-interaction/process/create\n        - string: \"/add/i\"\n        - or:\n          - string: \"/reg(|.exe)/i\"\n          - string: \"/hklm/i\"\n          - string: \"/HKEY_LOCAL_MACHINE/i\"\n          - string: \"/hkcu/i\"\n          - string: \"/HKEY_CURRENT_USER/i\"\n"
+                                           }
+                                       ],
+                 "mitre_attack_techniques":  [
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "get kernel version",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "8"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1129",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "link function at runtime on Linux",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "11"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1027.005",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "contain obfuscated stackstrings",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "14"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1059.004",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "create reverse shell on Linux",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "16"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1082",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "query environment variable",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "17"
+                                                                  }
+                                                              ]
+                                                 },
+                                                 {
+                                                     "id":  "T1497.001",
+                                                     "severity":  "IMPACT_SEVERITY_INFO",
+                                                     "signature_description":  "reference anti-VM strings targeting VMWare",
+                                                     "refs":  [
+                                                                  {
+                                                                      "ref":  "#signature_matches",
+                                                                      "value":  "23"
+                                                                  }
+                                                              ]
+                                                 }
+                                             ],
+                 "files_opened":  [
+                                      "/etc/ld.so.cache",
+                                      "/lib/x86_64-linux-gnu/libpthread.so.0"
+                                  ],
+                 "processes_terminated":  [
+                                              "/tmp/EB93A6/996E.elf",
+                                              "/lib/systemd/systemd-udevd --daemon"
+                                          ],
+                 "mbc":  [
+                             {
+                                 "id":  "C0038",
+                                 "objective":  "Process",
+                                 "behavior":  "Create Thread",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "0"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0001.003",
+                                 "objective":  "Communication",
+                                 "behavior":  "Socket Communication",
+                                 "method":  "Create Socket",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "2"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0023",
+                                 "objective":  "Execution",
+                                 "behavior":  "Install Additional Program",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "3"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0017",
+                                 "objective":  "Process",
+                                 "behavior":  "Create Process",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "4"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0047",
+                                 "objective":  "File System",
+                                 "behavior":  "Delete File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "6"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0001.006",
+                                 "objective":  "Communication",
+                                 "behavior":  "Socket Communication",
+                                 "method":  "Receive Data",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "9"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0017",
+                                 "objective":  "Process",
+                                 "behavior":  "Create Process",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "10"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0051",
+                                 "objective":  "File System",
+                                 "behavior":  "Read File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "13"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0032.020",
+                                 "objective":  "Anti-Static Analysis",
+                                 "behavior":  "Executable Code Obfuscation",
+                                 "method":  "Argument Obfuscation",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "14"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0032.017",
+                                 "objective":  "Anti-Static Analysis",
+                                 "behavior":  "Executable Code Obfuscation",
+                                 "method":  "Stack Strings",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "14"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0001.007",
+                                 "objective":  "Communication",
+                                 "behavior":  "Socket Communication",
+                                 "method":  "Send Data",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "15"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0022.001",
+                                 "objective":  "Impact",
+                                 "behavior":  "Remote Access",
+                                 "method":  "Reverse Shell",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "16"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "E1082",
+                                 "objective":  "Discovery",
+                                 "behavior":  "System Information Discovery",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "17"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0030.002",
+                                 "objective":  "Command and Control",
+                                 "behavior":  "C2 Communication",
+                                 "method":  "Receive Data",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "19"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0052",
+                                 "objective":  "File System",
+                                 "behavior":  "Writes File",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "21"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0001.010",
+                                 "objective":  "Communication",
+                                 "behavior":  "Socket Communication",
+                                 "method":  "Create UDP Socket",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "22"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "B0009",
+                                 "objective":  "Anti-Behavioral Analysis",
+                                 "behavior":  "Virtual Machine Detection",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "23"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0001.011",
+                                 "objective":  "Communication",
+                                 "behavior":  "Socket Communication",
+                                 "method":  "Create TCP Socket",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "24"
+                                              }
+                                          ]
+                             },
+                             {
+                                 "id":  "C0036.001",
+                                 "objective":  "Operating System",
+                                 "behavior":  "Registry",
+                                 "method":  "Set Registry Key",
+                                 "refs":  [
+                                              {
+                                                  "ref":  "#signature_matches",
+                                                  "value":  "26"
+                                              }
+                                          ]
+                             }
+                         ],
+                 "modules_loaded":  [
+                                        "/lib/x86_64-linux-gnu/libdl.so.2",
+                                        "/lib64/ld-linux-x86-64.so.2",
+                                        " not found",
+                                        "/lib/x86_64-linux-gnu/libc.so.6",
+                                        "/lib/x86_64-linux-gnu/libpthread.so.0",
+                                        "linux-vdso.so.1"
+                                    ],
+                 "attack_techniques":  {
+                                           "T1082":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "get kernel version",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "8"
+                                                                          }
+                                                                      ]
+                                                         },
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "query environment variable",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "17"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1129":  [
+                                                         {
+                                                             "severity":  "INFO",
+                                                             "description":  "link function at runtime on Linux",
+                                                             "refs":  [
+                                                                          {
+                                                                              "ref":  "#signature_matches",
+                                                                              "value":  "11"
+                                                                          }
+                                                                      ]
+                                                         }
+                                                     ],
+                                           "T1027.005":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "contain obfuscated stackstrings",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "14"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1059.004":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "create reverse shell on Linux",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "16"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ],
+                                           "T1497.001":  [
+                                                             {
+                                                                 "severity":  "INFO",
+                                                                 "description":  "reference anti-VM strings targeting VMWare",
+                                                                 "refs":  [
+                                                                              {
+                                                                                  "ref":  "#signature_matches",
+                                                                                  "value":  "23"
+                                                                              }
+                                                                          ]
+                                                             }
+                                                         ]
+                                       }
+             }
+}

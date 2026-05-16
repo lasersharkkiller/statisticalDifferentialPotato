@@ -7,6 +7,43 @@ function Get-NSRLOsSlug {
     return $slug
 }
 
+function Get-VTProxyForRegion {
+    # Maps a short region name to a (Proxy URL, user-secret-name, password-secret-name)
+    # triple. Used by -ProxyRegion on Get-VTBaseline / Get-AptMasterIntelVT*.
+    # To add a new provider/region, append an entry here and store the matching
+    # secrets in your SecretManagement vault.
+    param([string]$Region)
+
+    $regions = @{
+        'pia-nl' = @{
+            Proxy      = 'socks5://proxy-nl.privateinternetaccess.com:1080'
+            UserSecret = 'PIA_SOCKS_User'
+            PassSecret = 'PIA_SOCKS_Password'
+        }
+        # Add more once you've configured additional providers, e.g.:
+        # 'mullvad-se' = @{
+        #     Proxy      = 'socks5://se-mma-wg-001.relays.mullvad.net:1080'
+        #     UserSecret = 'MULLVAD_SOCKS_User'
+        #     PassSecret = 'MULLVAD_SOCKS_Password'
+        # }
+        # 'vps-fra' = @{
+        #     Proxy      = 'socks5://fra1.my-vps.example:1080'
+        #     UserSecret = 'VPS_FRA_User'
+        #     PassSecret = 'VPS_FRA_Password'
+        # }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($Region) -or $Region -eq 'direct') {
+        return $null  # no proxy
+    }
+    $key = $Region.ToLowerInvariant()
+    if (-not $regions.ContainsKey($key)) {
+        $known = ($regions.Keys | Sort-Object) -join ', '
+        throw "Unknown proxy region '$Region'. Known regions: $known. Use 'direct' or omit for no proxy."
+    }
+    return $regions[$key]
+}
+
 function Get-PlatformBaselineRoots {
     # Returns the list of directories that make up the "known-good" corpus
     # for differential analysis, filtered by platform.
@@ -55,13 +92,15 @@ function Get-VTBaseline {
         [string]$Mode = 'All',
         [string]$OsFilter,
         [string]$AttributionPattern = "equifax",
-        # SOCKS5/HTTP proxy URL, e.g. 'socks5://proxy-nl.privateinternetaccess.com:1080'.
-        # Falls back to $env:VT_PROXY when omitted. Set the env var to use the same
-        # script from multiple windows simultaneously, each egressing from a
-        # different PIA region.
+        # Short region name (e.g. 'pia-nl'). Resolved via Get-VTProxyForRegion to
+        # a Proxy URL + matching credential secret names. Falls back to
+        # $env:VT_PROXY_REGION when omitted. Use 'direct' or leave empty for no proxy.
+        [string]$ProxyRegion,
+        # Explicit proxy URL, e.g. 'socks5://proxy-nl.privateinternetaccess.com:1080'.
+        # Overrides -ProxyRegion's proxy if both are set. Falls back to $env:VT_PROXY.
         [string]$Proxy,
-        # Credentials for the proxy. Defaults to PIA_SOCKS_User/PIA_SOCKS_Password
-        # secrets in SecretManagement; falls back to an interactive prompt.
+        # Explicit credentials for the proxy. Overrides whatever -ProxyRegion would
+        # have resolved. Final fallback is an interactive Get-Credential prompt.
         [pscredential]$ProxyCredential
     )
 
@@ -71,11 +110,19 @@ function Get-VTBaseline {
     }
 
     # --- PROXY RESOLUTION ---
+    if ([string]::IsNullOrWhiteSpace($ProxyRegion)) { $ProxyRegion = $env:VT_PROXY_REGION }
+    $regionInfo = Get-VTProxyForRegion -Region $ProxyRegion
+    if ($regionInfo) {
+        if ([string]::IsNullOrWhiteSpace($Proxy)) { $Proxy = $regionInfo.Proxy }
+    }
     if ([string]::IsNullOrWhiteSpace($Proxy)) { $Proxy = $env:VT_PROXY }
+
     if ($Proxy -and -not $ProxyCredential) {
+        $userSecret = if ($regionInfo) { $regionInfo.UserSecret } else { 'PIA_SOCKS_User' }
+        $passSecret = if ($regionInfo) { $regionInfo.PassSecret } else { 'PIA_SOCKS_Password' }
         try {
-            $puser = Get-Secret -Name 'PIA_SOCKS_User' -AsPlainText -ErrorAction Stop
-            $ppass = Get-Secret -Name 'PIA_SOCKS_Password' -ErrorAction Stop
+            $puser = Get-Secret -Name $userSecret -AsPlainText -ErrorAction Stop
+            $ppass = Get-Secret -Name $passSecret -ErrorAction Stop
             if ($puser -and $ppass) {
                 $securePass = if ($ppass -is [System.Security.SecureString]) { $ppass }
                               else { ConvertTo-SecureString -String $ppass -AsPlainText -Force }
@@ -83,13 +130,14 @@ function Get-VTBaseline {
             }
         } catch {}
         if (-not $ProxyCredential) {
-            $ProxyCredential = Get-Credential -Message "Enter PIA SOCKS5 credentials for $Proxy"
+            $ProxyCredential = Get-Credential -Message "Enter SOCKS5 credentials for $Proxy"
         }
     }
     $script:VTProxy           = $Proxy
     $script:VTProxyCredential = $ProxyCredential
     if ($Proxy) {
-        Write-Host ("Proxy: {0} (user: {1})" -f $Proxy, $ProxyCredential.UserName) -ForegroundColor DarkCyan
+        $regionTag = if ($ProxyRegion) { " region=$ProxyRegion" } else { '' }
+        Write-Host ("Proxy: {0}{1} (user: {2})" -f $Proxy, $regionTag, $ProxyCredential.UserName) -ForegroundColor DarkCyan
     } else {
         Write-Host "Proxy: <none> (direct connection)" -ForegroundColor DarkGray
     }
@@ -578,4 +626,4 @@ function Get-VTBaseline {
     }
 }
 
-Export-ModuleMember -Function Get-VTBaseline, Get-NSRLOsSlug, Get-PlatformBaselineRoots
+Export-ModuleMember -Function Get-VTBaseline, Get-NSRLOsSlug, Get-PlatformBaselineRoots, Get-VTProxyForRegion

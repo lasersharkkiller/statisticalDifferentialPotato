@@ -15,16 +15,29 @@ function Initialize-AptVTRotator {
     # Returns a PSCustomObject carrying the loaded keys + cooldown tracker.
     # Also installs script-scope state used by Invoke-AptVTRequest.
     param(
+        [string]$ProxyRegion,
         [string]$Proxy,
         [pscredential]$ProxyCredential
     )
 
-    # --- PROXY RESOLUTION (mirrors Get-VTBaseline) ---
+    # --- PROXY RESOLUTION (mirrors Get-VTBaseline; uses VTBaseline's exported
+    #     Get-VTProxyForRegion helper for the region->URL+secret-names mapping) ---
+    if ([string]::IsNullOrWhiteSpace($ProxyRegion)) { $ProxyRegion = $env:VT_PROXY_REGION }
+    $regionInfo = $null
+    if (Get-Command Get-VTProxyForRegion -ErrorAction SilentlyContinue) {
+        $regionInfo = Get-VTProxyForRegion -Region $ProxyRegion
+    }
+    if ($regionInfo) {
+        if ([string]::IsNullOrWhiteSpace($Proxy)) { $Proxy = $regionInfo.Proxy }
+    }
     if ([string]::IsNullOrWhiteSpace($Proxy)) { $Proxy = $env:VT_PROXY }
+
     if ($Proxy -and -not $ProxyCredential) {
+        $userSecret = if ($regionInfo) { $regionInfo.UserSecret } else { 'PIA_SOCKS_User' }
+        $passSecret = if ($regionInfo) { $regionInfo.PassSecret } else { 'PIA_SOCKS_Password' }
         try {
-            $puser = Get-Secret -Name 'PIA_SOCKS_User' -AsPlainText -ErrorAction Stop
-            $ppass = Get-Secret -Name 'PIA_SOCKS_Password' -ErrorAction Stop
+            $puser = Get-Secret -Name $userSecret -AsPlainText -ErrorAction Stop
+            $ppass = Get-Secret -Name $passSecret -ErrorAction Stop
             if ($puser -and $ppass) {
                 $securePass = if ($ppass -is [System.Security.SecureString]) { $ppass }
                               else { ConvertTo-SecureString -String $ppass -AsPlainText -Force }
@@ -32,13 +45,14 @@ function Initialize-AptVTRotator {
             }
         } catch {}
         if (-not $ProxyCredential) {
-            $ProxyCredential = Get-Credential -Message "Enter PIA SOCKS5 credentials for $Proxy"
+            $ProxyCredential = Get-Credential -Message "Enter SOCKS5 credentials for $Proxy"
         }
     }
     $script:AptVTProxy           = $Proxy
     $script:AptVTProxyCredential = $ProxyCredential
     if ($Proxy) {
-        Write-Host ("Proxy: {0} (user: {1})" -f $Proxy, $ProxyCredential.UserName) -ForegroundColor DarkCyan
+        $regionTag = if ($ProxyRegion) { " region=$ProxyRegion" } else { '' }
+        Write-Host ("Proxy: {0}{1} (user: {2})" -f $Proxy, $regionTag, $ProxyCredential.UserName) -ForegroundColor DarkCyan
     }
 
     $VTKeys = @()
@@ -309,6 +323,7 @@ function Get-AptMasterIntelVTAll {
     [CmdletBinding()]
     param(
         [string]$AptRoot = "apt",
+        [string]$ProxyRegion,
         [string]$Proxy,
         [pscredential]$ProxyCredential
     )
@@ -317,7 +332,7 @@ function Get-AptMasterIntelVTAll {
         Write-Error "APT root not found at '$AptRoot'."
         return
     }
-    if (-not (Initialize-AptVTRotator -Proxy $Proxy -ProxyCredential $ProxyCredential)) { return }
+    if (-not (Initialize-AptVTRotator -ProxyRegion $ProxyRegion -Proxy $Proxy -ProxyCredential $ProxyCredential)) { return }
 
     $mainBaseRoot      = "output-baseline\VirusTotal-main\apt-master-intel"
     $behaviorsBaseRoot = "output-baseline\VirusTotal-behaviors\apt-master-intel"
@@ -377,6 +392,7 @@ function Get-AptMasterIntelVTByActor {
     param(
         [string]$AptRoot = "apt",
         [string]$ActorName,
+        [string]$ProxyRegion,
         [string]$Proxy,
         [pscredential]$ProxyCredential
     )
@@ -411,7 +427,7 @@ function Get-AptMasterIntelVTByActor {
     Write-Host "Matched $($csvFiles.Count) file(s):" -ForegroundColor DarkCyan
     $csvFiles | ForEach-Object { Write-Host "  $($_.FullName)" -ForegroundColor DarkGray }
 
-    if (-not (Initialize-AptVTRotator -Proxy $Proxy -ProxyCredential $ProxyCredential)) { return }
+    if (-not (Initialize-AptVTRotator -ProxyRegion $ProxyRegion -Proxy $Proxy -ProxyCredential $ProxyCredential)) { return }
 
     $mainBaseRoot      = "output-baseline\VirusTotal-main\apt-master-intel"
     $behaviorsBaseRoot = "output-baseline\VirusTotal-behaviors\apt-master-intel"

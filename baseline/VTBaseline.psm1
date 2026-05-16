@@ -106,7 +106,14 @@ function Get-VTBaseline {
         # SignedVerified. Most signed legitimate binaries have no sandbox data
         # at VT, so the call wastes a quota unit returning nothing. Default ON
         # (skip); pass -SkipBehaviorsForSignedVerified:$false to include them.
-        [bool]$SkipBehaviorsForSignedVerified = $true
+        [bool]$SkipBehaviorsForSignedVerified = $true,
+        # Subset of VT API keys to use. Comma-separated 1-based positions from
+        # the loaded-keys list (e.g. '1,3,5'), or 'all'/'*' for everything.
+        # Bypasses the interactive prompt. Falls back to $env:VT_KEYS.
+        # Useful for parallel shells - e.g. Window A '-Keys 1,2', Window B
+        # '-Keys 3,4,5' - so the two shells use disjoint key sets at VT's
+        # quota counter.
+        [string]$Keys
     )
 
     if ($Mode -eq 'NSRLOs' -and [string]::IsNullOrWhiteSpace($OsFilter)) {
@@ -175,29 +182,39 @@ function Get-VTBaseline {
         return
     }
 
-    Write-Host ""
-    Write-Host "Available VT API keys:" -ForegroundColor DarkCyan
-    for ($i = 0; $i -lt $VTKeys.Count; $i++) {
-        $k  = $VTKeys[$i]
-        $fp = $k.Substring(0,6) + '...' + $k.Substring($k.Length-4)
-        Write-Host ("  {0,2}) {1,-16}  {2}" -f ($i + 1), $loadedNames[$i], $fp) -ForegroundColor DarkCyan
-    }
-    Write-Host ("  {0,2}) ALL keys (default)" -f ($VTKeys.Count + 1)) -ForegroundColor DarkCyan
-    Write-Host ""
-    $keyChoice = (Read-Host "Which key(s) to use? (comma-separated numbers, '$($VTKeys.Count + 1)' or 'all' for all; Enter=all)").Trim()
+    # --- KEY SUBSET RESOLUTION ---
+    # Param -Keys wins; else $env:VT_KEYS; else interactive prompt.
+    if ([string]::IsNullOrWhiteSpace($Keys)) { $Keys = $env:VT_KEYS }
 
-    $useAll = [string]::IsNullOrWhiteSpace($keyChoice) -or
-              $keyChoice -ieq 'all' -or
-              $keyChoice -eq ($VTKeys.Count + 1).ToString()
+    if ([string]::IsNullOrWhiteSpace($Keys)) {
+        Write-Host ""
+        Write-Host "Available VT API keys:" -ForegroundColor DarkCyan
+        for ($i = 0; $i -lt $VTKeys.Count; $i++) {
+            $k  = $VTKeys[$i]
+            $fp = $k.Substring(0,6) + '...' + $k.Substring($k.Length-4)
+            Write-Host ("  {0,2}) {1,-16}  {2}" -f ($i + 1), $loadedNames[$i], $fp) -ForegroundColor DarkCyan
+        }
+        Write-Host ("  {0,2}) ALL keys (default)" -f ($VTKeys.Count + 1)) -ForegroundColor DarkCyan
+        Write-Host ""
+        $Keys = (Read-Host "Which key(s) to use? (comma-separated numbers, '$($VTKeys.Count + 1)' or 'all' for all; Enter=all)").Trim()
+        if ([string]::IsNullOrWhiteSpace($Keys) -or $Keys -eq ($VTKeys.Count + 1).ToString()) {
+            $Keys = 'all'
+        }
+    } else {
+        $keysSource = if ($PSBoundParameters.ContainsKey('Keys')) { '-Keys' } else { '$env:VT_KEYS' }
+        Write-Host ("Key subset from {0}: '{1}'" -f $keysSource, $Keys) -ForegroundColor DarkGray
+    }
+
+    $useAll = $Keys -ieq 'all' -or $Keys -eq '*'
 
     if (-not $useAll) {
-        $selectedIdxs = @($keyChoice -split '[,\s]+' |
+        $selectedIdxs = @($Keys -split '[,\s]+' |
             Where-Object { $_ -match '^\d+$' } |
             ForEach-Object { [int]$_ - 1 } |
             Where-Object { $_ -ge 0 -and $_ -lt $VTKeys.Count } |
             Sort-Object -Unique)
         if ($selectedIdxs.Count -eq 0) {
-            Write-Host "[WARN] No valid keys selected from '$keyChoice'; using ALL keys." -ForegroundColor Yellow
+            Write-Host "[WARN] No valid keys selected from '$Keys'; using ALL keys." -ForegroundColor Yellow
         } else {
             $VTKeys      = @($selectedIdxs | ForEach-Object { $VTKeys[$_] })
             $loadedNames = @($selectedIdxs | ForEach-Object { $loadedNames[$_] })

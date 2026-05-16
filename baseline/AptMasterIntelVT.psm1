@@ -17,7 +17,10 @@ function Initialize-AptVTRotator {
     param(
         [string]$ProxyRegion,
         [string]$Proxy,
-        [pscredential]$ProxyCredential
+        [pscredential]$ProxyCredential,
+        # Subset of VT API keys to use (e.g. '1,3' or 'all'). Falls back to
+        # $env:VT_KEYS. Matches Get-VTBaseline's -Keys parameter.
+        [string]$Keys
     )
 
     # --- PROXY RESOLUTION (mirrors Get-VTBaseline; uses VTBaseline's exported
@@ -55,7 +58,8 @@ function Initialize-AptVTRotator {
         Write-Host ("Proxy: {0}{1} (user: {2})" -f $Proxy, $regionTag, $ProxyCredential.UserName) -ForegroundColor DarkCyan
     }
 
-    $VTKeys = @()
+    $VTKeys      = @()
+    $loadedNames = @()
     try {
         $infos = Get-SecretInfo -Name 'VT_API_Key_*' -ErrorAction Stop |
                  Sort-Object { if ($_.Name -match '_(\d+)$') { [int]$matches[1] } else { [int]::MaxValue } }
@@ -67,7 +71,10 @@ function Initialize-AptVTRotator {
     foreach ($info in $infos) {
         try {
             $k = (Get-Secret -Name $info.Name -AsPlainText -ErrorAction Stop).Trim()
-            if (-not [string]::IsNullOrWhiteSpace($k)) { $VTKeys += $k }
+            if (-not [string]::IsNullOrWhiteSpace($k) -and $VTKeys -notcontains $k) {
+                $VTKeys      += $k
+                $loadedNames += $info.Name
+            }
         } catch {
             Write-Host "[WARN] Could not load $($info.Name) from vault." -ForegroundColor Yellow
         }
@@ -78,7 +85,23 @@ function Initialize-AptVTRotator {
         return $null
     }
 
-    Write-Host "Loaded $($VTKeys.Count) VT API key(s) ($(($infos | ForEach-Object Name) -join ', ')). Rotating with 15s spacing per key (~$($VTKeys.Count * 4) req/min combined)." -ForegroundColor DarkCyan
+    # --- KEY SUBSET RESOLUTION (mirrors Get-VTBaseline; no interactive prompt here) ---
+    if ([string]::IsNullOrWhiteSpace($Keys)) { $Keys = $env:VT_KEYS }
+    if (-not [string]::IsNullOrWhiteSpace($Keys) -and $Keys -ine 'all' -and $Keys -ne '*') {
+        $selectedIdxs = @($Keys -split '[,\s]+' |
+            Where-Object { $_ -match '^\d+$' } |
+            ForEach-Object { [int]$_ - 1 } |
+            Where-Object { $_ -ge 0 -and $_ -lt $VTKeys.Count } |
+            Sort-Object -Unique)
+        if ($selectedIdxs.Count -eq 0) {
+            Write-Host "[WARN] No valid keys selected from '$Keys'; using ALL keys." -ForegroundColor Yellow
+        } else {
+            $VTKeys      = @($selectedIdxs | ForEach-Object { $VTKeys[$_] })
+            $loadedNames = @($selectedIdxs | ForEach-Object { $loadedNames[$_] })
+        }
+    }
+
+    Write-Host "Using $($VTKeys.Count) VT API key(s) ($($loadedNames -join ', ')). Rotating with 15s spacing per key (~$($VTKeys.Count * 4) req/min combined)." -ForegroundColor DarkCyan
 
     $script:AptVTKeys        = $VTKeys
     $script:AptVTMinDelayMs  = 15000
@@ -325,14 +348,15 @@ function Get-AptMasterIntelVTAll {
         [string]$AptRoot = "apt",
         [string]$ProxyRegion,
         [string]$Proxy,
-        [pscredential]$ProxyCredential
+        [pscredential]$ProxyCredential,
+        [string]$Keys
     )
 
     if (-not (Test-Path $AptRoot)) {
         Write-Error "APT root not found at '$AptRoot'."
         return
     }
-    if (-not (Initialize-AptVTRotator -ProxyRegion $ProxyRegion -Proxy $Proxy -ProxyCredential $ProxyCredential)) { return }
+    if (-not (Initialize-AptVTRotator -ProxyRegion $ProxyRegion -Proxy $Proxy -ProxyCredential $ProxyCredential -Keys $Keys)) { return }
 
     $mainBaseRoot      = "output-baseline\VirusTotal-main\apt-master-intel"
     $behaviorsBaseRoot = "output-baseline\VirusTotal-behaviors\apt-master-intel"
@@ -394,7 +418,8 @@ function Get-AptMasterIntelVTByActor {
         [string]$ActorName,
         [string]$ProxyRegion,
         [string]$Proxy,
-        [pscredential]$ProxyCredential
+        [pscredential]$ProxyCredential,
+        [string]$Keys
     )
 
     if (-not (Test-Path $AptRoot)) {
@@ -427,7 +452,7 @@ function Get-AptMasterIntelVTByActor {
     Write-Host "Matched $($csvFiles.Count) file(s):" -ForegroundColor DarkCyan
     $csvFiles | ForEach-Object { Write-Host "  $($_.FullName)" -ForegroundColor DarkGray }
 
-    if (-not (Initialize-AptVTRotator -ProxyRegion $ProxyRegion -Proxy $Proxy -ProxyCredential $ProxyCredential)) { return }
+    if (-not (Initialize-AptVTRotator -ProxyRegion $ProxyRegion -Proxy $Proxy -ProxyCredential $ProxyCredential -Keys $Keys)) { return }
 
     $mainBaseRoot      = "output-baseline\VirusTotal-main\apt-master-intel"
     $behaviorsBaseRoot = "output-baseline\VirusTotal-behaviors\apt-master-intel"

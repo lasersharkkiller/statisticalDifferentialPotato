@@ -60,12 +60,28 @@ function Initialize-AptVTRotator {
 
     $VTKeys      = @()
     $loadedNames = @()
+    $infos = $null
     try {
         $infos = Get-SecretInfo -Name 'VT_API_Key_*' -ErrorAction Stop |
                  Sort-Object { if ($_.Name -match '_(\d+)$') { [int]$matches[1] } else { [int]::MaxValue } }
     } catch {
-        Write-Error "Unable to enumerate secrets matching 'VT_API_Key_*'. Is SecretManagement loaded and a vault registered?"
-        return $null
+        $firstErr = $_.Exception.Message
+        # Most common cause is the SecretStore vault auto-locking after its
+        # PasswordTimeout (default 15 min). Retry once after explicit unlock.
+        if (Get-Command Unlock-SecretStore -ErrorAction SilentlyContinue) {
+            Write-Host "[INFO] Vault enumeration failed - attempting Unlock-SecretStore..." -ForegroundColor DarkYellow
+            try {
+                Unlock-SecretStore -ErrorAction Stop
+                $infos = Get-SecretInfo -Name 'VT_API_Key_*' -ErrorAction Stop |
+                         Sort-Object { if ($_.Name -match '_(\d+)$') { [int]$matches[1] } else { [int]::MaxValue } }
+            } catch {
+                Write-Error ("Unable to enumerate secrets matching 'VT_API_Key_*' even after unlock attempt. First error: {0}. Unlock error: {1}" -f $firstErr, $_.Exception.Message)
+                return $null
+            }
+        } else {
+            Write-Error ("Unable to enumerate secrets matching 'VT_API_Key_*': {0}. Is SecretManagement loaded and a vault registered?" -f $firstErr)
+            return $null
+        }
     }
 
     foreach ($info in $infos) {
@@ -85,9 +101,28 @@ function Initialize-AptVTRotator {
         return $null
     }
 
-    # --- KEY SUBSET RESOLUTION (mirrors Get-VTBaseline; no interactive prompt here) ---
+    # --- KEY SUBSET RESOLUTION (mirrors Get-VTBaseline) ---
     if ([string]::IsNullOrWhiteSpace($Keys)) { $Keys = $env:VT_KEYS }
-    if (-not [string]::IsNullOrWhiteSpace($Keys) -and $Keys -ine 'all' -and $Keys -ne '*') {
+
+    if ([string]::IsNullOrWhiteSpace($Keys)) {
+        Write-Host ""
+        Write-Host "Available VT API keys:" -ForegroundColor DarkCyan
+        for ($i = 0; $i -lt $VTKeys.Count; $i++) {
+            $k  = $VTKeys[$i]
+            $fp = $k.Substring(0,6) + '...' + $k.Substring($k.Length-4)
+            Write-Host ("  {0,2}) {1,-16}  {2}" -f ($i + 1), $loadedNames[$i], $fp) -ForegroundColor DarkCyan
+        }
+        Write-Host ("  {0,2}) ALL keys (default)" -f ($VTKeys.Count + 1)) -ForegroundColor DarkCyan
+        Write-Host ""
+        $Keys = (Read-Host "Which key(s) to use? (comma-separated numbers, '$($VTKeys.Count + 1)' or 'all' for all; Enter=all)").Trim()
+        if ([string]::IsNullOrWhiteSpace($Keys) -or $Keys -eq ($VTKeys.Count + 1).ToString()) {
+            $Keys = 'all'
+        }
+    }
+
+    $useAll = $Keys -ieq 'all' -or $Keys -eq '*'
+
+    if (-not $useAll) {
         $selectedIdxs = @($Keys -split '[,\s]+' |
             Where-Object { $_ -match '^\d+$' } |
             ForEach-Object { [int]$_ - 1 } |

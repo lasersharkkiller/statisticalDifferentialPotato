@@ -156,12 +156,28 @@ function Get-VTBaseline {
 
     # --- API SETUP ---
     $VTKeys = @()
+    $infos = $null
     try {
         $infos = Get-SecretInfo -Name 'VT_API_Key_*' -ErrorAction Stop |
                  Sort-Object { if ($_.Name -match '_(\d+)$') { [int]$matches[1] } else { [int]::MaxValue } }
     } catch {
-        Write-Error "Unable to enumerate secrets matching 'VT_API_Key_*'. Is SecretManagement loaded and a vault registered?"
-        return
+        $firstErr = $_.Exception.Message
+        # Most common cause is the SecretStore vault auto-locking after its
+        # PasswordTimeout (default 15 min). Retry once after explicit unlock.
+        if (Get-Command Unlock-SecretStore -ErrorAction SilentlyContinue) {
+            Write-Host "[INFO] Vault enumeration failed - attempting Unlock-SecretStore..." -ForegroundColor DarkYellow
+            try {
+                Unlock-SecretStore -ErrorAction Stop
+                $infos = Get-SecretInfo -Name 'VT_API_Key_*' -ErrorAction Stop |
+                         Sort-Object { if ($_.Name -match '_(\d+)$') { [int]$matches[1] } else { [int]::MaxValue } }
+            } catch {
+                Write-Error ("Unable to enumerate secrets matching 'VT_API_Key_*' even after unlock attempt. First error: {0}. Unlock error: {1}" -f $firstErr, $_.Exception.Message)
+                return
+            }
+        } else {
+            Write-Error ("Unable to enumerate secrets matching 'VT_API_Key_*': {0}. Is SecretManagement loaded and a vault registered?" -f $firstErr)
+            return
+        }
     }
 
     $loadedNames = @()

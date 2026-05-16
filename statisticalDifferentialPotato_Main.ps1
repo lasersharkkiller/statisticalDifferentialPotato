@@ -84,47 +84,58 @@ if ($functionChoice -eq "1a") {
         Write-Host "[WARN] $nsrlCsvPath not found - per-OS continue options unavailable." -ForegroundColor Yellow
     }
 
-    Write-Host ""
-    Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkCyan
-    Write-Host "  $([char]27)[4m|        1a) Baseline Procs with VirusTotal     |$([char]27)[24m" -ForegroundColor DarkCyan
-    Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkCyan
+    # Toggleable per-run setting; default ON saves quota on signed legitimate
+    # software that has no sandbox data at VT.
+    $skipSignedBeh = $true
 
     $subOptions = New-Object System.Collections.Generic.List[object]
     $i = 1
     foreach ($os in $osList) {
         $subOptions.Add([pscustomobject]@{ Num = $i; Label = "Continue $os"; Action = 'NSRLOs'; OsName = $os })
-        Write-Host ("  {0,2}) Continue {1}" -f $i, $os) -ForegroundColor DarkCyan
         $i++
     }
-    $subOptions.Add([pscustomobject]@{ Num = $i; Label = "Continue ALL NSRL OSes"; Action = 'NSRLAll' })
-    Write-Host ("  {0,2}) Continue ALL NSRL OSes" -f $i) -ForegroundColor DarkCyan; $i++
-
-    $subOptions.Add([pscustomobject]@{ Num = $i; Label = "Pull VT Metadata for ALL Master Intel Hashes"; Action = 'MasterIntelAll' })
-    Write-Host ("  {0,2}) Pull VT Metadata for ALL Master Intel Hashes" -f $i) -ForegroundColor DarkCyan; $i++
-
-    $subOptions.Add([pscustomobject]@{ Num = $i; Label = "Pull VT Metadata for Specific APT / Malware Family"; Action = 'MasterIntelByActor' })
-    Write-Host ("  {0,2}) Pull VT Metadata for Specific APT / Malware Family" -f $i) -ForegroundColor DarkCyan; $i++
-
-    $subOptions.Add([pscustomobject]@{ Num = $i; Label = "Continue Local Baseline (procs + drivers)"; Action = 'LocalBaseline' })
-    Write-Host ("  {0,2}) Continue Local Baseline (procs + drivers)" -f $i) -ForegroundColor DarkCyan; $i++
-
+    $subOptions.Add([pscustomobject]@{ Num = $i; Label = "Continue ALL NSRL OSes"; Action = 'NSRLAll' }); $i++
+    $subOptions.Add([pscustomobject]@{ Num = $i; Label = "Pull VT Metadata for ALL Master Intel Hashes"; Action = 'MasterIntelAll' }); $i++
+    $subOptions.Add([pscustomobject]@{ Num = $i; Label = "Pull VT Metadata for Specific APT / Malware Family"; Action = 'MasterIntelByActor' }); $i++
+    $subOptions.Add([pscustomobject]@{ Num = $i; Label = "Continue Local Baseline (procs + drivers)"; Action = 'LocalBaseline' }); $i++
     $subOptions.Add([pscustomobject]@{ Num = $i; Label = "Continue Malicious Baseline"; Action = 'Malicious' })
-    Write-Host ("  {0,2}) Continue Malicious Baseline" -f $i) -ForegroundColor DarkCyan
 
-    Write-Host ""
-    $subChoice = (Read-Host "Please enter a 1a sub-option").Trim()
-    $picked = $subOptions | Where-Object { $_.Num.ToString() -eq $subChoice } | Select-Object -First 1
+    $picked = $null
+    while (-not $picked) {
+        Write-Host ""
+        Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkCyan
+        Write-Host "  $([char]27)[4m|        1a) Baseline Procs with VirusTotal     |$([char]27)[24m" -ForegroundColor DarkCyan
+        Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkCyan
+        $stateLabel = if ($skipSignedBeh) { 'SKIP (default - saves quota)' } else { 'INCLUDE (full pull)' }
+        Write-Host ("  SignedVerified behaviors fetch: {0}" -f $stateLabel) -ForegroundColor DarkGray
+        Write-Host ""
+        foreach ($opt in $subOptions) {
+            Write-Host ("  {0,2}) {1}" -f $opt.Num, $opt.Label) -ForegroundColor DarkCyan
+        }
+        Write-Host ("   t) Toggle SignedVerified behaviors fetch") -ForegroundColor DarkCyan
+        Write-Host ""
+        $subChoice = (Read-Host "Please enter a 1a sub-option").Trim()
 
-    if (-not $picked) {
-        Write-Host "Unknown sub-option: $subChoice" -ForegroundColor Red
-    } else {
+        if ($subChoice -ieq 't') {
+            $skipSignedBeh = -not $skipSignedBeh
+            continue
+        }
+
+        $picked = $subOptions | Where-Object { $_.Num.ToString() -eq $subChoice } | Select-Object -First 1
+        if (-not $picked) {
+            Write-Host "Unknown sub-option: $subChoice" -ForegroundColor Red
+            break
+        }
+    }
+
+    if ($picked) {
         switch ($picked.Action) {
-            'NSRLOs'             { Get-VTBaseline -Mode NSRLOs -OsFilter $picked.OsName }
-            'NSRLAll'            { Get-VTBaseline -Mode NSRL }
+            'NSRLOs'             { Get-VTBaseline -Mode NSRLOs -OsFilter $picked.OsName -SkipBehaviorsForSignedVerified $skipSignedBeh }
+            'NSRLAll'            { Get-VTBaseline -Mode NSRL                            -SkipBehaviorsForSignedVerified $skipSignedBeh }
             'MasterIntelAll'     { Get-AptMasterIntelVTAll }
             'MasterIntelByActor' { Get-AptMasterIntelVTByActor }
-            'LocalBaseline'      { Get-VTBaseline -Mode LocalBaseline }
-            'Malicious'          { Get-VTBaseline -Mode Malicious }
+            'LocalBaseline'      { Get-VTBaseline -Mode LocalBaseline                   -SkipBehaviorsForSignedVerified $skipSignedBeh }
+            'Malicious'          { Get-VTBaseline -Mode Malicious                       -SkipBehaviorsForSignedVerified $skipSignedBeh }
         }
     }
 }

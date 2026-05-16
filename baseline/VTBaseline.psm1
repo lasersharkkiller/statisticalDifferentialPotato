@@ -101,7 +101,12 @@ function Get-VTBaseline {
         [string]$Proxy,
         # Explicit credentials for the proxy. Overrides whatever -ProxyRegion would
         # have resolved. Final fallback is an interactive Get-Credential prompt.
-        [pscredential]$ProxyCredential
+        [pscredential]$ProxyCredential,
+        # Skip the behaviour_summary call for hashes whose destination sig is
+        # SignedVerified. Most signed legitimate binaries have no sandbox data
+        # at VT, so the call wastes a quota unit returning nothing. Default ON
+        # (skip); pass -SkipBehaviorsForSignedVerified:$false to include them.
+        [bool]$SkipBehaviorsForSignedVerified = $true
     )
 
     if ($Mode -eq 'NSRLOs' -and [string]::IsNullOrWhiteSpace($OsFilter)) {
@@ -407,7 +412,8 @@ function Get-VTBaseline {
         param(
             [string]$Hash,
             [string]$MainPath,
-            [string]$BehaviorsPath
+            [string]$BehaviorsPath,
+            [switch]$SkipBehaviors
         )
 
         if ($missingHashes.Contains($Hash)) {
@@ -418,7 +424,11 @@ function Get-VTBaseline {
         $mainFile   = Join-Path $MainPath      "$Hash.json"
         $behaveFile = Join-Path $BehaviorsPath "$Hash.json"
 
-        if ((Test-Path $mainFile) -and (Test-Path $behaveFile)) { return }
+        if ($SkipBehaviors) {
+            if (Test-Path $mainFile) { return }  # already cached, behaviors deliberately skipped
+        } else {
+            if ((Test-Path $mainFile) -and (Test-Path $behaveFile)) { return }
+        }
 
         if (-not (Test-Path $MainPath))      { New-Item -ItemType Directory -Path $MainPath      -Force | Out-Null }
         if (-not (Test-Path $BehaviorsPath)) { New-Item -ItemType Directory -Path $BehaviorsPath -Force | Out-Null }
@@ -450,6 +460,10 @@ function Get-VTBaseline {
         }
 
         if ($script:QuotaHit) { return }
+
+        if ($SkipBehaviors) {
+            return  # caller opted out of behaviors fetch
+        }
 
         if (-not (Test-Path $behaveFile)) {
             Write-Host "  Behaviors report missing for $Hash. Querying VirusTotal..." -ForegroundColor Yellow
@@ -502,7 +516,7 @@ function Get-VTBaseline {
             if ($script:QuotaHit) { break }
             $h = $proc.value[2]; if (-not $h) { continue }
             $p = Get-DestPaths -Hash $h -Sig 'SignedVerified'
-            Process-Hash -Hash $h -MainPath $p.Main -BehaviorsPath $p.Beh
+            Process-Hash -Hash $h -MainPath $p.Main -BehaviorsPath $p.Beh -SkipBehaviors:$SkipBehaviorsForSignedVerified
         }
     }
 
@@ -519,9 +533,11 @@ function Get-VTBaseline {
             $sigOrder = @('SignedVerified','unverified','unsignedWin')
 
             $existingBehPath = $null
+            $existingSig     = $null
             foreach ($sig in $sigOrder) {
                 if (Test-Path (Join-Path (Join-Path $nsrlMain (Join-Path $slug $sig)) "$h.json")) {
                     $existingBehPath = Join-Path $nsrlBeh (Join-Path $slug $sig)
+                    $existingSig     = $sig
                     break
                 }
             }
@@ -529,6 +545,7 @@ function Get-VTBaseline {
             if ($existingBehPath) {
                 $behFile = Join-Path $existingBehPath "$h.json"
                 if (Test-Path $behFile) { continue }
+                if ($SkipBehaviorsForSignedVerified -and $existingSig -eq 'SignedVerified') { continue }
                 if (-not (Test-Path $existingBehPath)) { New-Item -ItemType Directory -Path $existingBehPath -Force | Out-Null }
                 try {
                     $beh = Invoke-VTRequest -Uri "https://www.virustotal.com/api/v3/files/$h/behaviour_summary"
@@ -560,15 +577,19 @@ function Get-VTBaseline {
                 $vtData | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $destMain "$h.json")
                 Write-Host "  [OK] $h -> NSRL/$slug/$destSig" -ForegroundColor Green
 
-                try {
-                    $beh = Invoke-VTRequest -Uri "https://www.virustotal.com/api/v3/files/$h/behaviour_summary"
-                    $beh | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $destBeh "$h.json")
-                } catch {
-                    if ($_.Exception.Message -like 'VT_ALL_KEYS_EXHAUSTED*') {
-                        Write-Host "  [!] $($_.Exception.Message)" -ForegroundColor Red
-                        $script:QuotaHit = $true
-                    } else {
-                        Write-Host "  [WARN] Behaviors unavailable for $h" -ForegroundColor DarkGray
+                if ($SkipBehaviorsForSignedVerified -and $destSig -eq 'SignedVerified') {
+                    Write-Host "  [SKIP-BEH] $h is SignedVerified; behaviors call skipped." -ForegroundColor DarkGray
+                } else {
+                    try {
+                        $beh = Invoke-VTRequest -Uri "https://www.virustotal.com/api/v3/files/$h/behaviour_summary"
+                        $beh | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $destBeh "$h.json")
+                    } catch {
+                        if ($_.Exception.Message -like 'VT_ALL_KEYS_EXHAUSTED*') {
+                            Write-Host "  [!] $($_.Exception.Message)" -ForegroundColor Red
+                            $script:QuotaHit = $true
+                        } else {
+                            Write-Host "  [WARN] Behaviors unavailable for $h" -ForegroundColor DarkGray
+                        }
                     }
                 }
             } catch {

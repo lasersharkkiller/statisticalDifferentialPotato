@@ -14,6 +14,32 @@
 function Initialize-AptVTRotator {
     # Returns a PSCustomObject carrying the loaded keys + cooldown tracker.
     # Also installs script-scope state used by Invoke-AptVTRequest.
+    param(
+        [string]$Proxy,
+        [pscredential]$ProxyCredential
+    )
+
+    # --- PROXY RESOLUTION (mirrors Get-VTBaseline) ---
+    if ([string]::IsNullOrWhiteSpace($Proxy)) { $Proxy = $env:VT_PROXY }
+    if ($Proxy -and -not $ProxyCredential) {
+        try {
+            $puser = Get-Secret -Name 'PIA_SOCKS_User' -AsPlainText -ErrorAction Stop
+            $ppass = Get-Secret -Name 'PIA_SOCKS_Password' -ErrorAction Stop
+            if ($puser -and $ppass) {
+                $securePass = if ($ppass -is [System.Security.SecureString]) { $ppass }
+                              else { ConvertTo-SecureString -String $ppass -AsPlainText -Force }
+                $ProxyCredential = [pscredential]::new($puser, $securePass)
+            }
+        } catch {}
+        if (-not $ProxyCredential) {
+            $ProxyCredential = Get-Credential -Message "Enter PIA SOCKS5 credentials for $Proxy"
+        }
+    }
+    $script:AptVTProxy           = $Proxy
+    $script:AptVTProxyCredential = $ProxyCredential
+    if ($Proxy) {
+        Write-Host ("Proxy: {0} (user: {1})" -f $Proxy, $ProxyCredential.UserName) -ForegroundColor DarkCyan
+    }
 
     $VTKeys = @()
     try {
@@ -78,7 +104,13 @@ function Invoke-AptVTRequest {
     $script:AptVTKeyLastCall[$chosenIdx] = [DateTime]::UtcNow
     $Headers = @{ "x-apikey" = $script:AptVTKeys[$chosenIdx]; "Content-Type" = "application/json" }
 
-    return Invoke-RestMethod -Uri $Uri -Headers $Headers -Method $Method
+    $proxyArgs = @{}
+    if ($script:AptVTProxy) {
+        $proxyArgs['Proxy'] = $script:AptVTProxy
+        if ($script:AptVTProxyCredential) { $proxyArgs['ProxyCredential'] = $script:AptVTProxyCredential }
+    }
+
+    return Invoke-RestMethod -Uri $Uri -Headers $Headers -Method $Method @proxyArgs
 }
 
 function Get-AptHashRecords {
@@ -276,14 +308,16 @@ function Invoke-AptActorCsv {
 function Get-AptMasterIntelVTAll {
     [CmdletBinding()]
     param(
-        [string]$AptRoot = "apt"
+        [string]$AptRoot = "apt",
+        [string]$Proxy,
+        [pscredential]$ProxyCredential
     )
 
     if (-not (Test-Path $AptRoot)) {
         Write-Error "APT root not found at '$AptRoot'."
         return
     }
-    if (-not (Initialize-AptVTRotator)) { return }
+    if (-not (Initialize-AptVTRotator -Proxy $Proxy -ProxyCredential $ProxyCredential)) { return }
 
     $mainBaseRoot      = "output-baseline\VirusTotal-main\apt-master-intel"
     $behaviorsBaseRoot = "output-baseline\VirusTotal-behaviors\apt-master-intel"
@@ -342,7 +376,9 @@ function Get-AptMasterIntelVTByActor {
     [CmdletBinding()]
     param(
         [string]$AptRoot = "apt",
-        [string]$ActorName
+        [string]$ActorName,
+        [string]$Proxy,
+        [pscredential]$ProxyCredential
     )
 
     if (-not (Test-Path $AptRoot)) {
@@ -375,7 +411,7 @@ function Get-AptMasterIntelVTByActor {
     Write-Host "Matched $($csvFiles.Count) file(s):" -ForegroundColor DarkCyan
     $csvFiles | ForEach-Object { Write-Host "  $($_.FullName)" -ForegroundColor DarkGray }
 
-    if (-not (Initialize-AptVTRotator)) { return }
+    if (-not (Initialize-AptVTRotator -Proxy $Proxy -ProxyCredential $ProxyCredential)) { return }
 
     $mainBaseRoot      = "output-baseline\VirusTotal-main\apt-master-intel"
     $behaviorsBaseRoot = "output-baseline\VirusTotal-behaviors\apt-master-intel"

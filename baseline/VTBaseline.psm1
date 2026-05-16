@@ -54,12 +54,44 @@ function Get-VTBaseline {
         [ValidateSet('All','NSRL','NSRLOs','LocalBaseline','Malicious')]
         [string]$Mode = 'All',
         [string]$OsFilter,
-        [string]$AttributionPattern = "equifax"
+        [string]$AttributionPattern = "equifax",
+        # SOCKS5/HTTP proxy URL, e.g. 'socks5://proxy-nl.privateinternetaccess.com:1080'.
+        # Falls back to $env:VT_PROXY when omitted. Set the env var to use the same
+        # script from multiple windows simultaneously, each egressing from a
+        # different PIA region.
+        [string]$Proxy,
+        # Credentials for the proxy. Defaults to PIA_SOCKS_User/PIA_SOCKS_Password
+        # secrets in SecretManagement; falls back to an interactive prompt.
+        [pscredential]$ProxyCredential
     )
 
     if ($Mode -eq 'NSRLOs' -and [string]::IsNullOrWhiteSpace($OsFilter)) {
         Write-Error "Mode 'NSRLOs' requires -OsFilter to be specified."
         return
+    }
+
+    # --- PROXY RESOLUTION ---
+    if ([string]::IsNullOrWhiteSpace($Proxy)) { $Proxy = $env:VT_PROXY }
+    if ($Proxy -and -not $ProxyCredential) {
+        try {
+            $puser = Get-Secret -Name 'PIA_SOCKS_User' -AsPlainText -ErrorAction Stop
+            $ppass = Get-Secret -Name 'PIA_SOCKS_Password' -ErrorAction Stop
+            if ($puser -and $ppass) {
+                $securePass = if ($ppass -is [System.Security.SecureString]) { $ppass }
+                              else { ConvertTo-SecureString -String $ppass -AsPlainText -Force }
+                $ProxyCredential = [pscredential]::new($puser, $securePass)
+            }
+        } catch {}
+        if (-not $ProxyCredential) {
+            $ProxyCredential = Get-Credential -Message "Enter PIA SOCKS5 credentials for $Proxy"
+        }
+    }
+    $script:VTProxy           = $Proxy
+    $script:VTProxyCredential = $ProxyCredential
+    if ($Proxy) {
+        Write-Host ("Proxy: {0} (user: {1})" -f $Proxy, $ProxyCredential.UserName) -ForegroundColor DarkCyan
+    } else {
+        Write-Host "Proxy: <none> (direct connection)" -ForegroundColor DarkGray
     }
 
     # --- API SETUP ---
@@ -167,8 +199,14 @@ function Get-VTBaseline {
             $script:VTKeyLastCall[$chosenIdx] = [DateTime]::UtcNow
             $Headers = @{ "x-apikey" = $VTKeys[$chosenIdx]; "Content-Type" = "application/json" }
 
+            $proxyArgs = @{}
+            if ($script:VTProxy) {
+                $proxyArgs['Proxy'] = $script:VTProxy
+                if ($script:VTProxyCredential) { $proxyArgs['ProxyCredential'] = $script:VTProxyCredential }
+            }
+
             try {
-                return Invoke-RestMethod -Uri $Uri -Headers $Headers -Method $Method
+                return Invoke-RestMethod -Uri $Uri -Headers $Headers -Method $Method @proxyArgs
             } catch {
                 $code = $null
                 try { $code = $_.Exception.Response.StatusCode.value__ } catch {}

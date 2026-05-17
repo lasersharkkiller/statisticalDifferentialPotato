@@ -393,7 +393,7 @@ function Get-VTBaseline {
         }
     }
 
-    # --- LOAD MISSING HASHES TRACKER ---
+    # --- LOAD MISSING HASHES TRACKER (404s on /files/{hash}) ---
     $missingHashesPath = "output\MissingHashes.csv"
     $missingHashes = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     if (Test-Path $missingHashesPath) {
@@ -404,6 +404,24 @@ function Get-VTBaseline {
             Write-Host "Loaded $($missingHashes.Count) known-404 hashes from MissingHashes.csv." -ForegroundColor DarkGray
         } catch {
             Write-Host "[WARN] Could not read MissingHashes.csv: $($_.Exception.Message)" -ForegroundColor Yellow
+        }
+    }
+
+    # --- LOAD MISSING-BEHAVIORS TRACKER (404s on /files/{hash}/behaviour_summary) ---
+    # Hashes whose main report exists in VT but whose behaviour_summary returns
+    # 404. Recording these saves one quota unit per known-no-behaviors hash on
+    # every future run, since the script would otherwise retry the same hopeless
+    # call forever.
+    $missingBehaviorsPath = "output\MissingBehaviors.csv"
+    $missingBehaviors = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    if (Test-Path $missingBehaviorsPath) {
+        try {
+            Import-Csv -Path $missingBehaviorsPath | ForEach-Object {
+                if ($_.Hash) { [void]$missingBehaviors.Add($_.Hash) }
+            }
+            Write-Host "Loaded $($missingBehaviors.Count) known-no-behaviors hashes from MissingBehaviors.csv." -ForegroundColor DarkGray
+        } catch {
+            Write-Host "[WARN] Could not read MissingBehaviors.csv: $($_.Exception.Message)" -ForegroundColor Yellow
         }
     }
 
@@ -457,10 +475,13 @@ function Get-VTBaseline {
         $mainFile   = Join-Path $MainPath      "$Hash.json"
         $behaveFile = Join-Path $BehaviorsPath "$Hash.json"
 
+        # Treat "behaviors known-404" as equivalent to "behaviors cached" for
+        # skip-early purposes - either way there's nothing left to fetch.
+        $haveBehaviors = (Test-Path $behaveFile) -or $missingBehaviors.Contains($Hash)
         if ($SkipBehaviors) {
-            if (Test-Path $mainFile) { return }  # already cached, behaviors deliberately skipped
+            if (Test-Path $mainFile) { return }
         } else {
-            if ((Test-Path $mainFile) -and (Test-Path $behaveFile)) { return }
+            if ((Test-Path $mainFile) -and $haveBehaviors) { return }
         }
 
         if (-not (Test-Path $MainPath))      { New-Item -ItemType Directory -Path $MainPath      -Force | Out-Null }
@@ -498,7 +519,7 @@ function Get-VTBaseline {
             return  # caller opted out of behaviors fetch
         }
 
-        if (-not (Test-Path $behaveFile)) {
+        if (-not (Test-Path $behaveFile) -and -not $missingBehaviors.Contains($Hash)) {
             Write-Host "  Behaviors report missing for $Hash. Querying VirusTotal..." -ForegroundColor Yellow
             try {
                 $response = Invoke-VTRequest -Uri "https://www.virustotal.com/api/v3/files/$Hash/behaviour_summary"
@@ -510,6 +531,12 @@ function Get-VTBaseline {
                 if ($_.Exception.Message -like 'VT_ALL_KEYS_EXHAUSTED*') {
                     Write-Host "  [!] $($_.Exception.Message)" -ForegroundColor Red
                     $script:QuotaHit = $true
+                }
+                elseif ($code -eq 404) {
+                    Write-Host "  [404] No behaviors in VT for $Hash. Adding to MissingBehaviors.csv." -ForegroundColor DarkGray
+                    [void]$missingBehaviors.Add($Hash)
+                    [PSCustomObject]@{ Hash = $Hash; DateChecked = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ") } |
+                        Export-Csv -Path $missingBehaviorsPath -Append -NoTypeInformation
                 }
                 else { Write-Host "  [ERROR] Behaviors HTTP $code - $($_.Exception.Message)" -ForegroundColor Red }
             }
@@ -578,6 +605,7 @@ function Get-VTBaseline {
             if ($existingBehPath) {
                 $behFile = Join-Path $existingBehPath "$h.json"
                 if (Test-Path $behFile) { continue }
+                if ($missingBehaviors.Contains($h)) { continue }
                 if ($SkipBehaviorsForSignedVerified -and $existingSig -eq 'SignedVerified') { continue }
                 if (-not (Test-Path $existingBehPath)) { New-Item -ItemType Directory -Path $existingBehPath -Force | Out-Null }
                 try {
@@ -589,6 +617,11 @@ function Get-VTBaseline {
                     if ($_.Exception.Message -like 'VT_ALL_KEYS_EXHAUSTED*') {
                         Write-Host "  [!] $($_.Exception.Message)" -ForegroundColor Red
                         $script:QuotaHit = $true
+                    } elseif ($code -eq 404) {
+                        Write-Host "  [404-BEH] $h has no behaviors in VT. Adding to MissingBehaviors.csv." -ForegroundColor DarkGray
+                        [void]$missingBehaviors.Add($h)
+                        [PSCustomObject]@{ Hash = $h; DateChecked = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ") } |
+                            Export-Csv -Path $missingBehaviorsPath -Append -NoTypeInformation
                     } else {
                         Write-Host "  [WARN] Behaviors unavailable for $h (HTTP $code)" -ForegroundColor DarkGray
                     }
@@ -612,16 +645,24 @@ function Get-VTBaseline {
 
                 if ($SkipBehaviorsForSignedVerified -and $destSig -eq 'SignedVerified') {
                     Write-Host "  [SKIP-BEH] $h is SignedVerified; behaviors call skipped." -ForegroundColor DarkGray
+                } elseif ($missingBehaviors.Contains($h)) {
+                    Write-Host "  [SKIP-BEH] $h is in MissingBehaviors.csv (known 404)." -ForegroundColor DarkGray
                 } else {
                     try {
                         $beh = Invoke-VTRequest -Uri "https://www.virustotal.com/api/v3/files/$h/behaviour_summary"
                         $beh | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $destBeh "$h.json")
                     } catch {
+                        $behCode = $null; try { $behCode = $_.Exception.Response.StatusCode.value__ } catch {}
                         if ($_.Exception.Message -like 'VT_ALL_KEYS_EXHAUSTED*') {
                             Write-Host "  [!] $($_.Exception.Message)" -ForegroundColor Red
                             $script:QuotaHit = $true
+                        } elseif ($behCode -eq 404) {
+                            Write-Host "  [404-BEH] $h has no behaviors in VT. Adding to MissingBehaviors.csv." -ForegroundColor DarkGray
+                            [void]$missingBehaviors.Add($h)
+                            [PSCustomObject]@{ Hash = $h; DateChecked = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ") } |
+                                Export-Csv -Path $missingBehaviorsPath -Append -NoTypeInformation
                         } else {
-                            Write-Host "  [WARN] Behaviors unavailable for $h" -ForegroundColor DarkGray
+                            Write-Host "  [WARN] Behaviors unavailable for $h (HTTP $behCode)" -ForegroundColor DarkGray
                         }
                     }
                 }

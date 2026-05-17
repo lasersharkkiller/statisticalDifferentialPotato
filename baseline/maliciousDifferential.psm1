@@ -182,7 +182,7 @@ function Get-MaliciousDifferentialAnalysis {
                                 $ts = $r.data.attributes.first_submission_date
                                 if ($ts) { $Date = [DateTimeOffset]::FromUnixTimeSeconds($ts).DateTime.ToString("yyyy-MM-dd") }
                             }
-                            $r | ConvertTo-Json -Depth 6 | Set-Content -Path (Join-Path $MaliciousStoragePath "$RealSHA256.json")
+                            $r | ConvertTo-Json -Depth 100 | Set-Content -Path (Join-Path $MaliciousStoragePath "$RealSHA256.json")
                             $resolved = $true; break
                         } catch {
                             $code = $_.Exception.Response.StatusCode.value__
@@ -222,7 +222,7 @@ function Get-MaliciousDifferentialAnalysis {
                         if ($delay -gt 0) { Write-Host "[$BaseName] VT Rate Limit (behaviors) -- sleeping ${delay}s"; Start-Sleep -Seconds $delay }
                         try {
                             $r = Invoke-RestMethod -Uri "https://www.virustotal.com/api/v3/files/$RealSHA256/behaviour_summary" -Headers $VT_headers -Method Get
-                            $r | ConvertTo-Json -Depth 10 | Set-Content -Path $bFile
+                            $r | ConvertTo-Json -Depth 100 | Set-Content -Path $bFile
                             break
                         } catch {
                             if ($_.Exception.Response.StatusCode.value__ -eq 429) {

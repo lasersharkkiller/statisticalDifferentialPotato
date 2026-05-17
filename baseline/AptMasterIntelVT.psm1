@@ -281,7 +281,7 @@ function Process-AptHash {
         Write-Host "  Main report missing for $Hash. Querying VirusTotal..." -ForegroundColor Yellow
         try {
             $response = Invoke-AptVTRequest -Uri "https://www.virustotal.com/api/v3/files/$Hash"
-            $response | ConvertTo-Json -Depth 6 | Set-Content -Path $mainFile
+            $response | ConvertTo-Json -Depth 100 | Set-Content -Path $mainFile
             $script:AptVTMainIndex[$Hash] = $mainFile
             Write-Host "  [OK] Main report saved." -ForegroundColor Green
         } catch {
@@ -308,7 +308,7 @@ function Process-AptHash {
         Write-Host "  Behaviors report missing for $Hash. Querying VirusTotal..." -ForegroundColor Yellow
         try {
             $response = Invoke-AptVTRequest -Uri "https://www.virustotal.com/api/v3/files/$Hash/behaviour_summary"
-            $response | ConvertTo-Json -Depth 10 | Set-Content -Path $behaveFile
+            $response | ConvertTo-Json -Depth 100 | Set-Content -Path $behaveFile
             $script:AptVTBehaviorsIndex[$Hash] = $behaveFile
             Write-Host "  [OK] Behaviors report saved." -ForegroundColor Green
         } catch {

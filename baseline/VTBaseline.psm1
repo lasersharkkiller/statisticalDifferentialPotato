@@ -491,7 +491,7 @@ function Get-VTBaseline {
             Write-Host "  Main report missing for $Hash. Querying VirusTotal..." -ForegroundColor Yellow
             try {
                 $response = Invoke-VTRequest -Uri "https://www.virustotal.com/api/v3/files/$Hash"
-                $response | ConvertTo-Json -Depth 10 | Set-Content -Path $mainFile
+                $response | ConvertTo-Json -Depth 100 | Set-Content -Path $mainFile
                 Write-Host "  [OK] Main report saved." -ForegroundColor Green
             } catch {
                 $code = $null
@@ -523,7 +523,7 @@ function Get-VTBaseline {
             Write-Host "  Behaviors report missing for $Hash. Querying VirusTotal..." -ForegroundColor Yellow
             try {
                 $response = Invoke-VTRequest -Uri "https://www.virustotal.com/api/v3/files/$Hash/behaviour_summary"
-                $response | ConvertTo-Json -Depth 10 | Set-Content -Path $behaveFile
+                $response | ConvertTo-Json -Depth 100 | Set-Content -Path $behaveFile
                 Write-Host "  [OK] Behaviors report saved." -ForegroundColor Green
             } catch {
                 $code = $null
@@ -610,7 +610,7 @@ function Get-VTBaseline {
                 if (-not (Test-Path $existingBehPath)) { New-Item -ItemType Directory -Path $existingBehPath -Force | Out-Null }
                 try {
                     $beh = Invoke-VTRequest -Uri "https://www.virustotal.com/api/v3/files/$h/behaviour_summary"
-                    $beh | ConvertTo-Json -Depth 10 | Set-Content $behFile
+                    $beh | ConvertTo-Json -Depth 100 | Set-Content $behFile
                     Write-Host "  [OK] $h behaviors (main was cached)" -ForegroundColor Green
                 } catch {
                     $code = $null; try { $code = $_.Exception.Response.StatusCode.value__ } catch {}
@@ -640,7 +640,7 @@ function Get-VTBaseline {
                 $destBeh  = Join-Path $nsrlBeh  (Join-Path $slug $destSig)
                 if (-not (Test-Path $destMain)) { New-Item -ItemType Directory -Path $destMain -Force | Out-Null }
                 if (-not (Test-Path $destBeh))  { New-Item -ItemType Directory -Path $destBeh  -Force | Out-Null }
-                $vtData | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $destMain "$h.json")
+                $vtData | ConvertTo-Json -Depth 100 | Set-Content (Join-Path $destMain "$h.json")
                 Write-Host "  [OK] $h -> NSRL/$slug/$destSig" -ForegroundColor Green
 
                 if ($SkipBehaviorsForSignedVerified -and $destSig -eq 'SignedVerified') {
@@ -650,7 +650,7 @@ function Get-VTBaseline {
                 } else {
                     try {
                         $beh = Invoke-VTRequest -Uri "https://www.virustotal.com/api/v3/files/$h/behaviour_summary"
-                        $beh | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $destBeh "$h.json")
+                        $beh | ConvertTo-Json -Depth 100 | Set-Content (Join-Path $destBeh "$h.json")
                     } catch {
                         $behCode = $null; try { $behCode = $_.Exception.Response.StatusCode.value__ } catch {}
                         if ($_.Exception.Message -like 'VT_ALL_KEYS_EXHAUSTED*') {

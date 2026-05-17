@@ -242,9 +242,41 @@ function Get-VTBaseline {
     $script:VTMinDelayMs       = 15000
     $script:VTKeyLastCall      = @{}
     $script:VTKeyDisabledUntil = @{}
+    $script:VTKeyCallCount     = @{}
+    # Stop 1 short of VT's 500/day per-account cap so VT doesn't email
+    # "quota exhausted" notifications. Tracked per-key locally + seeded from
+    # VT's current api_requests_daily.used at startup so cross-window /
+    # earlier-today usage is respected.
+    $script:VTKeyCapPerDay     = 499
+
+    Write-Host "Seeding per-key daily-used counters from VT..." -ForegroundColor DarkGray
     for ($j = 0; $j -lt $VTKeys.Count; $j++) {
         $script:VTKeyLastCall[$j]      = [DateTime]::MinValue
         $script:VTKeyDisabledUntil[$j] = [DateTime]::MinValue
+
+        $used = 0
+        $probeArgs = @{
+            Uri        = "https://www.virustotal.com/api/v3/users/$($VTKeys[$j])"
+            Headers    = @{ 'x-apikey' = $VTKeys[$j] }
+            TimeoutSec = 15
+        }
+        if ($script:VTProxy) {
+            $probeArgs['Proxy'] = $script:VTProxy
+            if ($script:VTProxyCredential) { $probeArgs['ProxyCredential'] = $script:VTProxyCredential }
+        }
+        try {
+            $u    = Invoke-RestMethod @probeArgs
+            $used = [int]$u.data.attributes.quotas.api_requests_daily.used
+        } catch {
+            Write-Host ("  [WARN] Could not query daily-used for {0}: {1}" -f $loadedNames[$j], $_.Exception.Message) -ForegroundColor Yellow
+        }
+        $script:VTKeyCallCount[$j] = $used
+        if ($used -ge $script:VTKeyCapPerDay) {
+            $script:VTKeyDisabledUntil[$j] = [DateTime]::UtcNow.Date.AddDays(1)
+            Write-Host ("  Key {0,2} ({1,-16}) {2}/{3} - at cap, skipping until next UTC midnight" -f ($j + 1), $loadedNames[$j], $used, $script:VTKeyCapPerDay) -ForegroundColor Yellow
+        } else {
+            Write-Host ("  Key {0,2} ({1,-16}) {2}/{3} used today" -f ($j + 1), $loadedNames[$j], $used, $script:VTKeyCapPerDay) -ForegroundColor DarkGray
+        }
     }
 
     function Invoke-VTRequest {
@@ -258,6 +290,14 @@ function Get-VTBaseline {
 
             for ($k = 0; $k -lt $VTKeys.Count; $k++) {
                 if ($script:VTKeyDisabledUntil[$k] -gt $now) { continue }
+                # Local soft-cap: stop using this key once it has hit our
+                # per-day limit (499) - one short of VT's 500/day, so the
+                # vendor never sends a quota-exhausted email.
+                if ($script:VTKeyCallCount[$k] -ge $script:VTKeyCapPerDay) {
+                    $script:VTKeyDisabledUntil[$k] = [DateTime]::UtcNow.Date.AddDays(1)
+                    Write-Host ("    [Cap] Key $($k + 1) hit local cap ($($script:VTKeyCapPerDay)); disabled until next UTC midnight.") -ForegroundColor Yellow
+                    continue
+                }
                 $activeCount++
                 $readyAt = $script:VTKeyLastCall[$k].AddMilliseconds($script:VTMinDelayMs)
                 if ($readyAt -le $now) {
@@ -282,7 +322,8 @@ function Get-VTBaseline {
                 Start-Sleep -Milliseconds ([Math]::Ceiling($waitMs))
             }
 
-            $script:VTKeyLastCall[$chosenIdx] = [DateTime]::UtcNow
+            $script:VTKeyLastCall[$chosenIdx]   = [DateTime]::UtcNow
+            $script:VTKeyCallCount[$chosenIdx]++
             $Headers = @{ "x-apikey" = $VTKeys[$chosenIdx]; "Content-Type" = "application/json" }
 
             $proxyArgs = @{}

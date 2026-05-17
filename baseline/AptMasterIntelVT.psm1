@@ -138,11 +138,45 @@ function Initialize-AptVTRotator {
 
     Write-Host "Using $($VTKeys.Count) VT API key(s) ($($loadedNames -join ', ')). Rotating with 15s spacing per key (~$($VTKeys.Count * 4) req/min combined)." -ForegroundColor DarkCyan
 
-    $script:AptVTKeys        = $VTKeys
-    $script:AptVTMinDelayMs  = 15000
-    $script:AptVTKeyLastCall = @{}
+    $script:AptVTKeys          = $VTKeys
+    $script:AptVTLoadedNames   = $loadedNames
+    $script:AptVTMinDelayMs    = 15000
+    $script:AptVTKeyLastCall   = @{}
+    $script:AptVTKeyDisabled   = @{}
+    $script:AptVTKeyCallCount  = @{}
+    # Stop 1 short of VT's 500/day per-account cap so VT doesn't email
+    # "quota exhausted" notifications. Seeded from VT's current
+    # api_requests_daily.used at startup.
+    $script:AptVTKeyCapPerDay  = 499
+
+    Write-Host "Seeding per-key daily-used counters from VT..." -ForegroundColor DarkGray
     for ($j = 0; $j -lt $VTKeys.Count; $j++) {
         $script:AptVTKeyLastCall[$j] = [DateTime]::MinValue
+        $script:AptVTKeyDisabled[$j] = [DateTime]::MinValue
+
+        $used = 0
+        $probeArgs = @{
+            Uri        = "https://www.virustotal.com/api/v3/users/$($VTKeys[$j])"
+            Headers    = @{ 'x-apikey' = $VTKeys[$j] }
+            TimeoutSec = 15
+        }
+        if ($script:AptVTProxy) {
+            $probeArgs['Proxy'] = $script:AptVTProxy
+            if ($script:AptVTProxyCredential) { $probeArgs['ProxyCredential'] = $script:AptVTProxyCredential }
+        }
+        try {
+            $u    = Invoke-RestMethod @probeArgs
+            $used = [int]$u.data.attributes.quotas.api_requests_daily.used
+        } catch {
+            Write-Host ("  [WARN] Could not query daily-used for {0}: {1}" -f $loadedNames[$j], $_.Exception.Message) -ForegroundColor Yellow
+        }
+        $script:AptVTKeyCallCount[$j] = $used
+        if ($used -ge $script:AptVTKeyCapPerDay) {
+            $script:AptVTKeyDisabled[$j] = [DateTime]::UtcNow.Date.AddDays(1)
+            Write-Host ("  Key {0,2} ({1,-16}) {2}/{3} - at cap, skipping until next UTC midnight" -f ($j + 1), $loadedNames[$j], $used, $script:AptVTKeyCapPerDay) -ForegroundColor Yellow
+        } else {
+            Write-Host ("  Key {0,2} ({1,-16}) {2}/{3} used today" -f ($j + 1), $loadedNames[$j], $used, $script:AptVTKeyCapPerDay) -ForegroundColor DarkGray
+        }
     }
     return $true
 }
@@ -153,8 +187,18 @@ function Invoke-AptVTRequest {
     $now           = [DateTime]::UtcNow
     $chosenIdx     = -1
     $earliestReady = [DateTime]::MaxValue
+    $activeCount   = 0
 
     for ($k = 0; $k -lt $script:AptVTKeys.Count; $k++) {
+        if ($script:AptVTKeyDisabled[$k] -gt $now) { continue }
+        # Local soft-cap (499) - one short of VT's per-day 500 so no quota-
+        # exhausted email gets sent.
+        if ($script:AptVTKeyCallCount[$k] -ge $script:AptVTKeyCapPerDay) {
+            $script:AptVTKeyDisabled[$k] = [DateTime]::UtcNow.Date.AddDays(1)
+            Write-Host ("    [Cap] Key $($k + 1) hit local cap ($($script:AptVTKeyCapPerDay)); disabled until next UTC midnight.") -ForegroundColor Yellow
+            continue
+        }
+        $activeCount++
         $readyAt = $script:AptVTKeyLastCall[$k].AddMilliseconds($script:AptVTMinDelayMs)
         if ($readyAt -le $now) {
             $chosenIdx = $k
@@ -166,6 +210,10 @@ function Invoke-AptVTRequest {
         }
     }
 
+    if ($activeCount -eq 0) {
+        throw "VT_ALL_KEYS_EXHAUSTED: all keys at cap or disabled. Earliest re-enable next UTC midnight."
+    }
+
     $waitMs = ($script:AptVTKeyLastCall[$chosenIdx].AddMilliseconds($script:AptVTMinDelayMs) - [DateTime]::UtcNow).TotalMilliseconds
     if ($waitMs -gt 0) {
         $waitSec = [Math]::Round($waitMs / 1000, 1)
@@ -173,7 +221,8 @@ function Invoke-AptVTRequest {
         Start-Sleep -Milliseconds ([Math]::Ceiling($waitMs))
     }
 
-    $script:AptVTKeyLastCall[$chosenIdx] = [DateTime]::UtcNow
+    $script:AptVTKeyLastCall[$chosenIdx]   = [DateTime]::UtcNow
+    $script:AptVTKeyCallCount[$chosenIdx]++
     $Headers = @{ "x-apikey" = $script:AptVTKeys[$chosenIdx]; "Content-Type" = "application/json" }
 
     $proxyArgs = @{}

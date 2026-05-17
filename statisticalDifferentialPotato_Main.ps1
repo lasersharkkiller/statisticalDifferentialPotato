@@ -67,6 +67,13 @@ Write-Host "  $([char]27)[4m+----------------------------------------------+$([c
 Write-Host "3a) Iterate through APT Analyses and Create API Matrix" -ForegroundColor Gray
 Write-Host ""
 
+# -- GROUP 4: Firmware Extraction (NextGen NSRL Building) ---------------------
+Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkYellow
+Write-Host "  $([char]27)[4m|     Firmware Extraction (NextGen NSRL)        |$([char]27)[24m" -ForegroundColor DarkYellow
+Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkYellow
+Write-Host "4a) Eaton: Extract .sta firmware + build NSRL catalog" -ForegroundColor DarkYellow
+Write-Host ""
+
 
 $functionChoice = (Read-Host "Please enter an option").Trim().ToLowerInvariant()
 
@@ -167,6 +174,35 @@ elseif ($functionChoice -eq "2b") {
 # -- GROUP 3: Reports ---------------------------------------------------------
 elseif ($functionChoice -eq "3a") {
     New-ApiMatrixDashboard
+}
+
+# -- GROUP 4: Firmware Extraction (NextGen NSRL Building) ---------------------
+elseif ($functionChoice -eq "4a") {
+    $staPath = (Read-Host "Path to Eaton .sta firmware file").Trim().Trim('"')
+    if (-not (Test-Path -LiteralPath $staPath)) {
+        Write-Host "File not found: $staPath" -ForegroundColor Red
+    } else {
+        # Suggest OsName from filename (e.g. eaton_9px_lvhv11_e0_v02.24.0048_tl00.sta
+        #   -> 'Eaton 9PX v02.24.0048')
+        $baseName = [System.IO.Path]::GetFileNameWithoutExtension($staPath)
+        $vMatch   = [regex]::Match($baseName, 'v(\d+\.\d+\.\d+)')
+        $modelMatch = [regex]::Match($baseName, '(?i)9px|5sc|9sx|9155|9px[^_]*')
+        $modelHint  = if ($modelMatch.Success) { $modelMatch.Value.ToUpperInvariant() } else { 'UPS' }
+        $verHint    = if ($vMatch.Success)     { $vMatch.Value }                      else { '' }
+        $suggested  = ("Eaton {0} {1}" -f $modelHint, $verHint).Trim()
+
+        $osName = (Read-Host "OsName for catalog (Enter for '$suggested')").Trim()
+        if ([string]::IsNullOrWhiteSpace($osName)) { $osName = $suggested }
+
+        Write-Host ""
+        Write-Host ">>> Step 1/2: Extracting .sta blocks" -ForegroundColor DarkYellow
+        & "$PSScriptRoot\tools\Expand-EatonSta.ps1" -StaPath $staPath -Force
+
+        Write-Host ""
+        Write-Host ">>> Step 2/2: Building NSRL catalog" -ForegroundColor DarkYellow
+        $sourceDir = Split-Path -LiteralPath $staPath -Parent
+        & "$PSScriptRoot\tools\Build-OsCatalog.ps1" -OsName $osName -SourceDir $sourceDir
+    }
 }
 
 else {

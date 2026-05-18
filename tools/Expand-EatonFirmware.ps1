@@ -260,6 +260,65 @@ if ($sevenZip) {
     }
 }
 
+# --- Step 6: deep-extract embedded Linux firmware via WSL + binwalk/ubireader ---
+# Eaton's network / PDU / gateway products ship as .tar containing a UBIFS or
+# squashfs rootfs (xz-compressed). Without this step, those firmware payloads
+# stay as opaque blobs in the catalog and 5a only hashes ~4 vendor artifacts
+# per product. With it, the catalog grows to thousands of rows per product
+# (every binary, library, config, and HTML file in the embedded OS).
+# Requires WSL + Ubuntu + binwalk/squashfs-tools/xz/ubi_reader.
+
+$wslAvailable = $false
+try {
+    & wsl.exe --status *>$null
+    if ($LASTEXITCODE -eq 0) {
+        & wsl.exe --user root -d Ubuntu -- bash -lc 'command -v ubireader_extract_files >/dev/null && command -v binwalk >/dev/null' *>$null
+        if ($LASTEXITCODE -eq 0) { $wslAvailable = $true }
+    }
+} catch {}
+
+if ($wslAvailable) {
+    $candidates = @(Get-ChildItem -LiteralPath $OutputDir -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.FullName -notmatch '-deep[\\/]' -and
+            ($_.Extension -in @('.tar','.fw','.img') -or
+             ($_.Extension -in @('.bin','.gz','.xz') -and $_.Length -gt 1MB))
+        })
+    if (-not $Quiet) {
+        Write-Host ""
+        Write-Host ("Step 6: deep-extract {0} firmware payload(s) via WSL+binwalk" -f $candidates.Count) -ForegroundColor DarkCyan
+    }
+    $extractorWsl = '/mnt/c/githubProjects/statisticalDifferentialPotato/tools/extract-firmware.sh'
+    foreach ($f in $candidates) {
+        $deepDir = $f.FullName + '-deep'
+        if (Test-Path -LiteralPath $deepDir) {
+            if (-not $Quiet) { Write-Host ("  [skip] {0} already deep-extracted" -f $f.Name) -ForegroundColor DarkGray }
+            continue
+        }
+        $wslIn  = '/mnt/c' + ($f.FullName -replace '^C:','' -replace '\\','/')
+        $wslOut = '/mnt/c' + ($deepDir   -replace '^C:','' -replace '\\','/')
+        if (-not $Quiet) { Write-Host ("  {0} ..." -f $f.Name) -ForegroundColor DarkGray -NoNewline }
+        & wsl.exe --user root -d Ubuntu -- bash "$extractorWsl" "$wslIn" "$wslOut" *>$null
+        $extractedCount = @(Get-ChildItem -LiteralPath $deepDir -Recurse -File -ErrorAction SilentlyContinue).Count
+        if ($extractedCount -gt 0) {
+            if (-not $Quiet) { Write-Host (" {0} files" -f $extractedCount) -ForegroundColor Green }
+        } else {
+            if (-not $Quiet) { Write-Host " no filesystem detected" -ForegroundColor DarkGray }
+            if (Test-Path -LiteralPath $deepDir) {
+                Remove-Item -LiteralPath $deepDir -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+} else {
+    if (-not $Quiet) {
+        Write-Host ""
+        Write-Host "Step 6: skipped (WSL+binwalk+ubi_reader not installed)" -ForegroundColor DarkGray
+        Write-Host "  To enable embedded-Linux filesystem extraction:" -ForegroundColor DarkGray
+        Write-Host "    wsl --install -d Ubuntu --no-launch" -ForegroundColor DarkGray
+        Write-Host "    wsl --user root -d Ubuntu -- bash -c 'apt update && apt install -y binwalk squashfs-tools xz-utils python3-pip cpio && pip3 install --break-system-packages ubi_reader'" -ForegroundColor DarkGray
+    }
+}
+
 # --- Done ---
 if (-not $Quiet) {
     $allFiles = @(Get-ChildItem -LiteralPath $OutputDir -Recurse -File -ErrorAction SilentlyContinue)

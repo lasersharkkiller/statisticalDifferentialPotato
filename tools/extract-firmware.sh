@@ -99,6 +99,18 @@ extract_one() {
             mkdir -p "$out"
             (cd "$out" && cpio -idu --quiet < "$input") 2>/dev/null || { rm -rf "$out"; return 0; }
             ;;
+        *"Zip archive"*)
+            # Proper ZIP handler (7z handles all variants). Without this,
+            # ZIPs would fall into the binwalk-fallback case below and get
+            # carved as slices, which then re-trigger binwalk on themselves
+            # because each slice contains the same downstream signatures.
+            out="$outdir/zip"
+            mkdir -p "$out"
+            7z x -y "-o$out" "$input" >/dev/null 2>&1 || true
+            if [ -z "$(ls -A "$out" 2>/dev/null)" ]; then
+                rm -rf "$out"; return 0
+            fi
+            ;;
         *"DOS/MBR boot sector"*)
             # FAT12/16/32 volume. 7z handles all variants. Reports non-zero
             # exit on volumes without a real MBR (Eaton's .data_img has none)
@@ -124,7 +136,38 @@ extract_one() {
             done
             ;;
         *)
-            return 0
+            # Don't re-binwalk anything that came out of a previous binwalk
+            # carve -- binwalk's ZIP/gzip extractor produces partial slices
+            # that contain the rest of the original file, so re-scanning
+            # them re-discovers the same downstream signatures and the
+            # cascade explodes (PDU G3 went 1 -> 308 rows with only 8
+            # unique hashes before this guard was added).
+            case "$input" in
+                */_*.extracted/*) return 0 ;;
+            esac
+            # Fallback: try binwalk's signature-based auto-extract for any
+            # unrecognized format >=1MB. Picks up things like Eaton PDU G3
+            # firmware (STM32 image with zipped SNMP MIBs + gzipped web-UI
+            # assets embedded at fixed offsets) where no container handler
+            # applies but signature-scanning finds extractable payloads.
+            # Smaller files are skipped -- binwalk on tiny binaries tends
+            # to produce false-positive carves with no real content.
+            local sz
+            sz=$(stat -c%s "$input" 2>/dev/null || echo 0)
+            if [ "$sz" -lt 1048576 ]; then return 0; fi
+            if ! command -v binwalk >/dev/null 2>&1; then return 0; fi
+            local stage
+            stage="$outdir/binwalk"
+            mkdir -p "$stage"
+            (cd "$stage" && binwalk -e --run-as=root --depth=2 "$input" >/dev/null 2>&1) || true
+            local bwOut
+            bwOut="$stage/_$(basename "$input").extracted"
+            if [ -d "$bwOut" ] && [ -n "$(ls -A "$bwOut" 2>/dev/null)" ]; then
+                out="$bwOut"
+            else
+                rm -rf "$stage"
+                return 0
+            fi
             ;;
     esac
 

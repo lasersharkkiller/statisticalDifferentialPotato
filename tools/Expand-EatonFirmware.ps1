@@ -278,13 +278,27 @@ try {
 } catch {}
 
 if ($wslAvailable) {
+    # USHA-format firmware (BestLink / ConnectUPS / ConnectUPS-Web-SNMP-Card /
+    # X-Slot-Modbus) is ESP32-style and typically <1MB, so it'd be filtered
+    # out by the size threshold below. The bash script's USHA handler can
+    # carve embedded web-UI files from it, so detect by magic and force-include.
+    function Test-IsUshaFirmware {
+        param([System.IO.FileInfo]$File)
+        if ($File.Length -lt 4) { return $false }
+        try {
+            $b = [byte[]]::new(4)
+            $fs = [System.IO.File]::OpenRead($File.FullName)
+            try { [void]$fs.Read($b, 0, 4) } finally { $fs.Dispose() }
+            return ($b[0] -eq 0x55 -and $b[1] -eq 0x53 -and $b[2] -eq 0x48 -and $b[3] -eq 0x41)
+        } catch { return $false }
+    }
     $candidates = @(Get-ChildItem -LiteralPath $OutputDir -Recurse -File -ErrorAction SilentlyContinue |
         Where-Object {
-            $_.FullName -notmatch '-deep[\\/]' -and
-            # .rom = Power-Xpert-Gateway / PXGMS (POSIX tar with uImage +
-            # squashfs.img + devtree.dtb). Same handler chain as .tar.
-            ($_.Extension -in @('.tar','.fw','.img','.rom') -or
-             ($_.Extension -in @('.bin','.gz','.xz') -and $_.Length -gt 1MB))
+            if ($_.FullName -match '-deep[\\/]') { return $false }
+            $isContainer = $_.Extension -in @('.tar','.fw','.img','.rom')
+            $isBigBin    = $_.Extension -in @('.bin','.gz','.xz') -and $_.Length -gt 1MB
+            $isUsha      = $_.Extension -ieq '.bin' -and (Test-IsUshaFirmware $_)
+            $isContainer -or $isBigBin -or $isUsha
         })
     if (-not $Quiet) {
         Write-Host ""

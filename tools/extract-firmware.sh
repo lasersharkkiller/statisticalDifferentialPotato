@@ -145,6 +145,30 @@ extract_one() {
             case "$input" in
                 */_*.extracted/*) return 0 ;;
             esac
+
+            # USHA-format ESP32 firmware (Eaton BestLink Adapter / ConnectUPS /
+            # ConnectUPS-Web-SNMP-Card / X-Slot-Modbus). 'file' calls them
+            # "data", and binwalk -e returns 0 carves because the embedded
+            # HTML/GIF resources are stored inline (no compression container).
+            # Hand off to a Python slicer that carves between binwalk's
+            # signature offsets.
+            local magic
+            magic=$(head -c 4 "$input" 2>/dev/null)
+            if [ "$magic" = "USHA" ]; then
+                out="$outdir/usha-webui"
+                mkdir -p "$out"
+                # Locate the slicer next to this script
+                local slicer
+                slicer="$(dirname "$(readlink -f "$0")")/slice-usha-firmware.py"
+                if [ -x "$slicer" ] || [ -f "$slicer" ]; then
+                    python3 "$slicer" "$input" "$out" >/dev/null 2>&1 || true
+                fi
+                if [ -z "$(ls -A "$out" 2>/dev/null)" ]; then
+                    rm -rf "$out"; return 0
+                fi
+                return 0  # don't recurse into carved web assets
+            fi
+
             # Fallback: try binwalk's signature-based auto-extract for any
             # unrecognized format >=1MB. Picks up things like Eaton PDU G3
             # firmware (STM32 image with zipped SNMP MIBs + gzipped web-UI

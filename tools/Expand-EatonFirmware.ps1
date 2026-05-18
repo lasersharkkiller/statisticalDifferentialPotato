@@ -281,7 +281,9 @@ if ($wslAvailable) {
     $candidates = @(Get-ChildItem -LiteralPath $OutputDir -Recurse -File -ErrorAction SilentlyContinue |
         Where-Object {
             $_.FullName -notmatch '-deep[\\/]' -and
-            ($_.Extension -in @('.tar','.fw','.img') -or
+            # .rom = Power-Xpert-Gateway / PXGMS (POSIX tar with uImage +
+            # squashfs.img + devtree.dtb). Same handler chain as .tar.
+            ($_.Extension -in @('.tar','.fw','.img','.rom') -or
              ($_.Extension -in @('.bin','.gz','.xz') -and $_.Length -gt 1MB))
         })
     if (-not $Quiet) {

@@ -77,7 +77,15 @@ extract_one() {
             mkdir -p "$outdir"
             out="$outdir/squashfs"
             rm -rf "$out"
-            unsquashfs -no-progress -d "$out" "$input" >/dev/null 2>&1 || { rm -rf "$out"; return 0; }
+            # unsquashfs returns non-zero when device nodes / fifos / sockets
+            # can't be created on NTFS (/mnt/c) but still extracts every regular
+            # file/dir/symlink. Check post-hoc for content rather than trusting
+            # exit code, otherwise we'd throw away ~1900 real files to avoid a
+            # ~700-node /dev tree we can't represent on Windows anyway.
+            unsquashfs -no-progress -d "$out" "$input" >/dev/null 2>&1
+            if [ -z "$(ls -A "$out" 2>/dev/null)" ]; then
+                rm -rf "$out"; return 0
+            fi
             ;;
         "UBIfs image"*)
             out="$outdir/ubifs"

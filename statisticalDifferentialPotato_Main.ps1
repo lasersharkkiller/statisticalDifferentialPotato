@@ -72,7 +72,7 @@ Write-Host ""
 Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkYellow
 Write-Host "  $([char]27)[4m|     Firmware Extraction (NextGen NSRL)        |$([char]27)[24m" -ForegroundColor DarkYellow
 Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkYellow
-Write-Host "4a) Eaton: Extract .sta firmware + build NSRL catalog" -ForegroundColor DarkYellow
+Write-Host "4a) Eaton: Extract firmware bundles + build NSRL catalogs (submenu: pick one or ALL)" -ForegroundColor DarkYellow
 Write-Host ""
 
 # -- GROUP 5: OT Firmware Baselining ------------------------------------------
@@ -188,34 +188,76 @@ elseif ($functionChoice -eq "3a") {
 
 # -- GROUP 4: Firmware Extraction (NextGen NSRL Building) ---------------------
 elseif ($functionChoice -eq "4a") {
-    $staPath = (Read-Host "Path to Eaton .sta firmware file").Trim().Trim('"')
-    if (-not (Test-Path -LiteralPath $staPath)) {
-        Write-Host "File not found: $staPath" -ForegroundColor Red
+    # Auto-discover firmware ZIPs in firmware-staging\Eaton\**\raw\*.zip
+    $stagingRoot = Join-Path (Split-Path $PSScriptRoot -Parent) 'firmware-staging\Eaton'
+    $zipFiles = @()
+    if (Test-Path $stagingRoot) {
+        $zipFiles = @(Get-ChildItem -Path $stagingRoot -Recurse -File -Filter '*.zip' -ErrorAction SilentlyContinue |
+                      Where-Object { $_.DirectoryName -match '[\\/]raw([\\/]|$)' } |
+                      Sort-Object FullName)
+    }
+    if ($zipFiles.Count -eq 0) {
+        Write-Host "[WARN] No firmware ZIPs found under $stagingRoot\**\raw\ - drop firmware ZIPs there first." -ForegroundColor Yellow
     } else {
-        # Suggest OsName from filename (e.g. eaton_9px_lvhv11_e0_v02.24.0048_tl00.sta
-        #   -> 'Eaton 9PX v02.24.0048')
-        $baseName = [System.IO.Path]::GetFileNameWithoutExtension($staPath)
-        $vMatch   = [regex]::Match($baseName, 'v(\d+\.\d+\.\d+)')
-        $modelMatch = [regex]::Match($baseName, '(?i)9px|5sc|9sx|9155|9px[^_]*')
-        $modelHint  = if ($modelMatch.Success) { $modelMatch.Value.ToUpperInvariant() } else { 'UPS' }
-        $verHint    = if ($vMatch.Success)     { $vMatch.Value }                      else { '' }
-        $suggested  = ("Eaton {0} {1}" -f $modelHint, $verHint).Trim()
-
-        $osName = (Read-Host "OsName for catalog (Enter for '$suggested')").Trim()
-        if ([string]::IsNullOrWhiteSpace($osName)) { $osName = $suggested }
-
         Write-Host ""
-        Write-Host ">>> Step 1/2: Extracting .sta blocks" -ForegroundColor DarkYellow
-        & "$PSScriptRoot\tools\Expand-EatonSta.ps1" -StaPath $staPath -Force
-
+        Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkYellow
+        Write-Host "  $([char]27)[4m|      4a) Eaton: Extract + build catalog       |$([char]27)[24m" -ForegroundColor DarkYellow
+        Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkYellow
+        for ($i = 0; $i -lt $zipFiles.Count; $i++) {
+            # path: .../firmware-staging/Eaton/<Cat>/<Product>/raw/<zip>
+            $rawDir   = $zipFiles[$i].DirectoryName
+            $product  = Split-Path -Parent $rawDir | Split-Path -Leaf
+            $category = Split-Path -Parent (Split-Path -Parent $rawDir) | Split-Path -Leaf
+            Write-Host ("  {0,2}) {1}/{2}" -f ($i + 1), $category, $product) -ForegroundColor DarkYellow
+        }
+        Write-Host ("  {0,2}) ALL Eaton firmware ZIPs" -f ($zipFiles.Count + 1)) -ForegroundColor DarkYellow
         Write-Host ""
-        Write-Host ">>> Step 2/2: Building NSRL catalog" -ForegroundColor DarkYellow
-        $sourceDir   = Split-Path -LiteralPath $staPath -Parent
-        # Catalog lives alongside the product folder (one level above the
-        # extracted/ subfolder) so 5a/5b can auto-discover it by globbing
-        # firmware-staging/**/catalog.csv.
-        $catalogPath = Join-Path (Split-Path -Parent $sourceDir) 'catalog.csv'
-        & "$PSScriptRoot\tools\Build-OsCatalog.ps1" -OsName $osName -SourceDir $sourceDir -OutputCsv $catalogPath
+        $sub = (Read-Host "Please enter a 4a sub-option").Trim()
+
+        $picks = @()
+        if ($sub -eq ($zipFiles.Count + 1).ToString() -or $sub -ieq 'all') {
+            $picks = $zipFiles
+        } elseif ($sub -match '^\d+$' -and [int]$sub -ge 1 -and [int]$sub -le $zipFiles.Count) {
+            $picks = @($zipFiles[[int]$sub - 1])
+        } else {
+            Write-Host "Unknown sub-option: $sub" -ForegroundColor Red
+        }
+
+        foreach ($zip in $picks) {
+            $rawDir     = $zip.DirectoryName
+            $productDir = Split-Path -Parent $rawDir
+            $product    = Split-Path -Leaf $productDir
+            $category   = Split-Path -Leaf (Split-Path -Parent $productDir)
+
+            Write-Host ""
+            Write-Host ("=== {0}/{1} ===" -f $category, $product) -ForegroundColor Cyan
+            Write-Host ""
+            Write-Host ">>> Step 1/2: Extracting firmware bundle" -ForegroundColor DarkYellow
+            try {
+                & "$PSScriptRoot\tools\Expand-EatonFirmware.ps1" -ZipPath $zip.FullName -Force
+            } catch {
+                Write-Host "[ERROR] Extraction failed: $($_.Exception.Message)" -ForegroundColor Red
+                continue
+            }
+
+            # Build OsName from product folder name; try to enrich with a
+            # version from any .sta in the extract.
+            $extractedDir = Join-Path $productDir 'extracted'
+            $verHint = ''
+            $staFile = Get-ChildItem -LiteralPath $extractedDir -Recurse -File -Filter '*.sta' -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($staFile) {
+                $vMatch = [regex]::Match($staFile.BaseName, 'v\d+[._]\d+[._]\d+')
+                if ($vMatch.Success) {
+                    $verHint = ' ' + ($vMatch.Value -replace '_', '.')
+                }
+            }
+            $osName = "Eaton $product$verHint"
+
+            Write-Host ""
+            Write-Host ">>> Step 2/2: Building NSRL catalog (OsName='$osName')" -ForegroundColor DarkYellow
+            $catalogPath = Join-Path $productDir 'catalog.csv'
+            & "$PSScriptRoot\tools\Build-OsCatalog.ps1" -OsName $osName -SourceDir $extractedDir -OutputCsv $catalogPath
+        }
     }
 }
 

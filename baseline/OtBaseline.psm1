@@ -242,6 +242,44 @@ function Invoke-OtVTRequest {
     throw "VT_ALL_KEYS_EXHAUSTED: retry budget exhausted while attempting $Uri"
 }
 
+function Submit-OtVTFile {
+    # Upload a file to VT, returning the analysis_id. Picks the right
+    # endpoint based on file size:
+    #   <= 32MB : direct POST /api/v3/files
+    #   > 32MB  : GET /api/v3/files/upload_url, then POST to that one-time URL
+    # The upload_url path is gated to premium VT tiers on accounts > 32MB; if
+    # the user's account doesn't allow it, the GET fails with 403.
+    param([System.IO.FileInfo]$FileInfo)
+
+    if ($FileInfo.Length -le 32MB) {
+        $form = @{ file = $FileInfo }
+        $response = Invoke-OtVTRequest -Uri 'https://www.virustotal.com/api/v3/files' -Method 'POST' -Form $form
+        return $response.data.id
+    }
+
+    # Two-step path for >32MB
+    $urlResp   = Invoke-OtVTRequest -Uri 'https://www.virustotal.com/api/v3/files/upload_url'
+    $uploadUrl = $urlResp.data
+    if ([string]::IsNullOrWhiteSpace($uploadUrl)) {
+        throw "VT did not return an upload_url (account tier may not allow >32MB uploads)"
+    }
+
+    # The one-time upload URL embeds auth, so we don't reuse Invoke-OtVTRequest
+    # (which would attach x-apikey + count against rotation). Direct POST.
+    $reqArgs = @{
+        Uri        = $uploadUrl
+        Method     = 'POST'
+        Form       = @{ file = $FileInfo }
+        TimeoutSec = 600
+    }
+    if ($script:OtVTProxy) {
+        $reqArgs['Proxy'] = $script:OtVTProxy
+        if ($script:OtVTProxyCredential) { $reqArgs['ProxyCredential'] = $script:OtVTProxyCredential }
+    }
+    $response = Invoke-RestMethod @reqArgs
+    return $response.data.id
+}
+
 function Resolve-OtCatalogContext {
     # Derive Vendor/Category/Product from the path of a catalog.csv, e.g.
     #   .../firmware-staging/Eaton/UPS/9PX 5-11K-UPS/catalog.csv
@@ -404,10 +442,9 @@ function Submit-OtFilesNotInVT {
         [string]$Proxy,
         [pscredential]$ProxyCredential,
         [string]$Keys,
-        # VT public-tier direct upload limit. Files larger than this need
-        # /files/upload_url two-step flow (not implemented yet) and get
-        # skipped with a warning.
-        [int64]$MaxFileSizeBytes = 32MB
+        # Hard ceiling - VT's documented per-file maximum is 650MB; anything
+        # larger gets skipped with a warning rather than attempted.
+        [int64]$MaxFileSizeBytes = 650MB
     )
 
     if (-not (Test-Path -LiteralPath $CatalogCsv)) {
@@ -480,11 +517,10 @@ function Submit-OtFilesNotInVT {
             continue
         }
 
-        Write-Host ("  Submitting {0} ({1:N1} KB)..." -f $row.FileName, ($fi.Length / 1KB)) -ForegroundColor Yellow
+        $uploadMode = if ($fi.Length -le 32MB) { 'direct' } else { 'upload_url (2-step)' }
+        Write-Host ("  Submitting {0} ({1:N1} KB, {2})..." -f $row.FileName, ($fi.Length / 1KB), $uploadMode) -ForegroundColor Yellow
         try {
-            $form = @{ file = $fi }
-            $response = Invoke-OtVTRequest -Uri 'https://www.virustotal.com/api/v3/files' -Method 'POST' -Form $form
-            $analysisId = $response.data.id
+            $analysisId  = Submit-OtVTFile -FileInfo $fi
             $mainOutPath = Join-Path $mainBase "$h.json"
             $behOutPath  = Join-Path $behBase  "$h.json"
             [PSCustomObject]@{

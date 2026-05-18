@@ -207,6 +207,59 @@ if ($installerCandidates.Count -gt 0) {
     }
 }
 
+# --- Step 5: recursively expand nested .7z bundles (9PXM exposes per-module
+# .7z files after the installer EXE is cracked open: 9PXM-CSB-frw.7z,
+# 9PXM_UpmFW.7z, etc.). Bounded depth like Step 2. ---
+function Expand-Nested7zRecursive {
+    param([string]$Root, [string]$SevenZipExe, [int]$Depth, [int]$MaxDepth)
+    if ($Depth -ge $MaxDepth) { return }
+    $nested = Get-ChildItem -LiteralPath $Root -Recurse -File -Filter '*.7z' -ErrorAction SilentlyContinue
+    foreach ($nz in $nested) {
+        # .7z files live INSIDE the installer's '-unpacked' dir (Pattern C),
+        # so do not skip on parent-name. Test-Path below gives idempotency.
+        $dest = Join-Path $nz.DirectoryName ($nz.BaseName + '-unpacked')
+        if (Test-Path -LiteralPath $dest) { continue }
+        try {
+            # Known Eaton 9PXM install-script passwords (from SetUPS-Batchv*.bat).
+            # First entry is empty (covers unencrypted bundles); each is tried in
+            # order until extraction returns exit 0. Dest is wiped between tries
+            # so partial output from a wrong-password attempt doesn't pollute the
+            # next one (CSB_Firmware_Upgrade.7z and Utility.7z mix encrypted +
+            # unencrypted entries).
+            $passwords = @('', 'eaton', 'password')
+            $usedPw = $null
+            foreach ($pw in $passwords) {
+                if (Test-Path -LiteralPath $dest) { Remove-Item -LiteralPath $dest -Recurse -Force }
+                New-Item -ItemType Directory -Path $dest -Force | Out-Null
+                & $SevenZipExe x -y "-p$pw" "-o$dest" "$($nz.FullName)" *>$null
+                if ($LASTEXITCODE -eq 0) { $usedPw = $pw; break }
+            }
+            if ($null -eq $usedPw) {
+                Write-Host ("  [SKIP] {0}: no known password worked (last exit {1})" -f $nz.Name, $LASTEXITCODE) -ForegroundColor Yellow
+                if ((Get-ChildItem -LiteralPath $dest -Force -ErrorAction SilentlyContinue).Count -eq 0) {
+                    Remove-Item -LiteralPath $dest -Recurse -Force -ErrorAction SilentlyContinue
+                }
+                continue
+            }
+            if (-not $script:eatonFwQuiet) {
+                $pwTag = if ($usedPw -eq '') { 'none' } else { "'$usedPw'" }
+                Write-Host ("  Expanded nested {0} -> {1}/ (pw={2})" -f $nz.Name, ($nz.BaseName + '-unpacked'), $pwTag) -ForegroundColor DarkGray
+            }
+            Expand-Nested7zRecursive -Root $dest -SevenZipExe $SevenZipExe -Depth ($Depth + 1) -MaxDepth $MaxDepth
+        } catch {
+            Write-Host ("  [WARN] Could not expand nested {0}: {1}" -f $nz.Name, $_.Exception.Message) -ForegroundColor Yellow
+        }
+    }
+}
+
+if ($sevenZip) {
+    $existing7z = Get-ChildItem -LiteralPath $OutputDir -Recurse -File -Filter '*.7z' -ErrorAction SilentlyContinue
+    if ($existing7z) {
+        if (-not $Quiet) { Write-Host ""; Write-Host ("Step 5: expand {0} nested .7z bundle(s) (recursion depth <=3)" -f $existing7z.Count) -ForegroundColor DarkCyan }
+        Expand-Nested7zRecursive -Root $OutputDir -SevenZipExe $sevenZip -Depth 0 -MaxDepth 3
+    }
+}
+
 # --- Done ---
 if (-not $Quiet) {
     $allFiles = @(Get-ChildItem -LiteralPath $OutputDir -Recurse -File -ErrorAction SilentlyContinue)

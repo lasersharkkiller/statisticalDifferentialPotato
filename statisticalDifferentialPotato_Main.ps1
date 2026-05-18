@@ -11,6 +11,7 @@
 # Group 1: Build Process Baseline (was Group 15 in Loaded-Potato)
 Import-Module -Name ".\baseline\VTBaseline.psm1"
 Import-Module -Name ".\baseline\AptMasterIntelVT.psm1"
+Import-Module -Name ".\baseline\OtBaseline.psm1"
 Import-Module -Name ".\agentic\Build-VTFidelityIndex.psm1"
 Import-Module -Name ".\purpleTeaming\GetVTDetectionsFromList.psm1"
 Import-Module -Name ".\baseline\OrganizeBaselines.psm1"
@@ -72,6 +73,15 @@ Write-Host "  $([char]27)[4m+----------------------------------------------+$([c
 Write-Host "  $([char]27)[4m|     Firmware Extraction (NextGen NSRL)        |$([char]27)[24m" -ForegroundColor DarkYellow
 Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkYellow
 Write-Host "4a) Eaton: Extract .sta firmware + build NSRL catalog" -ForegroundColor DarkYellow
+Write-Host ""
+
+# -- GROUP 5: OT Firmware Baselining ------------------------------------------
+Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor Magenta
+Write-Host "  $([char]27)[4m|        OT Firmware Baselining                  |$([char]27)[24m" -ForegroundColor Magenta
+Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor Magenta
+Write-Host "5a) Eaton: Baseline firmware catalogs (pull VT metadata)" -ForegroundColor Magenta
+Write-Host "5b) Eaton: Submit 404'd firmware files to VT (opt-in upload)" -ForegroundColor Magenta
+Write-Host "5z) Poll pending VT submissions (downloads metadata once VT analysis completes)" -ForegroundColor Magenta
 Write-Host ""
 
 
@@ -200,9 +210,62 @@ elseif ($functionChoice -eq "4a") {
 
         Write-Host ""
         Write-Host ">>> Step 2/2: Building NSRL catalog" -ForegroundColor DarkYellow
-        $sourceDir = Split-Path -LiteralPath $staPath -Parent
-        & "$PSScriptRoot\tools\Build-OsCatalog.ps1" -OsName $osName -SourceDir $sourceDir
+        $sourceDir   = Split-Path -LiteralPath $staPath -Parent
+        # Catalog lives alongside the product folder (one level above the
+        # extracted/ subfolder) so 5a/5b can auto-discover it by globbing
+        # firmware-staging/**/catalog.csv.
+        $catalogPath = Join-Path (Split-Path -Parent $sourceDir) 'catalog.csv'
+        & "$PSScriptRoot\tools\Build-OsCatalog.ps1" -OsName $osName -SourceDir $sourceDir -OutputCsv $catalogPath
     }
+}
+
+# -- GROUP 5: OT Firmware Baselining ------------------------------------------
+elseif ($functionChoice -eq "5a" -or $functionChoice -eq "5b") {
+    # Auto-discover per-product catalogs under firmware-staging\Eaton\
+    $stagingRoot = Join-Path (Split-Path $PSScriptRoot -Parent) 'firmware-staging\Eaton'
+    $catalogs = @()
+    if (Test-Path $stagingRoot) {
+        $catalogs = @(Get-ChildItem -Path $stagingRoot -Recurse -Filter 'catalog.csv' -File -ErrorAction SilentlyContinue |
+                      Sort-Object FullName)
+    }
+    if ($catalogs.Count -eq 0) {
+        Write-Host "[WARN] No catalog.csv files found under $stagingRoot - run option 4a first." -ForegroundColor Yellow
+    } else {
+        $verb = if ($functionChoice -eq "5a") { 'Baseline' } else { "Submit 404'd files for" }
+        Write-Host ""
+        Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor Magenta
+        Write-Host ("  $([char]27)[4m|        {0} {1}     |$([char]27)[24m" -f $functionChoice.ToUpperInvariant(), $verb) -ForegroundColor Magenta
+        Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor Magenta
+        for ($i = 0; $i -lt $catalogs.Count; $i++) {
+            # Derive product label from path: .../Eaton/UPS/<Product>/catalog.csv
+            $product = (Split-Path -Parent $catalogs[$i].FullName | Split-Path -Leaf)
+            $category = (Split-Path -Parent $catalogs[$i].FullName | Split-Path -Parent | Split-Path -Leaf)
+            Write-Host ("  {0,2}) {1} Eaton {2}/{3}" -f ($i + 1), $verb, $category, $product) -ForegroundColor Magenta
+        }
+        Write-Host ("  {0,2}) {1} ALL Eaton catalogs" -f ($catalogs.Count + 1), $verb) -ForegroundColor Magenta
+        Write-Host ""
+        $sub = (Read-Host "Please enter a sub-option").Trim()
+
+        $picks = @()
+        if ($sub -eq ($catalogs.Count + 1).ToString() -or $sub -ieq 'all') {
+            $picks = $catalogs
+        } elseif ($sub -match '^\d+$' -and [int]$sub -ge 1 -and [int]$sub -le $catalogs.Count) {
+            $picks = @($catalogs[[int]$sub - 1])
+        } else {
+            Write-Host "Unknown sub-option: $sub" -ForegroundColor Red
+        }
+
+        foreach ($cat in $picks) {
+            if ($functionChoice -eq "5a") {
+                Get-OtBaseline -CatalogCsv $cat.FullName
+            } else {
+                Submit-OtFilesNotInVT -CatalogCsv $cat.FullName
+            }
+        }
+    }
+}
+elseif ($functionChoice -eq "5z") {
+    Sync-VTPendingSubmissions
 }
 
 else {

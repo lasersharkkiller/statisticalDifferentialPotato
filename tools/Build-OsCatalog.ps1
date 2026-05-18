@@ -90,9 +90,11 @@ if (-not $Append -and (Test-Path $OutputCsv)) {
 }
 
 if (-not (Test-Path $OutputCsv)) {
-    # Header row matches NSRL/nsrl_reduced.csv exactly so existing readers
-    # don't need adjustment.
-    'Hash,FileName,OsName' | Set-Content -Path $OutputCsv -Encoding UTF8
+    # Header row: same Hash,FileName,OsName triple as NSRL/nsrl_reduced.csv,
+    # plus a FullPath column that OT baselining / submission tooling needs
+    # to read the file bytes off disk. NSRL-only readers ignore the extra
+    # column; OT-aware readers consume it.
+    'Hash,FileName,OsName,FullPath' | Set-Content -Path $OutputCsv -Encoding UTF8
 }
 
 $excludeSet = [System.Collections.Generic.HashSet[string]]::new(
@@ -128,7 +130,11 @@ Get-ChildItem -LiteralPath $SourceDir -Recurse -File -ErrorAction SilentlyContin
         if ($osQuoted -match '[,"\r\n]') {
             $osQuoted = '"' + ($osQuoted -replace '"', '""') + '"'
         }
-        [void]$batch.Add("$h,$name,$osQuoted")
+        $pathQuoted = $_.FullName
+        if ($pathQuoted -match '[,"\r\n]') {
+            $pathQuoted = '"' + ($pathQuoted -replace '"', '""') + '"'
+        }
+        [void]$batch.Add("$h,$name,$osQuoted,$pathQuoted")
         $emitted++
         if ($batch.Count -ge $batchSize) {
             Add-Content -Path $OutputCsv -Value $batch -Encoding UTF8

@@ -73,8 +73,8 @@ if (-not (Test-Path -LiteralPath $ZipPath -PathType Leaf)) {
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
     # Default: <ZipPath's grand-parent>/extracted/
     # e.g. .../<product>/raw/firmware.zip -> .../<product>/extracted/
-    $rawDir     = Split-Path -LiteralPath $ZipPath -Parent
-    $productDir = Split-Path -LiteralPath $rawDir  -Parent
+    $rawDir     = Split-Path -Path $ZipPath -Parent
+    $productDir = Split-Path -Path $rawDir  -Parent
     $OutputDir  = Join-Path $productDir 'extracted'
 }
 
@@ -141,9 +141,9 @@ foreach ($sta in $staFiles) {
     if (Test-Path -LiteralPath $staUnpackDir) { continue }
     try {
         if (-not $Quiet) { Write-Host ("  {0} -> sta-unpacked/" -f $sta.Name) -ForegroundColor DarkGray }
-        $args = @{ StaPath = $sta.FullName; OutputDir = $staUnpackDir }
-        if ($Quiet) { $args['Quiet'] = $true }
-        & "$PSScriptRoot\Expand-EatonSta.ps1" @args | Out-Null
+        $staArgs = @{ StaPath = $sta.FullName; OutputDir = $staUnpackDir }
+        if ($Quiet) { $staArgs['Quiet'] = $true }
+        & "$PSScriptRoot\Expand-EatonSta.ps1" @staArgs | Out-Null
     } catch {
         Write-Host ("  [WARN] Could not unpack {0}: {1}" -f $sta.Name, $_.Exception.Message) -ForegroundColor Yellow
     }
@@ -162,8 +162,14 @@ if (-not $sevenZip) {
 }
 
 $installerCandidates = New-Object System.Collections.Generic.List[System.IO.FileInfo]
-$dirs = @($OutputDir) + (Get-ChildItem -LiteralPath $OutputDir -Recurse -Directory -ErrorAction SilentlyContinue).FullName
+$dirs = New-Object System.Collections.Generic.List[string]
+$dirs.Add($OutputDir)
+$subdirs = @(Get-ChildItem -LiteralPath $OutputDir -Recurse -Directory -ErrorAction SilentlyContinue)
+foreach ($sd in $subdirs) {
+    if ($sd -and $sd.FullName) { $dirs.Add($sd.FullName) }
+}
 foreach ($d in $dirs) {
+    if ([string]::IsNullOrWhiteSpace($d)) { continue }
     # Skip already-unpacked installer dirs from prior runs
     if ($d -match '-unpacked($|[\\/])' -or $d -match 'sta-unpacked($|[\\/])') { continue }
     $localFiles = @(Get-ChildItem -LiteralPath $d -File -ErrorAction SilentlyContinue)

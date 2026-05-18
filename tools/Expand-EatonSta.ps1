@@ -123,13 +123,13 @@ finally {
     $zls.Dispose(); $ms.Dispose(); $out.Dispose()
 }
 
-if (-not $manifestText.StartsWith('(')) {
-    Write-Warning ("Manifest text doesn't start with '(' as expected - .sta format may differ. First 80 chars: {0}" -f $manifestText.Substring(0, [Math]::Min(80, $manifestText.Length)))
-}
-
-# Parse Python-dict-ish entries: 'name': {size: N, csize: M}
+# Manifest can be in two observed shapes:
+#   Old (Python-dict-ish): ({'block-1.bin':{size:N,csize:M}, ...})
+#   New (JSON):            {"block-1.bin":{"size":N,"csize":M}, ...}
+# Single regex handles both: name and field names may be in single OR
+# double quotes (or unquoted for the field name in the old shape).
 $blocks = New-Object System.Collections.Generic.List[object]
-foreach ($m in [regex]::Matches($manifestText, "'([^']+)':\s*\{\s*size:\s*(\d+),\s*csize:\s*(\d+)\s*\}")) {
+foreach ($m in [regex]::Matches($manifestText, '["'']([^"'']+)["'']\s*:\s*\{\s*["'']?size["'']?\s*:\s*(\d+)\s*,\s*["'']?csize["'']?\s*:\s*(\d+)\s*\}')) {
     $blocks.Add([pscustomobject]@{
         Name  = $m.Groups[1].Value
         Size  = [int64]$m.Groups[2].Value

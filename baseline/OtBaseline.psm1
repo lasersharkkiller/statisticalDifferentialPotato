@@ -1,8 +1,12 @@
 # OtBaseline.psm1
 # OT (Operational Technology) firmware baselining + opt-in VT submission.
 # Separate pipeline from Get-VTBaseline because:
-#   - Output goes to output-baseline/VirusTotal-{main,behaviors}/OT/<Vendor>/<Cat>/<Product>/
-#     instead of the NSRL/localBaseline/malicious hierarchy
+#   - Output goes to output-baseline/VirusTotal-{main,behaviors}/OT/<Vendor>/
+#     flat (per-vendor) instead of the NSRL/localBaseline/malicious hierarchy.
+#     Flat keying means a SHA256 shared across multiple products of the same
+#     vendor (e.g. Eaton ships the same Network-M2 rootfs as Industrial-
+#     Gateway-Card and Industrial-Gateway-Card-X2) only consumes one VT
+#     lookup. The catalog.csv files still encode the per-product mapping.
 #   - We expect heavy 404 rate (most OT firmware isn't in VT) and have a
 #     follow-on Submit-OtFilesNotInVT step that uploads the files so VT
 #     will have something to return on the next pull
@@ -108,6 +112,13 @@ function Initialize-OtVTClient {
     # --- KEY SUBSET RESOLUTION ---
     if ([string]::IsNullOrWhiteSpace($Keys)) { $Keys = $env:VT_KEYS }
 
+    # Sticky-select: reuse the user's prior selection from earlier in the
+    # session (e.g. 5a over all 45 Eaton catalogs) without re-prompting.
+    if ([string]::IsNullOrWhiteSpace($Keys) -and -not [string]::IsNullOrWhiteSpace($script:OtVTKeysSelection)) {
+        $Keys = $script:OtVTKeysSelection
+        Write-Host "Reusing previously selected key subset: $Keys" -ForegroundColor DarkGray
+    }
+
     if ([string]::IsNullOrWhiteSpace($Keys)) {
         Write-Host ""
         Write-Host "Available VT API keys:" -ForegroundColor DarkCyan
@@ -120,6 +131,8 @@ function Initialize-OtVTClient {
         $Keys = (Read-Host "Which key(s) to use? (comma-separated numbers or 'all'; Enter=all)").Trim()
         if ([string]::IsNullOrWhiteSpace($Keys) -or $Keys -eq ($VTKeys.Count + 1).ToString()) { $Keys = 'all' }
     }
+
+    $script:OtVTKeysSelection = $Keys
 
     $useAll = $Keys -ieq 'all' -or $Keys -eq '*'
     if (-not $useAll) {
@@ -340,8 +353,11 @@ function Get-OtBaseline {
         return
     }
 
-    $mainBase = "output-baseline\VirusTotal-main\OT\$Vendor\$Category\$Product"
-    $behBase  = "output-baseline\VirusTotal-behaviors\OT\$Vendor\$Category\$Product"
+    # Flat per-vendor cache so SHA256s shared across products of the same
+    # vendor (rebadged firmware, common libc, busybox, etc.) only consume
+    # one VT lookup. Per-product mapping lives in catalog.csv.
+    $mainBase = "output-baseline\VirusTotal-main\OT\$Vendor"
+    $behBase  = "output-baseline\VirusTotal-behaviors\OT\$Vendor"
     New-Item -ItemType Directory -Path $mainBase -Force | Out-Null
     New-Item -ItemType Directory -Path $behBase  -Force | Out-Null
 
@@ -483,8 +499,9 @@ function Submit-OtFilesNotInVT {
         Import-Csv $pendingPath | ForEach-Object { if ($_.Hash) { [void]$pendingHashes.Add($_.Hash) } }
     }
 
-    $mainBase = "output-baseline\VirusTotal-main\OT\$Vendor\$Category\$Product"
-    $behBase  = "output-baseline\VirusTotal-behaviors\OT\$Vendor\$Category\$Product"
+    # Flat per-vendor cache (same scheme as Get-OtBaseline).
+    $mainBase = "output-baseline\VirusTotal-main\OT\$Vendor"
+    $behBase  = "output-baseline\VirusTotal-behaviors\OT\$Vendor"
 
     $rows = @(Import-Csv $CatalogCsv)
 

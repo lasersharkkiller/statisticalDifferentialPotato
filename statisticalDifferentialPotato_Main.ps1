@@ -74,6 +74,7 @@ Write-Host "  $([char]27)[4m|     Firmware Extraction (NextGen NSRL)        |$([
 Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkYellow
 Write-Host "4a) Eaton: Extract firmware bundles + build NSRL catalogs (submenu: pick one or ALL)" -ForegroundColor DarkYellow
 Write-Host "4b) APC (Schneider): Extract firmware bundles + build NSRL catalogs (submenu: pick one or ALL)" -ForegroundColor DarkYellow
+Write-Host "4c) Vertiv (Liebert/Avocent): Extract firmware bundles + build NSRL catalogs (submenu: pick one or ALL)" -ForegroundColor DarkYellow
 Write-Host ""
 
 # -- GROUP 5: OT Firmware Baselining ------------------------------------------
@@ -340,6 +341,88 @@ elseif ($functionChoice -eq "4b") {
                 }
             }
             $osName = "APC $product$verHint"
+
+            Write-Host ""
+            Write-Host ">>> Step 2/2: Building NSRL catalog (OsName='$osName')" -ForegroundColor DarkYellow
+            $catalogPath = Join-Path $productDir 'catalog.csv'
+            & "$PSScriptRoot\tools\Build-OsCatalog.ps1" -OsName $osName -SourceDir $extractedDir -OutputCsv $catalogPath
+        }
+    }
+}
+elseif ($functionChoice -eq "4c") {
+    # Vertiv (Liebert / Avocent / Geist / NetSure). Same flow as 4a/4b.
+    # Version-hint regex matches Vertiv firmware naming conventions:
+    #   intelliSlot_unity_v8.4.1.0.bin        -> v8.4.1.0
+    #   ACS8000-v2.28.4-firmware.tar           -> v2.28.4
+    #   GXT5-3.7.0.upd                          -> v3.7.0
+    #   liebert_psi5_2_1_0_4.bin                -> v2.1.0.4 (underscore variant)
+    $stagingRoot = Join-Path (Split-Path $PSScriptRoot -Parent) 'firmware-staging\Vertiv'
+    $zipFiles = @()
+    if (Test-Path $stagingRoot) {
+        $zipFiles = @(Get-ChildItem -Path $stagingRoot -Recurse -File -Filter '*.zip' -ErrorAction SilentlyContinue |
+                      Where-Object { $_.DirectoryName -match '[\\/]raw([\\/]|$)' } |
+                      Sort-Object FullName)
+    }
+    if ($zipFiles.Count -eq 0) {
+        Write-Host "[WARN] No firmware ZIPs found under $stagingRoot\**\raw\ - drop firmware ZIPs there first." -ForegroundColor Yellow
+        Write-Host "       Download URLs are listed in $stagingRoot\README.md" -ForegroundColor DarkGray
+    } else {
+        Write-Host ""
+        Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkYellow
+        Write-Host "  $([char]27)[4m|       4c) Vertiv: Extract + build catalog     |$([char]27)[24m" -ForegroundColor DarkYellow
+        Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkYellow
+        for ($i = 0; $i -lt $zipFiles.Count; $i++) {
+            $rawDir   = $zipFiles[$i].DirectoryName
+            $product  = Split-Path -Parent $rawDir | Split-Path -Leaf
+            $category = Split-Path -Parent (Split-Path -Parent $rawDir) | Split-Path -Leaf
+            Write-Host ("  {0,2}) {1}/{2}" -f ($i + 1), $category, $product) -ForegroundColor DarkYellow
+        }
+        Write-Host ("  {0,2}) ALL Vertiv firmware ZIPs" -f ($zipFiles.Count + 1)) -ForegroundColor DarkYellow
+        Write-Host ""
+        $sub = (Read-Host "Please enter a 4c sub-option").Trim()
+
+        $picks = @()
+        if ($sub -eq ($zipFiles.Count + 1).ToString() -or $sub -ieq 'all') {
+            $picks = $zipFiles
+        } elseif ($sub -match '^\d+$' -and [int]$sub -ge 1 -and [int]$sub -le $zipFiles.Count) {
+            $picks = @($zipFiles[[int]$sub - 1])
+        } else {
+            Write-Host "Unknown sub-option: $sub" -ForegroundColor Red
+        }
+
+        foreach ($zip in $picks) {
+            $rawDir     = $zip.DirectoryName
+            $productDir = Split-Path -Parent $rawDir
+            $product    = Split-Path -Leaf $productDir
+            $category   = Split-Path -Leaf (Split-Path -Parent $productDir)
+
+            Write-Host ""
+            Write-Host ("=== {0}/{1} ===" -f $category, $product) -ForegroundColor Cyan
+            Write-Host ""
+            Write-Host ">>> Step 1/2: Extracting firmware bundle" -ForegroundColor DarkYellow
+            try {
+                & "$PSScriptRoot\tools\Expand-EatonFirmware.ps1" -ZipPath $zip.FullName -Force
+            } catch {
+                Write-Host "[ERROR] Extraction failed: $($_.Exception.Message)" -ForegroundColor Red
+                continue
+            }
+
+            # Version hint for Vertiv: try dotted vN.N.N first, then underscore-style
+            $extractedDir = Join-Path $productDir 'extracted'
+            $verHint = ''
+            $hintFile = @(Get-ChildItem -LiteralPath $extractedDir -Recurse -File -Include '*.bin','*.upd','*.uup','*.iwo','*.tar','*.iso','*.img' -ErrorAction SilentlyContinue) | Select-Object -First 1
+            if ($hintFile) {
+                $vMatch = [regex]::Match($hintFile.BaseName, '[_-]v?(\d+\.\d+\.\d+(?:\.\d+)?)')
+                if (-not $vMatch.Success) {
+                    $vMatch = [regex]::Match($hintFile.BaseName, '_(\d+_\d+_\d+_\d+)$')
+                    if ($vMatch.Success) {
+                        $verHint = ' v' + ($vMatch.Groups[1].Value -replace '_','.')
+                    }
+                } else {
+                    $verHint = ' v' + $vMatch.Groups[1].Value
+                }
+            }
+            $osName = "Vertiv $product$verHint"
 
             Write-Host ""
             Write-Host ">>> Step 2/2: Building NSRL catalog (OsName='$osName')" -ForegroundColor DarkYellow

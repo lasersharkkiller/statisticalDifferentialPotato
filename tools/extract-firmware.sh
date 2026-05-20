@@ -36,6 +36,15 @@ if [ -z "$INPUT" ] || [ -z "$OUTDIR" ]; then
     exit 2
 fi
 
+# Make extracted output readable from PowerShell on /mnt/c. Squashfs / UBIFS
+# / cpio preserve the original Linux ACLs (often 0600 or 0640 on /etc/clish/*
+# style configs), which NTFS translates to "Access denied" for the
+# Windows-side user that later runs 5b's file uploads. chmod a+rX = files
+# readable, dirs readable+traversable.
+make_readable() {
+    chmod -R a+rX "$1" 2>/dev/null || true
+}
+
 extract_one() {
     local input="$1"
     local outdir="$2"
@@ -196,6 +205,7 @@ extract_one() {
     esac
 
     if [ -d "$out" ]; then
+        make_readable "$out"
         find "$out" -type f 2>/dev/null | while IFS= read -r f; do
             extract_one "$f" "${f}-d" $((depth + 1))
         done

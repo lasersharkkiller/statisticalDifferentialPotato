@@ -173,7 +173,10 @@ foreach ($d in $dirs) {
     # Skip already-unpacked installer dirs from prior runs
     if ($d -match '-unpacked($|[\\/])' -or $d -match 'sta-unpacked($|[\\/])') { continue }
     $localFiles = @(Get-ChildItem -LiteralPath $d -File -ErrorAction SilentlyContinue)
-    $bigExes = @($localFiles | Where-Object { $_.Extension -ieq '.exe' -and $_.Length -gt 5MB })
+    # 1MB threshold: 5MB was too restrictive -- APC's SNS Tool installer
+    # (apc_hw21_su_*.exe / NMC3 firmware) ships at 4MB and wasn't getting
+    # detected. Standalone non-installer .exes in our corpus all sit below 1MB.
+    $bigExes = @($localFiles | Where-Object { $_.Extension -ieq '.exe' -and $_.Length -gt 1MB })
     $nonSidecars = @($localFiles | Where-Object { $_.Extension -inotin @('.exe', '.pdf', '.txt', '.md', '.zip', '.sta') })
     if ($bigExes.Count -ge 1 -and $nonSidecars.Count -eq 0) {
         foreach ($e in $bigExes) { [void]$installerCandidates.Add($e) }
@@ -295,7 +298,9 @@ if ($wslAvailable) {
     $candidates = @(Get-ChildItem -LiteralPath $OutputDir -Recurse -File -ErrorAction SilentlyContinue |
         Where-Object {
             if ($_.FullName -match '-deep[\\/]') { return $false }
-            $isContainer = $_.Extension -in @('.tar','.fw','.img','.rom')
+            # .nmc3/.spkg added for APC: NMC3 firmware is a ZIP wrapping
+            # AOS+APP+sig; .spkg is the signed-package sub-bundle inside.
+            $isContainer = $_.Extension -in @('.tar','.fw','.img','.rom','.nmc3','.spkg')
             $isBigBin    = $_.Extension -in @('.bin','.gz','.xz') -and $_.Length -gt 1MB
             $isUsha      = $_.Extension -ieq '.bin' -and (Test-IsUshaFirmware $_)
             $isContainer -or $isBigBin -or $isUsha

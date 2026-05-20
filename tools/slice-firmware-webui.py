@@ -68,6 +68,13 @@ HANDLERS = [
     ('JPEG image',            'jpg',  (b'\xFF\xD9',)),            # EOI
     ('Adobe Flash SWF',       'swf',  ()),                        # no reliable end marker
     ('Uncompressed Adobe',    'swf',  ()),                        # "Uncompressed Adobe Flash SWF file"
+    ('PEM certificate',       'pem',  (b'-----END CERTIFICATE-----',
+                                       b'-----END RSA PRIVATE KEY-----',
+                                       b'-----END PRIVATE KEY-----',
+                                       b'-----END PUBLIC KEY-----',
+                                       b'-----END CERTIFICATE REQUEST-----',
+                                       b'-----END DH PARAMETERS-----')),
+    ('XML document',          'xml',  ()),                        # no fixed end marker; rely on next-sig boundary
 ]
 
 

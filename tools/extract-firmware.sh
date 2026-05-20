@@ -156,25 +156,27 @@ extract_one() {
             esac
 
             # USHA-format ESP32 firmware (Eaton BestLink Adapter / ConnectUPS /
-            # ConnectUPS-Web-SNMP-Card / X-Slot-Modbus). 'file' calls them
-            # "data", and binwalk -e returns 0 carves because the embedded
-            # HTML/GIF resources are stored inline (no compression container).
-            # Hand off to a Python slicer that carves between binwalk's
-            # signature offsets.
+            # ConnectUPS-Web-SNMP-Card). 'file' calls them "data", and
+            # binwalk -e returns 0 carves because the embedded HTML/GIF
+            # resources are stored inline (no compression container).
+            # Hand off to the Python slicer that carves between binwalk's
+            # signature offsets. The slicer is also called as a SECOND PASS
+            # after binwalk -e below for inline HTML/SWF in firmware images
+            # that DO yield container carves (APC NMC3 .bin).
+            local slicer
+            slicer="$(dirname "$(readlink -f "$0")")/slice-firmware-webui.py"
             local magic
             magic=$(head -c 4 "$input" 2>/dev/null)
             if [ "$magic" = "USHA" ]; then
                 out="$outdir/usha-webui"
                 mkdir -p "$out"
-                # Locate the slicer next to this script
-                local slicer
-                slicer="$(dirname "$(readlink -f "$0")")/slice-usha-firmware.py"
-                if [ -x "$slicer" ] || [ -f "$slicer" ]; then
+                if [ -f "$slicer" ]; then
                     python3 "$slicer" "$input" "$out" >/dev/null 2>&1 || true
                 fi
                 if [ -z "$(ls -A "$out" 2>/dev/null)" ]; then
                     rm -rf "$out"; return 0
                 fi
+                make_readable "$out"
                 return 0  # don't recurse into carved web assets
             fi
 
@@ -195,6 +197,20 @@ extract_one() {
             (cd "$stage" && binwalk -e --run-as=root --depth=2 "$input" >/dev/null 2>&1) || true
             local bwOut
             bwOut="$stage/_$(basename "$input").extracted"
+            # Second pass: also carve inline HTML/GIF/PNG/JPEG/SWF that
+            # binwalk -e identified by signature but had no extractor for.
+            # APC NMC3 firmware shows this pattern -- binwalk extracts the
+            # gzipped fonts but skips the inline HTML pages + Flash SWF + GIFs.
+            if [ -f "$slicer" ]; then
+                local sliceOut="$outdir/inline-webui"
+                mkdir -p "$sliceOut"
+                python3 "$slicer" "$input" "$sliceOut" >/dev/null 2>&1 || true
+                if [ -z "$(ls -A "$sliceOut" 2>/dev/null)" ]; then
+                    rm -rf "$sliceOut"
+                else
+                    make_readable "$sliceOut"
+                fi
+            fi
             if [ -d "$bwOut" ] && [ -n "$(ls -A "$bwOut" 2>/dev/null)" ]; then
                 out="$bwOut"
             else

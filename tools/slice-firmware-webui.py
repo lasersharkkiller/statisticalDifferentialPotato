@@ -1,29 +1,48 @@
 #!/usr/bin/env python3
 """
-Carve embedded web-UI files (HTML / GIF / PNG / JPEG) from Eaton USHA-format
-firmware -- the ESP32-style images shipped on the BestLink Adapter,
-ConnectUPS, ConnectUPS-Web-SNMP-Card, and X-Slot-Modbus network cards.
+Carve embedded web-UI resources (HTML / GIF / PNG / JPEG / SWF) from any
+firmware image where binwalk identifies the signatures but no standard
+container handler applies.
 
-USHA firmware stores its embedded web UI inline (not in a compressed
-container), so binwalk identifies the resource signatures but can't auto-
-carve them with `binwalk -e`. This script:
+Two production cases:
 
-  1. Verifies "USHA" magic at offset 0 of the input.
-  2. Runs binwalk in signature-only mode to get every {HTML, GIF, PNG, JPEG}
-     header / footer offset.
-  3. For each resource header, slices from that offset to the next signature
-     start and trims the result at the resource's natural end marker
-     (</html>, GIF terminator 0x3B, PNG IEND, JPEG EOI).
-  4. Looks for a likely filename near the start of the carve (printable
-     ASCII string ending in .html/.htm/.gif/.png/.jpg/.css/.js). Falls back
-     to a synthesized name like html-0001C00.html when none is found.
-  5. Writes each carve to OUTPUT_DIR.
+  * Eaton USHA (ESP32) -- BestLink Adapter, ConnectUPS, ConnectUPS-Web-
+    SNMP-Card. Flat .bin with inline HTML pages and GIF icons; binwalk -e
+    returns 0 carves because there is no compression container.
 
-Invoked from tools/extract-firmware.sh's fallback path when the input
-file's first 4 bytes are "USHA".
+  * APC NMC3 -- the apc_hw21_su_*.bin AOS+APP image is Renesas RZ/N1 MCU
+    code, not Linux, but ships the device's web UI inline. binwalk -e
+    handles the gzipped fonts + the inner ZIPs, but skips HTML, GIF, and
+    SWF chunks the same way.
+
+Algorithm:
+
+  1. Run binwalk in signature-only mode to get every {HTML, GIF, PNG,
+     JPEG, SWF} header offset.
+  2. For each header, slice from the offset to the next signature start
+     (or EOF) and trim the result at the resource's natural end marker:
+       - HTML: </html> / </HTML>
+       - GIF:  0x3B terminator
+       - PNG:  IEND + CRC32 (\xAE\x42\x60\x82)
+       - JPEG: 0xFFD9 EOI marker
+       - SWF:  no reliable end marker; cap at next signature
+  3. Look for a likely filename string within +/-512 bytes of the carve
+     header (printable ASCII ending in .html/.htm/.gif/.png/.jpg/...);
+     fall back to a synthesized {ext}-{offset:08x}.{ext} name.
+  4. Write each carve to OUTPUT_DIR, de-duplicating filenames.
+
+Exit codes:
+  0 = at least one resource carved
+  1 = no resources found / binwalk missing / input too small
+
+Invoked from tools/extract-firmware.sh both as the USHA fast-path (when
+the first 4 bytes are "USHA") and as a post-binwalk fallback for any
+firmware where binwalk -e produced output but inline web resources may
+remain. The two callers are idempotent because the destination dir
+gets the same content either way.
 
 Usage:
-  slice-usha-firmware.py INPUT_FILE OUTPUT_DIR
+  slice-firmware-webui.py INPUT_FILE OUTPUT_DIR
 """
 
 import os
@@ -35,17 +54,20 @@ import sys
 # Filename pattern used to label carves: printable ASCII ending in a known
 # web-asset extension. Tolerates path-style names but strips slashes.
 FILENAME_RE = re.compile(
-    rb'[A-Za-z0-9._/\\-]{3,40}\.(?:html?|css|js|gif|png|jpe?g|ico|txt)'
+    rb'[A-Za-z0-9._/\\-]{3,40}\.(?:html?|css|js|gif|png|jpe?g|ico|swf|txt|xml|svg|woff|eot|ttf)'
 )
 
 # Resource handlers: binwalk description prefix -> (extension, end-marker
 # byte sequence). end-marker is searched from the end of the slice and
-# everything past it is trimmed; None means use the next signature offset.
+# everything past it is trimmed; empty tuple means use the next signature
+# offset as-is (no end-marker trim).
 HANDLERS = [
-    ('HTML document header', 'html', (b'</html>', b'</HTML>')),
-    ('GIF image data',       'gif',  (b'\x3B',)),     # GIF terminator
-    ('PNG image',            'png',  (b'IEND\xae\x42\x60\x82',)),
-    ('JPEG image',           'jpg',  (b'\xFF\xD9',)),  # EOI
+    ('HTML document header',  'html', (b'</html>', b'</HTML>')),
+    ('GIF image data',        'gif',  (b'\x3B',)),                # GIF terminator
+    ('PNG image',             'png',  (b'IEND\xae\x42\x60\x82',)),
+    ('JPEG image',            'jpg',  (b'\xFF\xD9',)),            # EOI
+    ('Adobe Flash SWF',       'swf',  ()),                        # no reliable end marker
+    ('Uncompressed Adobe',    'swf',  ()),                        # "Uncompressed Adobe Flash SWF file"
 ]
 
 
@@ -79,7 +101,7 @@ def detect_filename(data, offset, search_radius=512):
     # in flat file tables); fall back to any match.
     for m in matches:
         s = m.decode('ascii', 'ignore')
-        # Skip 'plain' artifacts like ".js" or extension-only matches
+        # Skip extension-only artifacts (e.g. ".js")
         if len(s) >= 5 and s[0] not in '.':
             return s.replace('\\', '_').replace('/', '_')
     return None
@@ -91,7 +113,6 @@ def safe_filename(name, used):
     name = name.strip('. ') or 'unnamed'
     if name not in used:
         return name
-    # de-duplicate with numeric suffix preserving extension
     base, _, ext = name.rpartition('.')
     if not base:
         base, ext = name, ''
@@ -113,10 +134,8 @@ def carve(data, signatures, out_dir):
         for sig_prefix, ext, end_markers in HANDLERS:
             if not desc.startswith(sig_prefix):
                 continue
-            # Slice from this signature to the next one (or EOF)
             next_offset = signatures[i + 1][0] if i + 1 < len(signatures) else len(data)
             region = data[offset:next_offset]
-            # Trim at end marker if found
             best_end = len(region)
             for marker in end_markers:
                 pos = region.rfind(marker)
@@ -124,16 +143,10 @@ def carve(data, signatures, out_dir):
                     best_end = min(best_end, pos + len(marker))
             carved = region[:best_end]
             if len(carved) < 16:
-                # Too short to be meaningful
                 break
-            # Pick a name
             fname = detect_filename(data, offset)
             if not fname:
                 fname = f'{ext}-{offset:08x}.{ext}'
-            else:
-                # If the detected filename doesn't already end with the right
-                # extension, leave it as-is -- the firmware's own label wins.
-                pass
             fname = safe_filename(fname, used_names)
             used_names.add(fname)
             with open(os.path.join(out_dir, fname), 'wb') as f:
@@ -148,10 +161,13 @@ def main():
         print(__doc__, file=sys.stderr)
         sys.exit(2)
     input_path, out_dir = sys.argv[1], sys.argv[2]
-    with open(input_path, 'rb') as f:
-        data = f.read()
-    if len(data) < 4 or data[:4] != b'USHA':
-        # Not USHA-format: let the caller decide what to do
+    try:
+        with open(input_path, 'rb') as f:
+            data = f.read()
+    except OSError as e:
+        print(f'cannot read {input_path}: {e}', file=sys.stderr)
+        sys.exit(1)
+    if len(data) < 64:
         sys.exit(1)
     sigs = parse_binwalk(input_path)
     if not sigs:

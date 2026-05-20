@@ -73,6 +73,7 @@ Write-Host "  $([char]27)[4m+----------------------------------------------+$([c
 Write-Host "  $([char]27)[4m|     Firmware Extraction (NextGen NSRL)        |$([char]27)[24m" -ForegroundColor DarkYellow
 Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkYellow
 Write-Host "4a) Eaton: Extract firmware bundles + build NSRL catalogs (submenu: pick one or ALL)" -ForegroundColor DarkYellow
+Write-Host "4b) APC (Schneider): Extract firmware bundles + build NSRL catalogs (submenu: pick one or ALL)" -ForegroundColor DarkYellow
 Write-Host ""
 
 # -- GROUP 5: OT Firmware Baselining ------------------------------------------
@@ -252,6 +253,93 @@ elseif ($functionChoice -eq "4a") {
                 }
             }
             $osName = "Eaton $product$verHint"
+
+            Write-Host ""
+            Write-Host ">>> Step 2/2: Building NSRL catalog (OsName='$osName')" -ForegroundColor DarkYellow
+            $catalogPath = Join-Path $productDir 'catalog.csv'
+            & "$PSScriptRoot\tools\Build-OsCatalog.ps1" -OsName $osName -SourceDir $extractedDir -OutputCsv $catalogPath
+        }
+    }
+}
+elseif ($functionChoice -eq "4b") {
+    # Same flow as 4a but rooted at firmware-staging\APC. Expand-EatonFirmware
+    # is vendor-agnostic (its Step 3 .sta handler just no-ops for non-Eaton);
+    # version-hint regex is tuned for APC's apc_hw05_aos_704.bin / apcfwapp_v3.4.0.8.nmc3
+    # naming instead of Eaton's vNN.NN.NNNN.
+    $stagingRoot = Join-Path (Split-Path $PSScriptRoot -Parent) 'firmware-staging\APC'
+    $zipFiles = @()
+    if (Test-Path $stagingRoot) {
+        $zipFiles = @(Get-ChildItem -Path $stagingRoot -Recurse -File -Filter '*.zip' -ErrorAction SilentlyContinue |
+                      Where-Object { $_.DirectoryName -match '[\\/]raw([\\/]|$)' } |
+                      Sort-Object FullName)
+    }
+    if ($zipFiles.Count -eq 0) {
+        Write-Host "[WARN] No firmware ZIPs found under $stagingRoot\**\raw\ - drop firmware ZIPs there first." -ForegroundColor Yellow
+        Write-Host "       Download URLs are listed in $stagingRoot\README.md" -ForegroundColor DarkGray
+    } else {
+        Write-Host ""
+        Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkYellow
+        Write-Host "  $([char]27)[4m|       4b) APC: Extract + build catalog        |$([char]27)[24m" -ForegroundColor DarkYellow
+        Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkYellow
+        for ($i = 0; $i -lt $zipFiles.Count; $i++) {
+            $rawDir   = $zipFiles[$i].DirectoryName
+            $product  = Split-Path -Parent $rawDir | Split-Path -Leaf
+            $category = Split-Path -Parent (Split-Path -Parent $rawDir) | Split-Path -Leaf
+            Write-Host ("  {0,2}) {1}/{2}" -f ($i + 1), $category, $product) -ForegroundColor DarkYellow
+        }
+        Write-Host ("  {0,2}) ALL APC firmware ZIPs" -f ($zipFiles.Count + 1)) -ForegroundColor DarkYellow
+        Write-Host ""
+        $sub = (Read-Host "Please enter a 4b sub-option").Trim()
+
+        $picks = @()
+        if ($sub -eq ($zipFiles.Count + 1).ToString() -or $sub -ieq 'all') {
+            $picks = $zipFiles
+        } elseif ($sub -match '^\d+$' -and [int]$sub -ge 1 -and [int]$sub -le $zipFiles.Count) {
+            $picks = @($zipFiles[[int]$sub - 1])
+        } else {
+            Write-Host "Unknown sub-option: $sub" -ForegroundColor Red
+        }
+
+        foreach ($zip in $picks) {
+            $rawDir     = $zip.DirectoryName
+            $productDir = Split-Path -Parent $rawDir
+            $product    = Split-Path -Leaf $productDir
+            $category   = Split-Path -Leaf (Split-Path -Parent $productDir)
+
+            Write-Host ""
+            Write-Host ("=== {0}/{1} ===" -f $category, $product) -ForegroundColor Cyan
+            Write-Host ""
+            Write-Host ">>> Step 1/2: Extracting firmware bundle" -ForegroundColor DarkYellow
+            try {
+                & "$PSScriptRoot\tools\Expand-EatonFirmware.ps1" -ZipPath $zip.FullName -Force
+            } catch {
+                Write-Host "[ERROR] Extraction failed: $($_.Exception.Message)" -ForegroundColor Red
+                continue
+            }
+
+            # Version hint for APC: apc_hw05_aos_704.bin -> v7.0.4
+            #                       apcfwapp_v3.4.0.8.nmc3 -> v3.4.0.8
+            #                       apc_hw05_rpdu2g_633.bin -> v6.3.3
+            $extractedDir = Join-Path $productDir 'extracted'
+            $verHint = ''
+            $hintFile = @(Get-ChildItem -LiteralPath $extractedDir -Recurse -File -Include '*.bin','*.nmc3' -ErrorAction SilentlyContinue) | Select-Object -First 1
+            if ($hintFile) {
+                # First try _v3.4.0.8 / _v7.0.4 dotted style
+                $vMatch = [regex]::Match($hintFile.BaseName, '_v(\d+\.\d+\.\d+(?:\.\d+)?)')
+                if (-not $vMatch.Success) {
+                    # Then try _704 / _633 compact style at end of basename
+                    $vMatch = [regex]::Match($hintFile.BaseName, '_(\d{3,4})$')
+                    if ($vMatch.Success) {
+                        $compact = $vMatch.Groups[1].Value
+                        # 704 -> 7.0.4; 633 -> 6.3.3; 4006 -> 4.0.0.6 (4 chars)
+                        $dotted = ($compact.ToCharArray() | ForEach-Object { $_ }) -join '.'
+                        $verHint = " v$dotted"
+                    }
+                } else {
+                    $verHint = ' v' + $vMatch.Groups[1].Value
+                }
+            }
+            $osName = "APC $product$verHint"
 
             Write-Host ""
             Write-Host ">>> Step 2/2: Building NSRL catalog (OsName='$osName')" -ForegroundColor DarkYellow

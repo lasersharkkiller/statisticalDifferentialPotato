@@ -75,6 +75,7 @@ Write-Host "  $([char]27)[4m+----------------------------------------------+$([c
 Write-Host "4a) Eaton: Extract firmware bundles + build NSRL catalogs (submenu: pick one or ALL)" -ForegroundColor DarkYellow
 Write-Host "4b) APC (Schneider): Extract firmware bundles + build NSRL catalogs (submenu: pick one or ALL)" -ForegroundColor DarkYellow
 Write-Host "4c) Vertiv (Liebert/Avocent): Extract firmware bundles + build NSRL catalogs (submenu: pick one or ALL)" -ForegroundColor DarkYellow
+Write-Host "4d) SEL (Schweitzer Engineering Laboratories): Extract firmware bundles + build NSRL catalogs (submenu: pick one or ALL)" -ForegroundColor DarkYellow
 Write-Host ""
 
 # -- GROUP 5: OT Firmware Baselining ------------------------------------------
@@ -429,6 +430,89 @@ elseif ($functionChoice -eq "4c") {
                 }
             }
             $osName = "Vertiv $product$verHint"
+
+            Write-Host ""
+            Write-Host ">>> Step 2/2: Building NSRL catalog (OsName='$osName')" -ForegroundColor DarkYellow
+            $catalogPath = Join-Path $productDir 'catalog.csv'
+            & "$PSScriptRoot\tools\Build-OsCatalog.ps1" -OsName $osName -SourceDir $extractedDir -OutputCsv $catalogPath
+        }
+    }
+}
+elseif ($functionChoice -eq "4d") {
+    # SEL (Schweitzer Engineering Laboratories). Same flow as 4a/4b/4c.
+    # Version-hint regex matches SEL's naming conventions:
+    #   acSELerator_QuickSet_v7.1.4.0.exe       -> v7.1.4.0
+    #   sel-3355-os-bundle-2.1.3.tar             -> v2.1.3
+    #   acselerator_rtac_v3.16.0.exe             -> v3.16.0
+    # Accepts raw .bin/.tar/.iso/.up3/.upd/.s19/.hex/.cid alongside .zip in raw/.
+    $stagingRoot = Join-Path (Split-Path $PSScriptRoot -Parent) 'firmware-staging\SEL'
+    $selExts = '.zip','.bin','.tar','.iso','.img','.up3','.upd','.s19','.hex','.cid','.exe'
+    $zipFiles = @()
+    if (Test-Path $stagingRoot) {
+        $zipFiles = @(Get-ChildItem -Path $stagingRoot -Recurse -File -ErrorAction SilentlyContinue |
+                      Where-Object {
+                          ($_.DirectoryName -match '[\\/]raw([\\/]|$)') -and
+                          ($_.Extension.ToLowerInvariant() -in $selExts)
+                      } |
+                      Sort-Object FullName)
+    }
+    if ($zipFiles.Count -eq 0) {
+        Write-Host "[WARN] No firmware files found under $stagingRoot\**\raw\ - drop firmware ZIPs / installers / raw .bin there first." -ForegroundColor Yellow
+        Write-Host "       Download URLs are listed in $stagingRoot\README.md" -ForegroundColor DarkGray
+        Write-Host "       Note: most SEL relay firmware needs a mySchweitzer login; the public portal at" -ForegroundColor DarkGray
+        Write-Host "       https://selinc.com/software/downloads/ has industrial-PC OS + admin tools." -ForegroundColor DarkGray
+    } else {
+        Write-Host ""
+        Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkYellow
+        Write-Host "  $([char]27)[4m|        4d) SEL: Extract + build catalog       |$([char]27)[24m" -ForegroundColor DarkYellow
+        Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkYellow
+        for ($i = 0; $i -lt $zipFiles.Count; $i++) {
+            $rawDir   = $zipFiles[$i].DirectoryName
+            $product  = Split-Path -Parent $rawDir | Split-Path -Leaf
+            $category = Split-Path -Parent (Split-Path -Parent $rawDir) | Split-Path -Leaf
+            Write-Host ("  {0,2}) {1}/{2}" -f ($i + 1), $category, $product) -ForegroundColor DarkYellow
+        }
+        Write-Host ("  {0,2}) ALL SEL firmware files" -f ($zipFiles.Count + 1)) -ForegroundColor DarkYellow
+        Write-Host ""
+        $sub = (Read-Host "Please enter a 4d sub-option").Trim()
+
+        $picks = @()
+        if ($sub -eq ($zipFiles.Count + 1).ToString() -or $sub -ieq 'all') {
+            $picks = $zipFiles
+        } elseif ($sub -match '^\d+$' -and [int]$sub -ge 1 -and [int]$sub -le $zipFiles.Count) {
+            $picks = @($zipFiles[[int]$sub - 1])
+        } else {
+            Write-Host "Unknown sub-option: $sub" -ForegroundColor Red
+        }
+
+        foreach ($zip in $picks) {
+            $rawDir     = $zip.DirectoryName
+            $productDir = Split-Path -Parent $rawDir
+            $product    = Split-Path -Leaf $productDir
+            $category   = Split-Path -Leaf (Split-Path -Parent $productDir)
+
+            Write-Host ""
+            Write-Host ("=== {0}/{1} ===" -f $category, $product) -ForegroundColor Cyan
+            Write-Host ""
+            Write-Host ">>> Step 1/2: Extracting firmware bundle" -ForegroundColor DarkYellow
+            try {
+                & "$PSScriptRoot\tools\Expand-EatonFirmware.ps1" -ZipPath $zip.FullName -Force
+            } catch {
+                Write-Host "[ERROR] Extraction failed: $($_.Exception.Message)" -ForegroundColor Red
+                continue
+            }
+
+            # Version hint for SEL: dotted vN.N.N(.N) anywhere in any .exe/.bin/.tar
+            $extractedDir = Join-Path $productDir 'extracted'
+            $verHint = ''
+            $hintFile = @(Get-ChildItem -LiteralPath $extractedDir -Recurse -File -Include '*.exe','*.bin','*.tar','*.up3','*.upd','*.iso','*.img' -ErrorAction SilentlyContinue) | Select-Object -First 1
+            if ($hintFile) {
+                $vMatch = [regex]::Match($hintFile.BaseName, '[_-]v?(\d+\.\d+\.\d+(?:\.\d+)?)')
+                if ($vMatch.Success) {
+                    $verHint = ' v' + $vMatch.Groups[1].Value
+                }
+            }
+            $osName = "SEL $product$verHint"
 
             Write-Host ""
             Write-Host ">>> Step 2/2: Building NSRL catalog (OsName='$osName')" -ForegroundColor DarkYellow

@@ -357,10 +357,16 @@ elseif ($functionChoice -eq "4c") {
     #   GXT5-3.7.0.upd                          -> v3.7.0
     #   liebert_psi5_2_1_0_4.bin                -> v2.1.0.4 (underscore variant)
     $stagingRoot = Join-Path (Split-Path $PSScriptRoot -Parent) 'firmware-staging\Vertiv'
+    # Vertiv ships some firmware as raw .bin/.tar/.iso without a ZIP wrapper
+    # (e.g. IntelliSlot Unity vertiv-is-unity_*.bin). Discover both.
+    $vertivExts = '.zip','.bin','.tar','.iso','.img','.iwo','.upd','.uup'
     $zipFiles = @()
     if (Test-Path $stagingRoot) {
-        $zipFiles = @(Get-ChildItem -Path $stagingRoot -Recurse -File -Filter '*.zip' -ErrorAction SilentlyContinue |
-                      Where-Object { $_.DirectoryName -match '[\\/]raw([\\/]|$)' } |
+        $zipFiles = @(Get-ChildItem -Path $stagingRoot -Recurse -File -ErrorAction SilentlyContinue |
+                      Where-Object {
+                          ($_.DirectoryName -match '[\\/]raw([\\/]|$)') -and
+                          ($_.Extension.ToLowerInvariant() -in $vertivExts)
+                      } |
                       Sort-Object FullName)
     }
     if ($zipFiles.Count -eq 0) {

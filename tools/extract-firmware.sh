@@ -120,6 +120,19 @@ extract_one() {
                 rm -rf "$out"; return 0
             fi
             ;;
+        *"ext2 filesystem"*|*"ext3 filesystem"*|*"ext4 filesystem"*)
+            # 7z handles ext2/3/4 read-only extraction natively (no kernel
+            # mount, no fuseext2 dependency). Vertiv IntelliSlot Unity's
+            # binwalk extraction yields a 96MB ext2 rootfs we'd otherwise
+            # leave as an opaque blob; this handler pulls thousands of
+            # files out of it.
+            out="$outdir/ext"
+            mkdir -p "$out"
+            7z x -y "-o$out" "$input" >/dev/null 2>&1 || true
+            if [ -z "$(ls -A "$out" 2>/dev/null)" ]; then
+                rm -rf "$out"; return 0
+            fi
+            ;;
         *"DOS/MBR boot sector"*)
             # FAT12/16/32 volume. 7z handles all variants. Reports non-zero
             # exit on volumes without a real MBR (Eaton's .data_img has none)

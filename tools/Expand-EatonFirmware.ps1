@@ -91,15 +91,27 @@ if (-not $Quiet) {
     Write-Host ""
 }
 
-# --- Step 1: outer ZIP ---
-if (-not $Quiet) { Write-Host "Step 1: extract outer ZIP" -ForegroundColor DarkCyan }
-try {
-    Expand-Archive -LiteralPath $ZipPath -DestinationPath $OutputDir -Force
-} catch {
-    Write-Error "Outer ZIP extraction failed: $($_.Exception.Message)"
-    return
+# --- Step 1: outer container ---
+# Most vendor firmware ships as a ZIP, but some products distribute a raw
+# firmware blob directly (Vertiv IntelliSlot Unity ships its .bin without
+# any wrapper). For non-ZIP input we just copy it into extracted/ and let
+# Step 2-6 cascade as if a ZIP had unpacked it.
+$inputExt = [System.IO.Path]::GetExtension($ZipPath).ToLowerInvariant()
+if ($inputExt -eq '.zip') {
+    if (-not $Quiet) { Write-Host "Step 1: extract outer ZIP" -ForegroundColor DarkCyan }
+    try {
+        Expand-Archive -LiteralPath $ZipPath -DestinationPath $OutputDir -Force
+    } catch {
+        Write-Error "Outer ZIP extraction failed: $($_.Exception.Message)"
+        return
+    }
+    if (-not $Quiet) { Write-Host "  done" -ForegroundColor Green }
+} else {
+    if (-not $Quiet) { Write-Host "Step 1: copy non-ZIP raw firmware into extracted/" -ForegroundColor DarkCyan }
+    $destLeaf = Join-Path $OutputDir ([System.IO.Path]::GetFileName($ZipPath))
+    Copy-Item -LiteralPath $ZipPath -Destination $destLeaf -Force
+    if (-not $Quiet) { Write-Host "  done" -ForegroundColor Green }
 }
-if (-not $Quiet) { Write-Host "  done" -ForegroundColor Green }
 
 # --- Step 2: recursively expand any nested ZIPs (Pattern B) ---
 function Expand-NestedZipsRecursive {
@@ -300,7 +312,9 @@ if ($wslAvailable) {
             if ($_.FullName -match '-deep[\\/]') { return $false }
             # .nmc3/.spkg added for APC: NMC3 firmware is a ZIP wrapping
             # AOS+APP+sig; .spkg is the signed-package sub-bundle inside.
-            $isContainer = $_.Extension -in @('.tar','.fw','.img','.rom','.nmc3','.spkg')
+            # .fl added for Vertiv Avocent ACS 8000: custom JBOOT container
+            # with embedded kernel + gzipped rootfs + DER private keys.
+            $isContainer = $_.Extension -in @('.tar','.fw','.img','.rom','.nmc3','.spkg','.fl')
             $isBigBin    = $_.Extension -in @('.bin','.gz','.xz') -and $_.Length -gt 1MB
             $isUsha      = $_.Extension -ieq '.bin' -and (Test-IsUshaFirmware $_)
             $isContainer -or $isBigBin -or $isUsha

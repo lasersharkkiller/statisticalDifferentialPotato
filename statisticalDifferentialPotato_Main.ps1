@@ -81,8 +81,8 @@ Write-Host ""
 Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor Magenta
 Write-Host "  $([char]27)[4m|        OT Firmware Baselining                  |$([char]27)[24m" -ForegroundColor Magenta
 Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor Magenta
-Write-Host "5a) Eaton: Baseline firmware catalogs (pull VT metadata)" -ForegroundColor Magenta
-Write-Host "5b) Eaton: Submit 404'd firmware files to VT (opt-in upload)" -ForegroundColor Magenta
+Write-Host "5a) OT: Baseline firmware catalogs (pull VT metadata) -- all vendors (Eaton + APC + Vertiv + ...)" -ForegroundColor Magenta
+Write-Host "5b) OT: Submit 404'd firmware files to VT (opt-in upload) -- all vendors" -ForegroundColor Magenta
 Write-Host "5z) Poll pending VT submissions (downloads metadata once VT analysis completes)" -ForegroundColor Magenta
 Write-Host ""
 
@@ -440,36 +440,67 @@ elseif ($functionChoice -eq "4c") {
 
 # -- GROUP 5: OT Firmware Baselining ------------------------------------------
 elseif ($functionChoice -eq "5a" -or $functionChoice -eq "5b") {
-    # Auto-discover per-product catalogs under firmware-staging\Eaton\
-    $stagingRoot = Join-Path (Split-Path $PSScriptRoot -Parent) 'firmware-staging\Eaton'
+    # Auto-discover per-product catalogs under firmware-staging\<Vendor>\.
+    # Vendor-neutral: any first-level directory under firmware-staging\
+    # is treated as a vendor, and catalog.csv files anywhere beneath it
+    # are processed. Get-OtBaseline / Submit-OtFilesNotInVT already
+    # derive Vendor/Category/Product from the catalog's path, so each
+    # row stays cleanly partitioned in output-baseline/<main|behaviors>/OT/<Vendor>/.
+    $stagingRoot = Join-Path (Split-Path $PSScriptRoot -Parent) 'firmware-staging'
     $catalogs = @()
     if (Test-Path $stagingRoot) {
         $catalogs = @(Get-ChildItem -Path $stagingRoot -Recurse -Filter 'catalog.csv' -File -ErrorAction SilentlyContinue |
                       Sort-Object FullName)
     }
     if ($catalogs.Count -eq 0) {
-        Write-Host "[WARN] No catalog.csv files found under $stagingRoot - run option 4a first." -ForegroundColor Yellow
+        Write-Host "[WARN] No catalog.csv files found under $stagingRoot - run option 4a / 4b / 4c first." -ForegroundColor Yellow
     } else {
         $verb = if ($functionChoice -eq "5a") { 'Baseline' } else { "Submit 404'd files for" }
+        # Group catalogs by vendor for clearer display
+        $byVendor = @{}
+        foreach ($c in $catalogs) {
+            $parts   = $c.FullName -split '[\\/]'
+            $idx     = [array]::IndexOf($parts, 'firmware-staging')
+            $vendor  = if ($idx -ge 0 -and $parts.Count -gt $idx + 1) { $parts[$idx + 1] } else { '?' }
+            if (-not $byVendor.ContainsKey($vendor)) { $byVendor[$vendor] = @() }
+            $byVendor[$vendor] += $c
+        }
         Write-Host ""
         Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor Magenta
         Write-Host ("  $([char]27)[4m|        {0} {1}     |$([char]27)[24m" -f $functionChoice.ToUpperInvariant(), $verb) -ForegroundColor Magenta
         Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor Magenta
-        for ($i = 0; $i -lt $catalogs.Count; $i++) {
-            # Derive product label from path: .../Eaton/UPS/<Product>/catalog.csv
-            $product = (Split-Path -Parent $catalogs[$i].FullName | Split-Path -Leaf)
-            $category = (Split-Path -Parent $catalogs[$i].FullName | Split-Path -Parent | Split-Path -Leaf)
-            Write-Host ("  {0,2}) {1} Eaton {2}/{3}" -f ($i + 1), $verb, $category, $product) -ForegroundColor Magenta
+        $i = 0
+        $vendorCount = 0
+        foreach ($vendor in $byVendor.Keys | Sort-Object) {
+            $vendorCount++
+            Write-Host ("  --- {0} ({1} catalog(s)) ---" -f $vendor, $byVendor[$vendor].Count) -ForegroundColor DarkMagenta
+            foreach ($c in $byVendor[$vendor]) {
+                $i++
+                $product  = Split-Path -Parent $c.FullName | Split-Path -Leaf
+                $category = Split-Path -Parent $c.FullName | Split-Path -Parent | Split-Path -Leaf
+                Write-Host ("  {0,3}) {1} {2}/{3}" -f $i, $verb, $category, $product) -ForegroundColor Magenta
+            }
         }
-        Write-Host ("  {0,2}) {1} ALL Eaton catalogs" -f ($catalogs.Count + 1), $verb) -ForegroundColor Magenta
+        $allOpt = $catalogs.Count + 1
+        Write-Host ("  {0,3}) {1} ALL OT catalogs across all {2} vendor(s)" -f $allOpt, $verb, $vendorCount) -ForegroundColor Magenta
+        # Per-vendor "all" options
+        $vendorList = @($byVendor.Keys | Sort-Object)
+        for ($v = 0; $v -lt $vendorList.Count; $v++) {
+            $vName = $vendorList[$v]
+            $optNum = $allOpt + $v + 1
+            Write-Host ("  {0,3}) {1} ALL {2} catalogs only" -f $optNum, $verb, $vName) -ForegroundColor Magenta
+        }
         Write-Host ""
         $sub = (Read-Host "Please enter a sub-option").Trim()
 
         $picks = @()
-        if ($sub -eq ($catalogs.Count + 1).ToString() -or $sub -ieq 'all') {
+        if ($sub -eq $allOpt.ToString() -or $sub -ieq 'all') {
             $picks = $catalogs
         } elseif ($sub -match '^\d+$' -and [int]$sub -ge 1 -and [int]$sub -le $catalogs.Count) {
             $picks = @($catalogs[[int]$sub - 1])
+        } elseif ($sub -match '^\d+$' -and [int]$sub -gt $allOpt -and [int]$sub -le ($allOpt + $vendorList.Count)) {
+            $vIdx = [int]$sub - $allOpt - 1
+            $picks = $byVendor[$vendorList[$vIdx]]
         } else {
             Write-Host "Unknown sub-option: $sub" -ForegroundColor Red
         }

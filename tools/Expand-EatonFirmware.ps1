@@ -162,9 +162,14 @@ foreach ($sta in $staFiles) {
 }
 
 # --- Step 4: try to extract any installer-style EXEs (Pattern C) ---
-# Heuristic: a single >5MB .exe in a directory whose only other contents
+# Heuristic: a single >1MB .exe in a directory whose only other contents
 # are .pdf / .txt / .md / a tiny number of files is almost certainly an
 # installer EXE that wraps the actual firmware payload.
+#
+# Iterates: after each round of 7-Zip extraction, re-walks the tree to
+# discover newly-exposed inner installers (e.g. SEL_3300_Driver_Bundle_Win
+# wraps SEL_3300_Driver_Bundle which is itself an installer; SEL BaRT
+# similarly wraps make_selbart.exe). Cap at 5 passes to prevent runaway.
 $sevenZip = $null
 foreach ($cand in 'C:\Program Files\7-Zip\7z.exe', 'C:\Program Files (x86)\7-Zip\7z.exe') {
     if (Test-Path $cand) { $sevenZip = $cand; break }
@@ -173,27 +178,28 @@ if (-not $sevenZip) {
     $sevenZip = (Get-Command 7z -ErrorAction SilentlyContinue).Source
 }
 
-$installerCandidates = New-Object System.Collections.Generic.List[System.IO.FileInfo]
-$dirs = New-Object System.Collections.Generic.List[string]
-$dirs.Add($OutputDir)
-$subdirs = @(Get-ChildItem -LiteralPath $OutputDir -Recurse -Directory -ErrorAction SilentlyContinue)
-foreach ($sd in $subdirs) {
-    if ($sd -and $sd.FullName) { $dirs.Add($sd.FullName) }
-}
-foreach ($d in $dirs) {
-    if ([string]::IsNullOrWhiteSpace($d)) { continue }
-    # Skip already-unpacked installer dirs from prior runs
-    if ($d -match '-unpacked($|[\\/])' -or $d -match 'sta-unpacked($|[\\/])') { continue }
-    $localFiles = @(Get-ChildItem -LiteralPath $d -File -ErrorAction SilentlyContinue)
-    # 1MB threshold: 5MB was too restrictive -- APC's SNS Tool installer
-    # (apc_hw21_su_*.exe / NMC3 firmware) ships at 4MB and wasn't getting
-    # detected. Standalone non-installer .exes in our corpus all sit below 1MB.
-    $bigExes = @($localFiles | Where-Object { $_.Extension -ieq '.exe' -and $_.Length -gt 1MB })
-    $nonSidecars = @($localFiles | Where-Object { $_.Extension -inotin @('.exe', '.pdf', '.txt', '.md', '.zip', '.sta') })
-    if ($bigExes.Count -ge 1 -and $nonSidecars.Count -eq 0) {
-        foreach ($e in $bigExes) { [void]$installerCandidates.Add($e) }
+function Find-InstallerCandidates {
+    param([string]$Root)
+    # Any .exe file >=2MB that doesn't yet have a sibling -unpacked dir is a
+    # candidate. The extraction loop attempts 7z on each and cleans up empty
+    # output, so this can be inclusive without polluting the catalog with
+    # false positives. Replaces an older "must be alone with sidecars" rule
+    # that missed Intel/SEL driver installers shipped alongside HTML+CSS+GIF
+    # documentation in the same dir.
+    $cands = New-Object System.Collections.Generic.List[System.IO.FileInfo]
+    $all = @(Get-ChildItem -LiteralPath $Root -Recurse -File -Filter '*.exe' -ErrorAction SilentlyContinue |
+             Where-Object { $_.Length -gt 2MB })
+    foreach ($e in $all) {
+        # sta-unpacked = Eaton .sta block dirs; skip
+        if ($e.DirectoryName -match 'sta-unpacked($|[\\/])') { continue }
+        $unpackDir = Join-Path $e.DirectoryName ($e.BaseName + '-unpacked')
+        if (Test-Path -LiteralPath $unpackDir) { continue }
+        [void]$cands.Add($e)
     }
+    return $cands
 }
+
+$installerCandidates = Find-InstallerCandidates -Root $OutputDir
 
 if ($installerCandidates.Count -gt 0) {
     if (-not $Quiet) {
@@ -202,19 +208,50 @@ if ($installerCandidates.Count -gt 0) {
     }
     if ($sevenZip) {
         if (-not $Quiet) { Write-Host "  Using 7-Zip: $sevenZip" -ForegroundColor DarkGray }
-        foreach ($exe in $installerCandidates) {
-            $unpackDir = Join-Path $exe.DirectoryName ($exe.BaseName + '-unpacked')
-            if (Test-Path -LiteralPath $unpackDir) { continue }
-            try {
-                New-Item -ItemType Directory -Path $unpackDir -Force | Out-Null
-                if (-not $Quiet) { Write-Host ("  Extracting {0} ..." -f $exe.Name) -ForegroundColor DarkGray }
-                & $sevenZip x -y "-o$unpackDir" "$($exe.FullName)" *>$null
-                if ($LASTEXITCODE -ne 0) {
-                    Write-Host ("  [WARN] 7z exited {0} on {1}" -f $LASTEXITCODE, $exe.Name) -ForegroundColor Yellow
-                }
-            } catch {
-                Write-Host ("  [WARN] 7z extraction failed for {0}: {1}" -f $exe.Name, $_.Exception.Message) -ForegroundColor Yellow
+        # Iterative pass: SEL ships two-stage installers (outer .exe wraps a
+        # readme + inner .exe that's the real installer). After each batch,
+        # re-walk for newly-exposed candidates. Cap at 5 passes to prevent
+        # runaway on pathological self-referential installers.
+        $maxPasses = 5
+        $pass = 1
+        $remaining = $installerCandidates
+        while ($remaining.Count -gt 0 -and $pass -le $maxPasses) {
+            if (-not $Quiet -and $pass -gt 1) {
+                Write-Host ("  Pass {0}: {1} newly-revealed installer(s)" -f $pass, $remaining.Count) -ForegroundColor DarkGray
             }
+            foreach ($exe in $remaining) {
+                $unpackDir = Join-Path $exe.DirectoryName ($exe.BaseName + '-unpacked')
+                if (Test-Path -LiteralPath $unpackDir) { continue }
+                try {
+                    New-Item -ItemType Directory -Path $unpackDir -Force | Out-Null
+                    if (-not $Quiet) { Write-Host ("  Extracting {0} ..." -f $exe.Name) -ForegroundColor DarkGray }
+                    & $sevenZip x -y "-o$unpackDir" "$($exe.FullName)" *>$null
+                    # Inclusive heuristic now tries 7z on every >2MB .exe;
+                    # most are real installers but non-installers produce
+                    # near-empty output. Clean up if 7z extracted nothing
+                    # useful (only .pdb / readme-style residue) so we don't
+                    # pollute the catalog or block future passes.
+                    $extractedFiles = @(Get-ChildItem -LiteralPath $unpackDir -Recurse -File -ErrorAction SilentlyContinue)
+                    if ($extractedFiles.Count -eq 0) {
+                        Remove-Item -LiteralPath $unpackDir -Recurse -Force -ErrorAction SilentlyContinue
+                    }
+                } catch {
+                    Write-Host ("  [WARN] 7z extraction failed for {0}: {1}" -f $exe.Name, $_.Exception.Message) -ForegroundColor Yellow
+                    if (Test-Path -LiteralPath $unpackDir) {
+                        $orphan = @(Get-ChildItem -LiteralPath $unpackDir -Force -ErrorAction SilentlyContinue)
+                        if ($orphan.Count -eq 0) {
+                            Remove-Item -LiteralPath $unpackDir -Recurse -Force -ErrorAction SilentlyContinue
+                        }
+                    }
+                }
+            }
+            # Re-scan to find any inner installers that just became visible
+            $allCandidates = Find-InstallerCandidates -Root $OutputDir
+            # Filter to candidates whose -unpacked dir doesn't yet exist
+            $remaining = @($allCandidates | Where-Object {
+                -not (Test-Path -LiteralPath (Join-Path $_.DirectoryName ($_.BaseName + '-unpacked')))
+            })
+            $pass++
         }
     } else {
         Write-Host "  [WARN] 7-Zip not found. Installer EXEs left as opaque blobs." -ForegroundColor Yellow

@@ -76,6 +76,10 @@ Write-Host "4a) Eaton: Extract firmware bundles + build NSRL catalogs (submenu: 
 Write-Host "4b) APC (Schneider): Extract firmware bundles + build NSRL catalogs (submenu: pick one or ALL)" -ForegroundColor DarkYellow
 Write-Host "4c) Vertiv (Liebert/Avocent): Extract firmware bundles + build NSRL catalogs (submenu: pick one or ALL)" -ForegroundColor DarkYellow
 Write-Host "4d) SEL (Schweitzer Engineering Laboratories): Extract firmware bundles + build NSRL catalogs (submenu: pick one or ALL)" -ForegroundColor DarkYellow
+Write-Host "4e) Honeywell (Niagara / Experion / ControlEdge / HC900): Extract firmware bundles + build NSRL catalogs" -ForegroundColor DarkYellow
+Write-Host "4f) Schneider Electric (Modicon / EcoStruxure / Magelis / Altivar): Extract firmware bundles + build NSRL catalogs" -ForegroundColor DarkYellow
+Write-Host "4g) Rockwell (ControlLogix / CompactLogix / FactoryTalk / Studio 5000): Extract firmware bundles + build NSRL catalogs" -ForegroundColor DarkYellow
+Write-Host "4h) Siemens (SIMATIC / SCALANCE / SINAMICS / RUGGEDCOM / TIA Portal): Extract firmware bundles + build NSRL catalogs" -ForegroundColor DarkYellow
 Write-Host ""
 
 # -- GROUP 5: OT Firmware Baselining ------------------------------------------
@@ -513,6 +517,117 @@ elseif ($functionChoice -eq "4d") {
                 }
             }
             $osName = "SEL $product$verHint"
+
+            Write-Host ""
+            Write-Host ">>> Step 2/2: Building NSRL catalog (OsName='$osName')" -ForegroundColor DarkYellow
+            $catalogPath = Join-Path $productDir 'catalog.csv'
+            & "$PSScriptRoot\tools\Build-OsCatalog.ps1" -OsName $osName -SourceDir $extractedDir -OutputCsv $catalogPath
+        }
+    }
+}
+elseif ($functionChoice -in @("4e","4f","4g","4h")) {
+    # 4e/4f/4g/4h: Honeywell / Schneider / Rockwell / Siemens.
+    # Same flow as 4a/4b/4c/4d -- factored into one block since the
+    # vendor-specific bits are just the staging-root path, the extension
+    # allowlist, and a one-line OsName prefix. The extraction + catalog
+    # build calls Expand-EatonFirmware.ps1 (vendor-neutral despite its
+    # name) and Build-OsCatalog.ps1 unchanged.
+    $vendorMap = @{
+        '4e' = @{
+            Name  = 'Honeywell'
+            Dir   = 'Honeywell'
+            Exts  = '.zip','.exe','.dist','.par','.cck','.dpe','.tar','.iso','.img'
+            Note  = 'Honeywell Process Solutions / Niagara firmware needs partner login.'
+        }
+        '4f' = @{
+            Name  = 'Schneider'
+            Dir   = 'Schneider'
+            Exts  = '.zip','.exe','.fwm','.cck','.eds','.lds','.tar','.iso','.img','.bin'
+            Note  = 'Schneider gates downloads via secureidentity.schneider-electric.com (same wall as APC).'
+        }
+        '4g' = @{
+            Name  = 'Rockwell'
+            Dir   = 'Rockwell'
+            Exts  = '.zip','.exe','.dmk','.nvs','.acd','.L5K','.L5X','.tar','.iso','.img','.bin'
+            Note  = 'Rockwell PCDC requires a free MyRockwell account for firmware downloads.'
+        }
+        '4h' = @{
+            Name  = 'Siemens'
+            Dir   = 'Siemens'
+            Exts  = '.zip','.exe','.upd','.zap','.s7p','.fwl','.fwu','.tar','.iso','.img','.bin'
+            Note  = 'Siemens Industry Online Support requires a free PIA account.'
+        }
+    }
+    $cfg = $vendorMap[$functionChoice]
+    $stagingRoot = Join-Path (Split-Path $PSScriptRoot -Parent) "firmware-staging\$($cfg.Dir)"
+    $vendorExts = $cfg.Exts
+    $zipFiles = @()
+    if (Test-Path $stagingRoot) {
+        $zipFiles = @(Get-ChildItem -Path $stagingRoot -Recurse -File -ErrorAction SilentlyContinue |
+                      Where-Object {
+                          ($_.DirectoryName -match '[\\/]raw([\\/]|$)') -and
+                          ($_.Extension.ToLowerInvariant() -in $vendorExts)
+                      } |
+                      Sort-Object FullName)
+    }
+    if ($zipFiles.Count -eq 0) {
+        Write-Host "[WARN] No firmware files found under $stagingRoot\**\raw\ - drop firmware files there first." -ForegroundColor Yellow
+        Write-Host "       Download URLs are listed in $stagingRoot\README.md" -ForegroundColor DarkGray
+        Write-Host "       Note: $($cfg.Note)" -ForegroundColor DarkGray
+    } else {
+        Write-Host ""
+        Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkYellow
+        Write-Host ("  $([char]27)[4m|     {0}) {1}: Extract + build catalog     |$([char]27)[24m" -f $functionChoice, $cfg.Name) -ForegroundColor DarkYellow
+        Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkYellow
+        for ($i = 0; $i -lt $zipFiles.Count; $i++) {
+            $rawDir   = $zipFiles[$i].DirectoryName
+            $product  = Split-Path -Parent $rawDir | Split-Path -Leaf
+            $category = Split-Path -Parent (Split-Path -Parent $rawDir) | Split-Path -Leaf
+            Write-Host ("  {0,2}) {1}/{2}" -f ($i + 1), $category, $product) -ForegroundColor DarkYellow
+        }
+        Write-Host ("  {0,2}) ALL $($cfg.Name) firmware files" -f ($zipFiles.Count + 1)) -ForegroundColor DarkYellow
+        Write-Host ""
+        $sub = (Read-Host "Please enter a $functionChoice sub-option").Trim()
+
+        $picks = @()
+        if ($sub -eq ($zipFiles.Count + 1).ToString() -or $sub -ieq 'all') {
+            $picks = $zipFiles
+        } elseif ($sub -match '^\d+$' -and [int]$sub -ge 1 -and [int]$sub -le $zipFiles.Count) {
+            $picks = @($zipFiles[[int]$sub - 1])
+        } else {
+            Write-Host "Unknown sub-option: $sub" -ForegroundColor Red
+        }
+
+        foreach ($zip in $picks) {
+            $rawDir     = $zip.DirectoryName
+            $productDir = Split-Path -Parent $rawDir
+            $product    = Split-Path -Leaf $productDir
+            $category   = Split-Path -Leaf (Split-Path -Parent $productDir)
+
+            Write-Host ""
+            Write-Host ("=== {0}/{1} ===" -f $category, $product) -ForegroundColor Cyan
+            Write-Host ""
+            Write-Host ">>> Step 1/2: Extracting firmware bundle" -ForegroundColor DarkYellow
+            try {
+                & "$PSScriptRoot\tools\Expand-EatonFirmware.ps1" -ZipPath $zip.FullName -Force
+            } catch {
+                Write-Host "[ERROR] Extraction failed: $($_.Exception.Message)" -ForegroundColor Red
+                continue
+            }
+
+            # Dotted-version regex covers Honeywell / Schneider / Rockwell / Siemens
+            # firmware naming uniformly (e.g. tia_portal_v19.0.exe, m580_2.10.exe,
+            # PowerFlex755_v32.001.exe, niagara_4.11.exe).
+            $extractedDir = Join-Path $productDir 'extracted'
+            $verHint = ''
+            $hintFile = @(Get-ChildItem -LiteralPath $extractedDir -Recurse -File -Include '*.exe','*.bin','*.tar','*.upd','*.iso','*.img','*.dmk','*.fwm','*.dist','*.par','*.zap' -ErrorAction SilentlyContinue) | Select-Object -First 1
+            if ($hintFile) {
+                $vMatch = [regex]::Match($hintFile.BaseName, '[_-]v?(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)')
+                if ($vMatch.Success) {
+                    $verHint = ' v' + $vMatch.Groups[1].Value
+                }
+            }
+            $osName = "$($cfg.Name) $product$verHint"
 
             Write-Host ""
             Write-Host ">>> Step 2/2: Building NSRL catalog (OsName='$osName')" -ForegroundColor DarkYellow

@@ -351,7 +351,9 @@ if ($wslAvailable) {
             # AOS+APP+sig; .spkg is the signed-package sub-bundle inside.
             # .fl added for Vertiv Avocent ACS 8000: custom JBOOT container
             # with embedded kernel + gzipped rootfs + DER private keys.
-            $isContainer = $_.Extension -in @('.tar','.fw','.img','.rom','.nmc3','.spkg','.fl')
+            # .iso added for Siemens TIA Portal + similar installers; 7z
+            # handles ISO 9660 / UDF / hybrid natively.
+            $isContainer = $_.Extension -in @('.tar','.fw','.img','.rom','.nmc3','.spkg','.fl','.iso')
             $isBigBin    = $_.Extension -in @('.bin','.gz','.xz') -and $_.Length -gt 1MB
             $isUsha      = $_.Extension -ieq '.bin' -and (Test-IsUshaFirmware $_)
             $isContainer -or $isBigBin -or $isUsha

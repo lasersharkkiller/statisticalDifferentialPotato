@@ -133,6 +133,16 @@ extract_one() {
                 rm -rf "$out"; return 0
             fi
             ;;
+        *"ISO 9660"*|*"UDF filesystem"*)
+            # CD/DVD images shipped by Siemens TIA Portal, Schneider EcoStruxure,
+            # Rockwell Studio 5000, etc. 7z extracts both ISO 9660 and UDF natively.
+            out="$outdir/iso"
+            mkdir -p "$out"
+            7z x -y "-o$out" "$input" >/dev/null 2>&1 || true
+            if [ -z "$(ls -A "$out" 2>/dev/null)" ]; then
+                rm -rf "$out"; return 0
+            fi
+            ;;
         *"DOS/MBR boot sector"*)
             # FAT12/16/32 volume. 7z handles all variants. Reports non-zero
             # exit on volumes without a real MBR (Eaton's .data_img has none)

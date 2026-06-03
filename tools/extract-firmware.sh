@@ -143,6 +143,30 @@ extract_one() {
                 rm -rf "$out"; return 0
             fi
             ;;
+        *"Microsoft Cabinet"*)
+            # InstallShield's primary payload container. Each Siemens TIA Portal
+            # subcomponent ships a Data1.cab with the actual product binaries
+            # (DLLs, exes, configs) inside. Without this handler the .cab falls
+            # to the binwalk fallback and yields nothing usable.
+            out="$outdir/cab"
+            mkdir -p "$out"
+            7z x -y "-o$out" "$input" >/dev/null 2>&1 || true
+            if [ -z "$(ls -A "$out" 2>/dev/null)" ]; then
+                rm -rf "$out"; return 0
+            fi
+            ;;
+        *"Composite Document File"*)
+            # Windows MSI Installer (OLE compound document). 7z extracts the
+            # MSI's streams: custom-action DLLs, embedded sub-CABs, and the
+            # File/Component tables as binary blobs. Siemens TIA Portal ships
+            # one Setup.msi per subcomponent alongside Data1.cab.
+            out="$outdir/msi"
+            mkdir -p "$out"
+            7z x -y "-o$out" "$input" >/dev/null 2>&1 || true
+            if [ -z "$(ls -A "$out" 2>/dev/null)" ]; then
+                rm -rf "$out"; return 0
+            fi
+            ;;
         *"DOS/MBR boot sector"*)
             # FAT12/16/32 volume. 7z handles all variants. Reports non-zero
             # exit on volumes without a real MBR (Eaton's .data_img has none)
@@ -166,6 +190,22 @@ extract_one() {
             while dumpimage -T flat_dt -p "$i" -o "$out/sub-$i" "$input" >/dev/null 2>&1; do
                 i=$((i + 1))
             done
+            ;;
+        "PDF document"*|"PE32 executable"*|"PE32+ executable"*|"TrueType Font"*|"OpenType font"*|"PNG image"*|"JPEG image"*|"GIF image"*|"SVG Scalable"*|"Web Open Font"*|*"text,"*|*"text "*|*"text"|"Bourne-Again shell"*|"POSIX shell"*|"Python script"*|"Perl script"*)
+            # Terminal formats with no embedded payload worth carving.
+            # PDFs (Siemens TIA Portal ships ~1GB of documentation PDFs)
+            # and PE binaries (every InstallShield launcher and Siemens
+            # .NET assembly) otherwise fall to the binwalk fallback and
+            # produce massive zlib-carve false positives -- one PDF can
+            # yield 1000+ junk .zlib chunks. PE installers ARE worth
+            # cracking, but only via 7-Zip with installer-marker
+            # heuristics; that lives in PowerShell Step 4 (top-level)
+            # and is intentionally NOT replicated here because the inner
+            # .exes that reach this layer in real vendor cascades have
+            # always been launchers/managed assemblies, not content
+            # archives. Text/font/image formats never contain
+            # extractable inner content.
+            return 0
             ;;
         *)
             # Don't re-binwalk anything that came out of a previous binwalk

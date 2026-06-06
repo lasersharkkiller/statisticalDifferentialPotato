@@ -36,8 +36,27 @@ function Test-FidelityIndexCalibration {
         recent 5 (by LastWriteTime) are used for the verdict regression gate.
         Default: elasticPotato\purpleTeaming.
 
+    .PARAMETER MinCorpora
+        Minimum number of labeled corpora required to satisfy the Phase 4
+        binding-gate floor. Default: 20 (chosen so that ceil(0.05 * 20) = 1
+        disagreement is still tolerated under the 95% bar).
+
+        PILOT MODE: passing a smaller value (e.g. -MinCorpora 3) lowers the
+        floor and lets Phase 4 run on a small staged corpus. This materially
+        weakens calibration_passed semantics - statistical confidence is
+        reduced because a single disagreement at n=3 already crosses the 5%
+        tolerance. The chosen value is written to
+        manifest.scoring.calibration_min_corpora so the consumer can render a
+        'PILOT MODE' badge and dashboards can warn. Stage more corpora before
+        relying on the gate in production.
+
     .EXAMPLE
         Test-FidelityIndexCalibration -Verbose
+
+    .EXAMPLE
+        # Pilot mode with only 3 staged corpora. Calibration may PASS but
+        # confidence is materially reduced - see -MinCorpora notes.
+        Test-FidelityIndexCalibration -MinCorpora 3 -Verbose
 
     .NOTES
         Sets $global:LASTEXITCODE = 0 on PASS, 1 on FAIL/SKIP-overall.
@@ -69,11 +88,42 @@ function Test-FidelityIndexCalibration {
                         loadable / no toggleable entrypoint).
                         calibration_passed = $null (no binding evidence).
             'NOT_RUN' - Should not occur in normal runs; sentinel value.
+
+        PILOT MODE (-MinCorpora override):
+            The default minimum-N floor for the binding Phase 4 gate is 20.
+            Below 20 the gate SKIPS and calibration_passed stays $null. For
+            initial bring-up with a small staged corpus, pass -MinCorpora N
+            (e.g. 3). The console banner will print
+                'PILOT MODE: min-N floor lowered to N (default 20). Statistical
+                 confidence reduced; calibration_passed semantics weakened.'
+            and manifest.scoring.calibration_min_corpora is written with the
+            value used so consumers can render a 'pilot mode' badge. Stage
+            more corpora (especially CLEAN-labeled samples) before relying on
+            the gate in production.
+
+        POINTER CORPORA (pointer.json):
+            A corpus subdirectory under -LabeledCorpusRoot may contain a single
+            pointer.json file that resolves to an external absolute_path. This
+            keeps large NDJSON detonation logs out of the repo. When
+            pointer.json is detected, the runner resolves absolute_path and
+            walks that directory instead. Pointer schema:
+                { "label": "COMPROMISED",
+                  "framework": "Sliver",
+                  "absolute_path": "C:\\path\\to\\corpus",
+                  "expected_verdict": "COMPROMISED",
+                  "datasets": ["windows.sysmon_operational.ndjson", ...] }
     #>
     [CmdletBinding()]
     param(
         [string]$BaselineRoot      = "",
-        [string]$LabeledCorpusRoot = ""
+        [string]$LabeledCorpusRoot = "",
+        # PILOT MODE override. Default 20 - matches the binding-gate floor that
+        # was hardcoded prior to this commit. Pass a smaller value (e.g. 3) to
+        # let Phase 4 run on a small staged corpus during initial bring-up.
+        # See -MinCorpora notes in .PARAMETER / .NOTES for the confidence
+        # caveat - statistical bar is materially weakened below 20.
+        [ValidateRange(1, 10000)]
+        [int]$MinCorpora           = 20
     )
 
     # ---------- path resolution ----------
@@ -193,6 +243,17 @@ function Test-FidelityIndexCalibration {
     Write-Host "Test-FidelityIndexCalibration" -ForegroundColor White
     Write-Host ("  BaselineRoot      : {0}" -f $BaselineRoot) -ForegroundColor Gray
     Write-Host ("  LabeledCorpusRoot : {0}" -f $LabeledCorpusRoot) -ForegroundColor Gray
+    $pilotTag = if ($MinCorpora -lt 20) { ' (PILOT MODE)' } else { '' }
+    Write-Host ("  MinCorpora        : {0}{1}" -f $MinCorpora, $pilotTag) -ForegroundColor Gray
+    # PILOT MODE banner - explicit, loud, repeated in the Phase 4 SKIP path too.
+    # If the caller lowered the floor we want the operator to see this BEFORE any
+    # gate output so they cannot miss it in a long log tail.
+    $script:_pilotModeActive = ($MinCorpora -lt 20)
+    if ($script:_pilotModeActive) {
+        Write-Host ""
+        Write-Host ("  PILOT MODE: min-N floor lowered to {0} (default 20). Statistical confidence reduced; calibration_passed semantics weakened." -f $MinCorpora) -ForegroundColor Yellow
+        Write-Host  "             Stage more corpora (especially CLEAN-labeled baselines) before relying on the gate in production." -ForegroundColor Yellow
+    }
 
     # ============================================================
     # PHASE 1 - SCHEMA SANITY
@@ -612,21 +673,65 @@ function Test-FidelityIndexCalibration {
     $script:_phase4_n        = 0
 
     # (1) Discover labeled corpora
+    #
+    # A corpus subdirectory under -LabeledCorpusRoot may be materialized in
+    # either of two ways:
+    #   (a) INLINE - the subdirectory contains the NDJSON datasets directly.
+    #       This is the historical layout and is still walked as-is.
+    #   (b) POINTER - the subdirectory contains a single 'pointer.json' file
+    #       that resolves to an external absolute_path. This keeps large
+    #       detonation logs out of the calibration_samples repo. When a
+    #       pointer is detected we resolve absolute_path and walk THAT
+    #       directory instead, taking the label / expected_verdict from the
+    #       pointer (falling back to the subdir-name heuristic only if the
+    #       pointer omits an explicit label).
     $corpora = @()
     if (Test-Path $LabeledCorpusRoot) {
         $candidates = @(Get-ChildItem -LiteralPath $LabeledCorpusRoot -Directory -ErrorAction SilentlyContinue |
                        Sort-Object LastWriteTime -Descending)
         foreach ($d in $candidates) {
-            $ndjson = @(Get-ChildItem -LiteralPath $d.FullName -File -Recurse -ErrorAction SilentlyContinue -Filter '*.ndjson')
+            $walkDir       = $d.FullName
+            $pointerLabel  = $null
+            $pointerFramework = $null
+            $pointerPath   = Join-Path $d.FullName 'pointer.json'
+            if (Test-Path -LiteralPath $pointerPath) {
+                try {
+                    $ptr = Get-Content -LiteralPath $pointerPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+                    if ($ptr.absolute_path) {
+                        if (Test-Path -LiteralPath $ptr.absolute_path) {
+                            $walkDir = [string]$ptr.absolute_path
+                            if ($ptr.label)            { $pointerLabel     = [string]$ptr.label }
+                            elseif ($ptr.expected_verdict) { $pointerLabel = [string]$ptr.expected_verdict }
+                            if ($ptr.framework)        { $pointerFramework = [string]$ptr.framework }
+                            Write-Host ("    [pointer] {0} -> {1}" -f $d.Name, $walkDir) -ForegroundColor DarkGray
+                        } else {
+                            Write-Warning ("pointer.json absolute_path not found, skipping corpus '{0}': {1}" -f $d.Name, $ptr.absolute_path)
+                            continue
+                        }
+                    } else {
+                        Write-Warning ("pointer.json in '{0}' has no absolute_path field; skipping." -f $d.Name)
+                        continue
+                    }
+                } catch {
+                    Write-Warning ("pointer.json in '{0}' failed to parse, skipping: {1}" -f $d.Name, $_.Exception.Message)
+                    continue
+                }
+            }
+            $ndjson = @(Get-ChildItem -LiteralPath $walkDir -File -Recurse -ErrorAction SilentlyContinue -Filter '*.ndjson')
             if ($ndjson.Count -eq 0) {
-                $ndjson = @(Get-ChildItem -LiteralPath $d.FullName -File -Recurse -ErrorAction SilentlyContinue -Filter '*.json')
+                $ndjson = @(Get-ChildItem -LiteralPath $walkDir -File -Recurse -ErrorAction SilentlyContinue -Filter '*.json' |
+                            Where-Object { $_.Name -ne 'pointer.json' })
             }
             if ($ndjson.Count -gt 0) {
+                $label =
+                    if ($pointerLabel) { $pointerLabel.ToUpperInvariant() }
+                    elseif ($d.Name -match '(?i)clean|baseline|benign') { 'CLEAN' }
+                    else { 'COMPROMISED' }
                 $corpora += [pscustomobject]@{
-                    Name      = $d.Name
-                    Path      = $d.FullName
+                    Name      = if ($pointerFramework) { "$($d.Name) ($pointerFramework)" } else { $d.Name }
+                    Path      = $walkDir
                     EventFile = $ndjson[0].FullName
-                    Label     = if ($d.Name -match '(?i)clean|baseline|benign') { 'CLEAN' } else { 'COMPROMISED' }
+                    Label     = $label
                 }
             }
         }
@@ -684,7 +789,13 @@ function Test-FidelityIndexCalibration {
     # disagreement is still tolerated; below 20 we cannot distinguish noise
     # from a real regression, so we treat the gate as SKIPPED (same state as
     # 'no corpora at all') and leave calibration_passed = $null.
-    $minCorporaForBinding = 20
+    #
+    # PILOT MODE: $MinCorpora is a runtime override (default 20) that lets
+    # the operator lower this floor for initial bring-up on a small staged
+    # corpus. The pilot-mode banner is printed at startup; the chosen value
+    # is recorded in manifest.scoring.calibration_min_corpora so the
+    # consumer can render a 'PILOT MODE' badge.
+    $minCorporaForBinding = $MinCorpora
     $skipReasons = New-Object System.Collections.Generic.List[string]
     if ($corpora.Count -eq 0) {
         $skipReasons.Add("no NDJSON/JSON corpora under $LabeledCorpusRoot")
@@ -709,13 +820,13 @@ function Test-FidelityIndexCalibration {
             elseif  ($consumerLoaded)                            { 'loaded' }
             elseif  ($consumerResolved)                          { "load failed: $consumerLoadErr" }
             else                                                 { 'module not found' }
-        Add-Gate 4 'labeled corpora available (>=20)'    'SKIP' ("corpora found: {0}" -f $corpora.Count) $false
+        Add-Gate 4 ("labeled corpora available (>={0})" -f $minCorporaForBinding) 'SKIP' ("corpora found: {0}" -f $corpora.Count) $false
         Add-Gate 4 'real consumer loadable + toggleable' 'SKIP' $consumerDetail $false
         Add-Gate 4 'verdict agreement >= 95% (binding)'  'SKIP' "skipped: $reason" $false
         Add-Gate 4 'no COMPROMISED -> CLEAN regression'  'SKIP' "skipped: $reason" $false
     } else {
         # All preconditions met - run the REAL consumer twice per corpus.
-        Add-Gate 4 'labeled corpora available (>=20)'    'PASS' "$($corpora.Count) corpora" $false
+        Add-Gate 4 ("labeled corpora available (>={0})" -f $minCorporaForBinding) 'PASS' "$($corpora.Count) corpora" $false
         Add-Gate 4 'real consumer loadable + toggleable' 'PASS' "$($consumerEntryFn.Name) exposes -DetonationLogsDir + legacy toggle + verdict-return" $false
 
         $agree       = 0
@@ -867,6 +978,18 @@ function Test-FidelityIndexCalibration {
             } else {
                 $manifest.scoring.calibration_phase4_reason = [string]$script:_phase4_reason
             }
+            # PILOT MODE breadcrumb: record the minimum-N floor that was in effect
+            # for THIS run so consumers / dashboards can render a 'PILOT MODE'
+            # badge when the value is below the default 20. We deliberately write
+            # the value on EVERY run (including non-pilot runs) so the field is
+            # always present and the consumer never has to disambiguate
+            # 'unset = default' from 'unset = old runner without the override'.
+            if (-not $manifest.scoring.PSObject.Properties['calibration_min_corpora']) {
+                Add-Member -InputObject $manifest.scoring -MemberType NoteProperty -Name 'calibration_min_corpora' `
+                    -Value $MinCorpora -Force
+            } else {
+                $manifest.scoring.calibration_min_corpora = $MinCorpora
+            }
             # Also record a timestamp + gate summary for forensics.
             $summary = [pscustomobject]@{
                 timestamp_utc = (Get-Date).ToUniversalTime().ToString('o')
@@ -946,6 +1069,8 @@ function Test-FidelityIndexCalibration {
         Phase4Reason            = [string]$script:_phase4_reason
         Phase4AgreementPct      = $script:_phase4_agreepct
         Phase4N                 = $script:_phase4_n
+        MinCorpora              = $MinCorpora              # binding-gate floor used this run (PILOT MODE if < 20)
+        PilotMode               = [bool]$script:_pilotModeActive
         BaselineRoot            = $BaselineRoot
         ManifestPath            = $manifestPath
         Gates                   = $gates

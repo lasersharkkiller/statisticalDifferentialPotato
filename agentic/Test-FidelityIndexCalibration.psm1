@@ -92,11 +92,15 @@ function Test-FidelityIndexCalibration {
         }
         if (-not $BaselineRoot) { $BaselineRoot = [System.IO.Path]::GetFullPath($crossRepoBaselineCandidates[0]) }
     } elseif (-not [System.IO.Path]::IsPathRooted($BaselineRoot)) {
-        # Relative override: try both candidate roots, error if neither exists.
+        # Relative override: resolve against CALLER's CWD first (least-surprise -
+        # the caller wrote the path string relative to where they ran the cmdlet,
+        # not where the runner module happens to live). Only if CWD-relative does
+        # not exist do we probe the cross-repo candidates as a last-ditch
+        # disambiguation. Then error if NONE exist.
         $rel = $BaselineRoot
         $tried = @()
         $resolved = $null
-        foreach ($base in @((Join-Path $PSScriptRoot "..\..\elasticPotato"), (Join-Path $PSScriptRoot ".."), (Get-Location).Path)) {
+        foreach ($base in @((Get-Location).Path, (Join-Path $PSScriptRoot "..\..\elasticPotato"), (Join-Path $PSScriptRoot ".."))) {
             $p = Join-Path $base $rel
             $tried += $p
             if (Test-Path $p) { $resolved = [System.IO.Path]::GetFullPath($p); break }
@@ -104,6 +108,7 @@ function Test-FidelityIndexCalibration {
         if (-not $resolved) {
             throw "BaselineRoot '$rel' is relative and was not found under any candidate root. Tried: $($tried -join '; '). Pass an absolute path."
         }
+        Write-Host ("  [BaselineRoot resolved] '{0}' -> {1}" -f $rel, $resolved) -ForegroundColor DarkGray
         $BaselineRoot = $resolved
     }
 
@@ -117,10 +122,11 @@ function Test-FidelityIndexCalibration {
         }
         if (-not $LabeledCorpusRoot) { $LabeledCorpusRoot = [System.IO.Path]::GetFullPath($crossRepoCorpusCandidates[0]) }
     } elseif (-not [System.IO.Path]::IsPathRooted($LabeledCorpusRoot)) {
+        # Same CWD-first policy as BaselineRoot above.
         $rel = $LabeledCorpusRoot
         $tried = @()
         $resolved = $null
-        foreach ($base in @((Join-Path $PSScriptRoot "..\..\elasticPotato"), (Join-Path $PSScriptRoot ".."), (Get-Location).Path)) {
+        foreach ($base in @((Get-Location).Path, (Join-Path $PSScriptRoot "..\..\elasticPotato"), (Join-Path $PSScriptRoot ".."))) {
             $p = Join-Path $base $rel
             $tried += $p
             if (Test-Path $p) { $resolved = [System.IO.Path]::GetFullPath($p); break }
@@ -128,6 +134,7 @@ function Test-FidelityIndexCalibration {
         if (-not $resolved) {
             throw "LabeledCorpusRoot '$rel' is relative and was not found under any candidate root. Tried: $($tried -join '; '). Pass an absolute path."
         }
+        Write-Host ("  [LabeledCorpusRoot resolved] '{0}' -> {1}" -f $rel, $resolved) -ForegroundColor DarkGray
         $LabeledCorpusRoot = $resolved
     }
 
@@ -318,58 +325,124 @@ function Test-FidelityIndexCalibration {
         return $null
     }
 
-    # 5 hardcoded probes. These are CORPUS-CONTENT checks, not schema checks -
-    # they will legitimately fail on first builds where the VT main JSONs have
-    # not yet been ingested or on Linux-only corpora. To prevent the runner from
-    # crying wolf on a clean build, these are non-blocking (Blocking=$false).
-    # Structural schema checks (manifest present, indices on disk, entry_count>0,
-    # M/G > 0) above remain blocking.
+    # ----- STRUCTURAL per-dim entry schema validation (binding) -----
+    # The 5 hardcoded probes below assert CORPUS CONTENT (e.g. 'is 8.8.8.8 in the
+    # IP index, is powershell.exe in the process index'). On a fresh build where
+    # the VT corpus has not been ingested, or on a Linux-only corpus where
+    # powershell.exe does not appear, those probes would legitimately fail and
+    # the runner would confuse 'corpus not ingested' with 'schema is invalid'.
+    # Instead we split:
+    #   - STRUCTURE (this block, BINDING): each per-dim index loads as JSON and
+    #     a sample entry exposes the documented v2 value_schema fields. These
+    #     are 100% schema-driven and have no corpus-content dependency.
+    #   - CORPUS HEALTH (next block, NON-BINDING informational): the 5 legacy
+    #     hardcoded probes, surfaced via $script:_corpusHealthStatus and a
+    #     console warning - NEVER contributing to PASS/FAIL.
+    $script:_corpusHealthStatus = [pscustomobject]@{
+        Probed   = 0
+        Passed   = 0
+        Failed   = 0
+        Skipped  = 0
+        Details  = New-Object System.Collections.Generic.List[string]
+    }
+    $valueSchemaFields = @('M','G','RiskScore','Confidence','PMI','Score100','Dimension')
+    if ($manifest) {
+        $structuralFailures = New-Object System.Collections.Generic.List[string]
+        $structuralChecked  = 0
+        foreach ($f in $perDimFiles) {
+            $idx = & $loadIndex $f
+            if ($null -eq $idx) {
+                # File-missing is handled by the 'all 20 index files on disk' gate
+                # above. Don't double-count here.
+                continue
+            }
+            $sampleEntries = @()
+            try {
+                $sampleEntries = @($idx.PSObject.Properties | Select-Object -First 2 | ForEach-Object { $_.Value })
+            } catch {}
+            if ($sampleEntries.Count -eq 0) {
+                # Empty per-dim file is OK (handled by entry_count gate); structurally
+                # there is nothing to check here.
+                continue
+            }
+            foreach ($entry in $sampleEntries) {
+                $structuralChecked++
+                $missing = @()
+                foreach ($fld in $valueSchemaFields) {
+                    $hasField = $false
+                    try { $hasField = ($null -ne $entry.PSObject.Properties[$fld]) } catch {}
+                    if (-not $hasField) { $missing += $fld }
+                }
+                if ($missing.Count -gt 0) {
+                    $structuralFailures.Add("${f}: missing field(s) [$($missing -join ', ')]")
+                }
+            }
+        }
+        if ($structuralChecked -eq 0) {
+            Add-Gate 1 'per-dim entries match v2 value_schema' 'SKIP' 'no per-dim sample entries available' $false
+        } elseif ($structuralFailures.Count -eq 0) {
+            Add-Gate 1 'per-dim entries match v2 value_schema' 'PASS' "$structuralChecked sample entries OK"
+        } else {
+            $head = ($structuralFailures | Select-Object -First 3) -join '; '
+            Add-Gate 1 'per-dim entries match v2 value_schema' 'FAIL' "checked=$structuralChecked failures=$($structuralFailures.Count) e.g. $head"
+        }
+    }
+
+    # ----- CORPUS HEALTH (informational, NON-BINDING) -----
+    # These 5 probes assert corpus content, not schema. They are EXCLUDED from
+    # the gate accumulator entirely - they emit a console warning and populate
+    # $script:_corpusHealthStatus so dashboards can surface a 'corpus health'
+    # badge separately from the binding 'schema sanity' verdict.
     if ($manifest) {
         $idxIP        = & $loadIndex 'fidelity-ip.json'
         $idxCertStat  = & $loadIndex 'fidelity-cert-status.json'
         $idxMitre     = & $loadIndex 'fidelity-mitre-technique.json'
         $idxProc      = & $loadIndex 'fidelity-process.json'
 
-        $e = & $findEntry $idxIP '8.8.8.8'
-        $g = if ($e) { & $getNum $e @('G','GoodCount','goodCount','good') } else { $null }
-        if ($e -and $g -gt 0) {
-            Add-Gate 1 "probe: IP 8.8.8.8 G > 0" 'PASS' "G=$g" $false
-        } else {
-            Add-Gate 1 "probe: IP 8.8.8.8 G > 0" 'FAIL' ("entry={0} G={1} [corpus-content; non-blocking]" -f [bool]$e, $g) $false
+        $probeRows = @(
+            @{ Name = 'IP 8.8.8.8 G > 0'; Eval = {
+                $e = & $findEntry $idxIP '8.8.8.8'
+                $g = if ($e) { & $getNum $e @('G','GoodCount','goodCount','good') } else { $null }
+                @{ Ok = ($e -and $g -gt 0); Detail = "entry=$([bool]$e) G=$g" }
+            }},
+            @{ Name = 'SignedVerified G > M'; Eval = {
+                $eS = & $findEntry $idxCertStat 'SignedVerified'
+                $gS = if ($eS) { & $getNum $eS @('G','GoodCount','goodCount','good') } else { $null }
+                $mS = if ($eS) { & $getNum $eS @('M','MalCount','malCount','mal','malicious') } else { $null }
+                @{ Ok = ($eS -and $gS -gt $mS); Detail = "entry=$([bool]$eS) G=$gS M=$mS" }
+            }},
+            @{ Name = 'SelfSigned M > G'; Eval = {
+                $eSS = & $findEntry $idxCertStat 'SelfSigned'
+                $gSS = if ($eSS) { & $getNum $eSS @('G','GoodCount','goodCount','good') } else { $null }
+                $mSS = if ($eSS) { & $getNum $eSS @('M','MalCount','malCount','mal','malicious') } else { $null }
+                @{ Ok = ($eSS -and $mSS -gt $gSS); Detail = "entry=$([bool]$eSS) M=$mSS G=$gSS" }
+            }},
+            @{ Name = 'MITRE T1055 RiskScore > 0.5'; Eval = {
+                $eT = & $findEntry $idxMitre 'T1055'
+                $rs = if ($eT) { & $getNum $eT @('RiskScore','riskScore','risk') } else { $null }
+                @{ Ok = ($eT -and $rs -gt 0.5); Detail = ("entry={0} RiskScore={1}" -f [bool]$eT, $rs) }
+            }},
+            @{ Name = 'process powershell.exe G > 0'; Eval = {
+                $eP = & $findEntry $idxProc 'powershell.exe'
+                $gP = if ($eP) { & $getNum $eP @('G','GoodCount','goodCount','good') } else { $null }
+                @{ Ok = ($eP -and $gP -gt 0); Detail = "entry=$([bool]$eP) G=$gP" }
+            }}
+        )
+        foreach ($row in $probeRows) {
+            $script:_corpusHealthStatus.Probed++
+            $r = & $row.Eval
+            if ($r.Ok) {
+                $script:_corpusHealthStatus.Passed++
+                Write-Host ("  [CORPUS-HEALTH ok]   {0,-40} {1}" -f $row.Name, $r.Detail) -ForegroundColor DarkGreen
+            } else {
+                $script:_corpusHealthStatus.Failed++
+                $msg = "{0}: {1}" -f $row.Name, $r.Detail
+                $script:_corpusHealthStatus.Details.Add($msg)
+                Write-Host ("  [CORPUS-HEALTH warn] {0,-40} {1}" -f $row.Name, $r.Detail) -ForegroundColor DarkYellow
+            }
         }
-
-        $eS = & $findEntry $idxCertStat 'SignedVerified'
-        $gS = if ($eS) { & $getNum $eS @('G','GoodCount','goodCount','good') } else { $null }
-        $mS = if ($eS) { & $getNum $eS @('M','MalCount','malCount','mal','malicious') } else { $null }
-        if ($eS -and $gS -gt $mS) {
-            Add-Gate 1 "probe: SignedVerified G > M" 'PASS' "G=$gS M=$mS" $false
-        } else {
-            Add-Gate 1 "probe: SignedVerified G > M" 'FAIL' ("entry={0} G={1} M={2} [corpus-content; non-blocking]" -f [bool]$eS,$gS,$mS) $false
-        }
-
-        $eSS = & $findEntry $idxCertStat 'SelfSigned'
-        $gSS = if ($eSS) { & $getNum $eSS @('G','GoodCount','goodCount','good') } else { $null }
-        $mSS = if ($eSS) { & $getNum $eSS @('M','MalCount','malCount','mal','malicious') } else { $null }
-        if ($eSS -and $mSS -gt $gSS) {
-            Add-Gate 1 "probe: SelfSigned M > G" 'PASS' "M=$mSS G=$gSS" $false
-        } else {
-            Add-Gate 1 "probe: SelfSigned M > G" 'FAIL' ("entry={0} M={1} G={2} [corpus-content; non-blocking]" -f [bool]$eSS,$mSS,$gSS) $false
-        }
-
-        $eT = & $findEntry $idxMitre 'T1055'
-        $rs = if ($eT) { & $getNum $eT @('RiskScore','riskScore','risk') } else { $null }
-        if ($eT -and $rs -gt 0.5) {
-            Add-Gate 1 "probe: MITRE T1055 RiskScore > 0.5" 'PASS' "RiskScore=$([Math]::Round($rs,3))" $false
-        } else {
-            Add-Gate 1 "probe: MITRE T1055 RiskScore > 0.5" 'FAIL' ("entry={0} RiskScore={1} [corpus-content; non-blocking]" -f [bool]$eT,$rs) $false
-        }
-
-        $eP = & $findEntry $idxProc 'powershell.exe'
-        $gP = if ($eP) { & $getNum $eP @('G','GoodCount','goodCount','good') } else { $null }
-        if ($eP -and $gP -gt 0) {
-            Add-Gate 1 "probe: process powershell.exe G > 0" 'PASS' "G=$gP" $false
-        } else {
-            Add-Gate 1 "probe: process powershell.exe G > 0" 'FAIL' ("entry={0} G={1} [corpus-content; non-blocking]" -f [bool]$eP,$gP) $false
+        if ($script:_corpusHealthStatus.Failed -gt 0) {
+            Write-Warning ("Corpus-health probes: {0}/{1} probes failed. This is INFORMATIONAL (does not affect calibration_passed) - typically means VT corpus not fully ingested or Linux-only corpus. Investigate ingestion if unexpected." -f $script:_corpusHealthStatus.Failed, $script:_corpusHealthStatus.Probed)
         }
     }
 
@@ -605,12 +678,18 @@ function Test-FidelityIndexCalibration {
     }
 
     # (4) Decide PASS / SKIP / FAIL
-    $minCorporaForBinding = 5
+    # Minimum-N floor for the 95% verdict-agreement gate: with n<20 a single
+    # disagreement crosses the 5% bar (e.g. n=5 -> 1 disagreement = 80% =
+    # instant FAIL). The 20-corpus floor was chosen so that ceil(0.05 * 20) = 1
+    # disagreement is still tolerated; below 20 we cannot distinguish noise
+    # from a real regression, so we treat the gate as SKIPPED (same state as
+    # 'no corpora at all') and leave calibration_passed = $null.
+    $minCorporaForBinding = 20
     $skipReasons = New-Object System.Collections.Generic.List[string]
     if ($corpora.Count -eq 0) {
         $skipReasons.Add("no NDJSON/JSON corpora under $LabeledCorpusRoot")
     } elseif ($corpora.Count -lt $minCorporaForBinding) {
-        $skipReasons.Add("only $($corpora.Count) corpora found; need >= $minCorporaForBinding for binding")
+        $skipReasons.Add("only $($corpora.Count) corpora found; need >= $minCorporaForBinding for binding gate (minimum-N floor)")
     }
     if (-not $consumerResolved) {
         $skipReasons.Add("consumer module not found at $consumerPath")
@@ -630,13 +709,13 @@ function Test-FidelityIndexCalibration {
             elseif  ($consumerLoaded)                            { 'loaded' }
             elseif  ($consumerResolved)                          { "load failed: $consumerLoadErr" }
             else                                                 { 'module not found' }
-        Add-Gate 4 'labeled corpora available (>=5)'     'SKIP' ("corpora found: {0}" -f $corpora.Count) $false
+        Add-Gate 4 'labeled corpora available (>=20)'    'SKIP' ("corpora found: {0}" -f $corpora.Count) $false
         Add-Gate 4 'real consumer loadable + toggleable' 'SKIP' $consumerDetail $false
         Add-Gate 4 'verdict agreement >= 95% (binding)'  'SKIP' "skipped: $reason" $false
         Add-Gate 4 'no COMPROMISED -> CLEAN regression'  'SKIP' "skipped: $reason" $false
     } else {
         # All preconditions met - run the REAL consumer twice per corpus.
-        Add-Gate 4 'labeled corpora available (>=5)'     'PASS' "$($corpora.Count) corpora" $false
+        Add-Gate 4 'labeled corpora available (>=20)'    'PASS' "$($corpora.Count) corpora" $false
         Add-Gate 4 'real consumer loadable + toggleable' 'PASS' "$($consumerEntryFn.Name) exposes -DetonationLogsDir + legacy toggle + verdict-return" $false
 
         $agree       = 0

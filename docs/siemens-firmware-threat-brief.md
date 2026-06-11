@@ -12,8 +12,8 @@
 | **B. WinCC SCADA / HMI server** (in DVD1) | L3 Site Operations | WinCC Basic/Comfort/Advanced/Professional/Unified, Runtime, OPC UA server | Windows services (CCEServer, CCAgent), SQL Server backend, web client | subset of DVD1 |
 | **C. TIA Portal HSPs + tools** (DVD2) | L3 Site Operations | Hardware Support Packages, IntegrityValidator, SIMATIC CAx data | Signed `.isp16` / `.sis8` containers + .NET tooling | 270,700 hashes |
 | **D. SIMATIC PLCs** (S7-1500/1200/300/400) | L1 Basic Controllers (S7-1500F → Safety) | CPU 1500/1200/300/400, ET 200 distributed I/O | ADONIS RTOS (1500) / proprietary (1200) on PPC/ARM, S7comm/S7comm-Plus (102/TCP), PROFINET | research only |
-| **E. SCALANCE industrial switches** | L3.5 IT/OT Boundary | XB-200, XC-200, XM-400, XR-500, S615 (firewall), W-700 (wireless) | Linux on MIPS/ARM, web UI, SNMP, SSH, Telnet | research only |
-| **F. RUGGEDCOM substation gear** | L3.5 IT/OT Boundary | RSG2100, RST2228, RX1500, ROS / ROX II | ROS (proprietary) / ROX II (Linux), IEC 61850 stack | research only |
+| **E. SCALANCE industrial switches** | L2-L3.5 fabric (S615 firewall + W-700 at L3.5; XB/XC/XM/XR cell-area at L2) | XB-200, XC-200, XM-400, XR-500, S615 (firewall), W-700 (wireless) | Linux on MIPS/ARM, web UI, SNMP, SSH, Telnet | research only |
+| **F. RUGGEDCOM substation gear** | L1/L2 substation network (IEC 61850 station/process bus); L3.5 mgmt plane | RSG2100, RST2228, RX1500, ROS / ROX II | ROS (proprietary) / ROX II (Linux), IEC 61850 stack | research only |
 
 ---
 
@@ -101,7 +101,7 @@ HSPs are signed device-support bundles that the engineering workstation installs
 
 ---
 
-## Group E / F — SCALANCE switches and RUGGEDCOM (research only) — Purdue L3.5 (IT/OT Boundary)
+## Group E / F — SCALANCE switches and RUGGEDCOM (research only) — Purdue L2–L3.5 fabric (SCALANCE cell-LAN at L2, S615 firewall at L3.5; RUGGEDCOM IEC 61850 substation bus at L1/L2 with L3.5 mgmt plane)
 
 ProductCERT publishes SCALANCE advisories roughly monthly. The recurring classes:
 

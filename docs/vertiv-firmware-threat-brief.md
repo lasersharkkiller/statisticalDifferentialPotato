@@ -11,7 +11,7 @@
 | **A. Avocent ACS 8000 console server** | L3.5 IT/OT Boundary | ACS 8000 (4/8/16/32/48-port) | ARM Linux + busybox + OpenSSH + lighttpd/nginx web UI + serial-port daemons (`portmgr`, `cycladesd`) | 34,689 hashes |
 | **B. Liebert IntelliSlot Unity NMC** | L3.5 IT/OT Boundary | IS-UNITY-DP, IS-UNITY-LIFE, IS-UNITY-SNMP | ARM Linux + ext2 rootfs + busybox + Velocity protocol stack + SNMP/Modbus/BACnet daemons | 8,437 hashes |
 | **C. Bare-metal UPS MCU** | Power Infrastructure (L0/L1-adjacent) | Liebert GXT5 Lithium-Ion UPS | Renesas/STM32 MCU, monolithic firmware blob | 5 hashes |
-| **D. Geist PDU NMCs** | L3.5 IT/OT Boundary | Geist GU/GUL/I03/R-series Upgradeable PDUs | ARM Linux + Lua web UI ("Geist Manager"), SSH/SNMP/Modbus | research only |
+| **D. Geist PDU NMCs** | L3.5 IT/OT Boundary (Power Infrastructure outlet-actuation core) | Geist GU/GUL/I03/R-series Upgradeable PDUs | ARM Linux + Lua web UI ("Geist Manager"), SSH/SNMP/Modbus | research only |
 | **E. NetSure DC power controllers** | Power Infrastructure / L1-adjacent | NetSure 211/501/701/801 (M830B / NCU+ / ACU+ controllers) | ARM Linux + proprietary "ACU" web UI, SNMP/Modbus over -48VDC plant | research only |
 | **F. Vertiv management software (Windows/Java)** | L3 Site Operations | Vertiv Power Insight, Trellis Platform, Environet Alert, Avocent DSView | Windows .NET / Apache Tomcat / Postgres / Java | research only |
 
@@ -77,7 +77,7 @@ Only 5 hashes — a monolithic MCU firmware blob with no network surface on the 
 
 ---
 
-## Group D — Geist PDU NMCs (research only — extraction pending) — Purdue L3.5 (IT/OT Boundary)
+## Group D — Geist PDU NMCs (research only — extraction pending) — Purdue L3.5 (IT/OT Boundary) with Power Infrastructure outlet-actuation core
 
 **Direct attack surface (per vendor documentation):** SSH, SNMP v1/v2c/v3, HTTP/HTTPS web UI ("Geist Manager"), Modbus TCP, optional BACnet/IP, EnergyWise. Default credentials historically `admin`/`admin`.
 

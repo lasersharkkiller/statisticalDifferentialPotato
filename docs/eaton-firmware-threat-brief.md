@@ -4,7 +4,7 @@
 Findings combine CVE research and direct examination of the extracted
 firmware (services, default configs, embedded resources).
 
-**Purdue layer mapping:** NMCs (Groups A/B/C) live at **Purdue L3.5 (IT/OT Boundary)** — the SNMP+web bridge from corporate IT into OT power infra. UPS internal MCUs (Group D) and PDU G3 (Group E) sit at the **Power Infrastructure** cross-cut (L0/L1-adjacent, not strictly Purdue L1). UPS Companion / IPM / Windows-side tooling (Group F) runs at **Purdue L3 (Site Operations)**. See [purdue-l35-it-ot-boundary-brief.md](purdue-l35-it-ot-boundary-brief.md) (includes the Power Infrastructure appendix), [purdue-l3-site-operations-brief.md](purdue-l3-site-operations-brief.md), and [purdue-l1-basic-controllers-brief.md](purdue-l1-basic-controllers-brief.md) for cross-vendor views.
+**Purdue layer mapping:** NMCs (Groups A/B/C) and PDU G3 (Group E) live at **Purdue L3.5 (IT/OT Boundary)** — the SNMP+web bridge from corporate IT into OT power infra; the PDU G3 also has an L0/L1-adjacent **Power Infrastructure** outlet-actuation core (consistent with how Rack PDU G4 is treated in Group A: both are IP-managed PDUs whose primary attack surface is the L3.5 management plane). UPS internal MCUs (Group D) sit purely at the **Power Infrastructure** cross-cut (L0/L1-adjacent, no IP network surface on the UPS itself). UPS Companion / IPM / Windows-side tooling (Group F) runs at **Purdue L3 (Site Operations)**. See [purdue-l35-it-ot-boundary-brief.md](purdue-l35-it-ot-boundary-brief.md) (includes the Power Infrastructure appendix) and [purdue-l3-site-operations-brief.md](purdue-l3-site-operations-brief.md) for cross-vendor views.
 
 ## Architecture grouping (drives the threat model, not the SKU)
 
@@ -14,7 +14,7 @@ firmware (services, default configs, embedded resources).
 | **B. ESP32 "USHA"** | L3.5 IT/OT Boundary | BestLink, ConnectUPS, ConnectUPS-Web-SNMP-Card | ESP32 + flat HTML web UI, no real OS | 88-184 hashes (carved) |
 | **C. Legacy NMC** | L3.5 IT/OT Boundary | Network-MS (ee-he/hf/jc/jl/kb/lc/ld/le), Industrial-Modbus-Card-Mini-Slot, X-Slot-Modbus | ARM/x86 proprietary `NmcKA`/`inmc` container, EOL | 2-7 hashes (opaque) |
 | **D. Bare-metal UPS MCU** | Power Infrastructure (L0/L1-adjacent) | 5P / 5PX / 5SC / 9PX / 9SX / 9PXM / 9170+ / Blade / Ferrups | STM32 / Callisto chipset, .sta blocks | 6-96 hashes |
-| **E. PDU G3** | Power Infrastructure / L1-adjacent | one SKU | STM32 with embedded SNMP MIBs + zipped Shark web UI | 14 hashes |
+| **E. PDU G3** | L3.5 IT/OT Boundary (Power Infrastructure outlet-actuation core) | one SKU | STM32 with embedded SNMP MIBs + zipped Shark web UI | 14 hashes |
 | **F. Windows-side** | L3 Site Operations | UPS Companion, IPM/IPP, RNDIS driver, PX-UPS driver, MIBs | Windows binaries the admin runs | small |
 
 ---

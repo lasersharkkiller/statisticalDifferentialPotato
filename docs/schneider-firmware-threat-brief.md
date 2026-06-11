@@ -12,8 +12,8 @@
 | B | L3 Site Operations (EWS) | EcoStruxure Control Expert (Unity Pro), Operator Terminal Expert (Vijeo Designer) | Windows engineering workstation, .NET + native, project files `.stu`/`.xef`/`.zef` | research only |
 | C | Safety Systems (parallel to L1) | Triconex Tricon v10/v11, Trident, Tri-GP | Proprietary RTOS on MP/IOP, TriStation 1131 protocol UDP/1502, key-switch PROGRAM/RUN/REMOTE | research only |
 | D | L3 Site Operations | Citect SCADA / Plant SCADA | Windows server, CTAPI, ANL files, embedded Cicode runtime | research only |
-| E | L3 (Power Operation) + L1 (Sepam) | EcoStruxure Power Operation / Power Monitoring Expert; Sepam 20/40/60/80 relays | Windows SCADA stack; Sepam = ARM/firmware over Modbus, IEC 61850 on optional MES card | research only |
-| F | L3.5 IT/OT Boundary (+ L4 cloud) | EcoStruxure cloud agents (Augmented Operator Advisor, Asset Advisor, Secure Connect Advisor) | x86/ARM Linux gateway + Azure IoT Hub egress (TCP 443/8883) | research only |
+| E | L3 SCADA (Power Operation / PME) + L1 IED (Sepam, incl. IEC 61850 station bus) | EcoStruxure Power Operation / Power Monitoring Expert; Sepam 20/40/60/80 relays | Windows SCADA stack; Sepam = ARM/firmware over Modbus, IEC 61850 on optional MES card | research only |
+| F | L3 on-prem edge agent + L3.5 IDMZ traversal + L4/L5 cloud egress (Azure IoT Hub) | EcoStruxure cloud agents (Augmented Operator Advisor, Asset Advisor, Secure Connect Advisor) | x86/ARM Linux gateway + Azure IoT Hub egress (TCP 443/8883) | research only |
 
 ## Group A — Modicon PLCs (M340 / M580 / Quantum / Premium / Momentum) — Purdue L1 (Basic Controllers)
 
@@ -74,7 +74,7 @@
 
 **Top attack vector (MITRE ATT&CK ICS):** [T0853 Scripting](https://attack.mitre.org/techniques/T0853/) — Cicode payload embedded in a tampered `.ctz` project.
 
-## Group E — EcoStruxure Power Operation / Power Monitoring Expert / Sepam relays — Purdue L3 (Power Operation) + L1 (Sepam)
+## Group E — EcoStruxure Power Operation / Power Monitoring Expert / Sepam relays — Purdue L3 SCADA (Power Operation / PME) + L1 IED (Sepam, incl. IEC 61850 station bus)
 
 **Direct attack surface (per vendor docs):** Power Operation = Windows SCADA stack (ex-Citect codebase). Sepam relays expose Modbus RTU/TCP for protection settings, IEC 61850 MMS on TCP 102 with optional MES card, and a serial console for firmware load. Sepam 20/40 series has a documented credentials-in-clear issue.
 
@@ -88,7 +88,7 @@
 
 **Top attack vector (MITRE ATT&CK ICS):** [T0836 Modify Parameter](https://attack.mitre.org/techniques/T0836/) — alter Sepam protective relay setpoints to defeat fault clearing.
 
-## Group F — EcoStruxure cloud agents — Purdue L3.5 (IT/OT Boundary) + L4 cloud
+## Group F — EcoStruxure cloud agents — Purdue L3 on-prem edge + L3.5 IDMZ traversal + L4/L5 cloud egress (Azure IoT Hub)
 
 **Direct attack surface (per vendor docs):** Linux gateway (Augmented Operator Advisor / Secure Connect Advisor) phoning home to Azure IoT Hub on TCP 8883 (MQTT/TLS) and 443; bundled OpenSSL, BusyBox, and Node.js runtime — typical Linux-IoT supply-chain surface. Local config web UI on TCP 8080/8443.
 

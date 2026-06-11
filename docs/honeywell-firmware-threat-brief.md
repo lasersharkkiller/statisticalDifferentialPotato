@@ -11,7 +11,7 @@
 | **A. Experion PKS DCS controllers** | L1 Basic Controllers (DCS) | C300, C200/E, ACE-T, Series-C I/O, FIM | VxWorks 6.x / pSOS on PowerPC + proprietary CEE control engine, Control Data Access (CDA) over UDP/55555 | research only |
 | **B. ControlEdge UOC / PLC / RTU** | L1 Basic Controllers | UOC, ControlEdge 900 PLC, ControlEdge 2020 RTU | Embedded Linux (post-2018) + IEC-61131 runtime, OPC UA server, Modbus TCP, DNP3 (RTU) | research only |
 | **C. Honeywell Forge IIoT** | L3 Site Operations (+ L4 cloud) | Forge cloud connectors, on-prem edge agents (Forge Performance+) | Windows / containerized .NET, MQTT/AMQP to Azure backplane, on-prem ETL | research only |
-| **D. Honeywell Building Technologies (HBT)** | Building Automation (L1/L2 parallel) | Niagara-based controllers (Tridium-derived), Saia Burgess PCD3/PCD7, NOTIFIER fire panels, WEBs-AX | Java/Niagara Fox protocol (1911/4911), Saia S-Bus, BACnet/IP, proprietary fire-panel bus | research only |
+| **D. Honeywell Building Technologies (HBT)** | BAS parallel: BAS-L1 (Saia PCD3/PCD7, BACnet controllers); BAS-L2 (Niagara/WEBs-AX supervisor); life-safety parallel (NOTIFIER fire panels) | Niagara-based controllers (Tridium-derived), Saia Burgess PCD3/PCD7, NOTIFIER fire panels, WEBs-AX | Java/Niagara Fox protocol (1911/4911), Saia S-Bus, BACnet/IP, proprietary fire-panel bus | research only |
 | **E. Safety Manager FSC (SIS)** | Safety Systems (parallel to L1) | Safety Manager R200+, FSC10/20, QPP-quad processor | Proprietary safety OS on quad-redundant CPU, FSC-SafeNet (UDP/51966), serial diagnostic | research only |
 
 ---
@@ -79,7 +79,7 @@ Forge is the "soft" pivot: customer-side agents brokering plant data into Azure-
 
 ---
 
-## Group D — Honeywell Building Technologies (HBT) — Building Automation (L1/L2 parallel)
+## Group D — Honeywell Building Technologies (HBT) — Building Automation parallel: BAS-L1 controllers (Saia PCD3/PCD7) + BAS-L2 supervisor (Niagara/WEBs-AX) + life-safety parallel (NOTIFIER fire panels)
 
 Niagara-derived controllers (Honeywell WEBs-AX is a Tridium OEM), Saia Burgess PCD3/PCD7 PLCs, NOTIFIER fire alarm panels. Same protocol family that Forescout's OT:ICEFALL / "Niagara" research repeatedly demolished.
 

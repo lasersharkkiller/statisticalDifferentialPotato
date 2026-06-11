@@ -11,10 +11,10 @@
 | **A. ControlLogix / GuardLogix** | L1 Basic Controllers (GuardLogix → Safety) | 1756-L8x (5580), 1756-L7x (5570), 1756-EN2T/EN2TR/EN3TR/EN4TR comms modules | VxWorks 6.x / 7.x on PPC, CIP over EtherNet/IP (TCP/44818, UDP/2222), embedded web (HTTP/80) | research only |
 | **B. CompactLogix / Compact GuardLogix** | L1 Basic Controllers (Compact GuardLogix → Safety) | 5380 (1769-L3xER), 5370 (1769-L1x/L2x/L3x) | VxWorks on ARM/PPC, same CIP/EtherNet/IP stack as Logix | research only |
 | **C. Micro800** | L1 Basic Controllers | Micro820/830/850/870, 2080-LCxx | proprietary RTOS, CIP + Modbus TCP, embedded HTTP, USB | research only |
-| **D. FactoryTalk SCADA/HMI** | L3 Site Operations | View SE/ME server, AssetCentre, Historian SE, Linx Gateway, ThinManager | Windows Server + .NET + MSSQL backend, RNA/FTLinx protocols | research only |
+| **D. FactoryTalk SCADA/HMI** | L3 Site Operations (View ME runtime on PanelView/ThinManager spans L2) | View SE/ME server, AssetCentre, Historian SE, Linx Gateway, ThinManager | Windows Server + .NET + MSSQL backend, RNA/FTLinx protocols | research only |
 | **E. Studio 5000 + engineering WS** | L3 Site Operations (EWS) | Studio 5000 Logix Designer, RSLinx Classic, FactoryTalk Linx, Emulate | Windows workstation, FactoryTalk Services Platform | research only |
 | **F. PowerFlex drives** | L1 Basic Controllers | 525/527/753/755/755T, 6000T | embedded MCU + optional 20-COMM-E EtherNet/IP card, CIP, DPI | research only |
-| **G. Stratix switches** | L3.5 IT/OT Boundary | 5700/5400/5410/5800/8000/8300 (Cisco IE OEM) | Cisco IOS or IOS-XE, SNMP, SSH, web | research only |
+| **G. Stratix switches** | L2-L3.5 fabric (5410/8300 IDMZ at L3.5; 5700/5400 cell-area at L1/L2; mgmt plane is the L3.5 pivot risk) | 5700/5400/5410/5800/8000/8300 (Cisco IE OEM) | Cisco IOS or IOS-XE, SNMP, SSH, web | research only |
 
 ---
 
@@ -74,7 +74,7 @@ Default factory state: CIP unauthenticated, web UI open, no CIP Security enforce
 
 ---
 
-## Group D — FactoryTalk SCADA/HMI server (the Windows-side high-CVSS surface) — Purdue L3 (Site Operations)
+## Group D — FactoryTalk SCADA/HMI server (the Windows-side high-CVSS surface) — Purdue L3 (Site Operations); View ME runtime on PanelView/ThinManager spans L2
 
 **Direct attack surface (per Rockwell architecture docs):** Windows Server hosting FactoryTalk Directory, View SE Server, AssetCentre, Historian. RNA messaging, FactoryTalk Linx (TCP/3060 + dynamic), HTTP/HTTPS portal, SQL Server backend. AssetCentre stores PLC project archives + credentials.
 
@@ -123,7 +123,7 @@ Default factory state: CIP unauthenticated, web UI open, no CIP Security enforce
 
 ---
 
-## Group G — Stratix switches — Purdue L3.5 (IT/OT Boundary)
+## Group G — Stratix switches — Purdue L2-L3.5 fabric (5410/8300 IDMZ at L3.5; 5700/5400 cell-area at L1/L2; mgmt plane is the L3.5 pivot risk)
 
 **Direct attack surface:** Cisco IE OEM running IOS/IOS-XE. SSH, SNMP, HTTPS web. Inherits Cisco IOS CVE surface entirely.
 

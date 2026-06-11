@@ -8,14 +8,14 @@
 
 | Class | Purdue layer | Products | Stack | Catalog depth |
 |---|---|---|---|---|
-| **A. SEL Industrial PCs** | L3 Site Operations | SEL-3355-2, SEL-3355, SEL-3300 | Windows 10 IoT LTSC / Win Server, ruggedized substation HMI/SCADA host, runs SEL acSELerator + RTU clients | 1,143 hashes |
+| **A. SEL Industrial PCs** | L3 Site Operations (some deployments serve as L2 HMI panel) | SEL-3355-2, SEL-3355, SEL-3300 | Windows 10 IoT LTSC / Win Server, ruggedized substation HMI/SCADA host, runs SEL acSELerator + RTU clients | 1,143 hashes |
 | **B. SEL engineering software** | L3 Site Operations | acSELerator QuickSet, SEL-BaRT, SEL Compass, Virtual Port Service 5828 | Windows .NET / native, serial-over-TCP virtualization, relay config & firmware-push tooling | 13,130 hashes |
 | **C. Protective relays (research only)** | L1 Basic Controllers | SEL-300/351/387/400/421/451/487/700/751 series | Bare-metal embedded (proprietary RTOS), Fast Message / SEL ASCII / IEC 61850 GOOSE+MMS / DNP3 | not extracted |
-| **D. Communications processors (research only)** | L1 Basic Controllers | SEL-3530 / SEL-3555 RTAC, SEL-2730M switch | Embedded Linux (RTAC OS), serves IEC 61850 / DNP3 / Modbus / IEC 60870-5-104 concentration | not extracted |
+| **D. Communications processors (research only)** | L1 Basic Controllers (RTAC); L3.5 IT/OT Boundary (SEL-2730M managed switch) | SEL-3530 / SEL-3555 RTAC, SEL-2730M switch | Embedded Linux (RTAC OS), serves IEC 61850 / DNP3 / Modbus / IEC 60870-5-104 concentration | not extracted |
 
 ---
 
-## Group A — SEL Industrial PCs (3355/3300 substation HMI hosts) — Purdue L3 (Site Operations)
+## Group A — SEL Industrial PCs (3355/3300 substation HMI hosts) — Purdue L3 (Site Operations); some deployments serve as L2 HMI panel
 
 **Direct attack surface (verified via PE imports and embedded `.inf`/service configs in the extracted 3355-2 catalog):**
 
@@ -74,7 +74,7 @@ SEL relays (300/351/387/400/421/451/487/700/751 series) are bare-metal embedded 
 
 ---
 
-## Group D — RTAC communications processors (research only) — Purdue L1 (Basic Controllers)
+## Group D — RTAC communications processors (research only) — Purdue L1 (RTAC) + L3.5 (SEL-2730M managed switch)
 
 SEL-3530 / SEL-3555 RTAC runs an embedded Linux ("RTAC OS"). It concentrates protocols (DNP3 master/slave, IEC 61850 client, Modbus, IEC 60870-5-104) and runs IEC 61131-3 logic. Public CVE coverage in this family is sparse; the [CISA ICSA-23-194-02](https://www.cisa.gov/news-events/ics-advisories/icsa-23-194-02) RTAC advisory bundle is the public anchor. Attack-surface assumption: HTTPS web UI on TCP/443, SSH on TCP/22 (factory-disabled but operator-enabled in the field), DNP3 outstation, and the IEC 61850 client/server stack.
 

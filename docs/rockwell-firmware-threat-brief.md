@@ -2,21 +2,23 @@
 
 **Scope:** ~12 product families across 7 architecture classes. Firmware extraction **pending** — staging only, no unique-hash counts yet. Findings combine CVE/PSIRT research (Rockwell Trust Center, CISA ICSAs, Claroty Team82, Dragos, Forescout, Armis) with vendor architecture documentation. Intent: prime detection engineering and prioritize triage classes before firmware is pulled and statistically differenced.
 
+**Purdue layer mapping:** ControlLogix/GuardLogix (Group A), CompactLogix/Compact GuardLogix (Group B), Micro800 (Group C), and PowerFlex drives (Group F) live at **Purdue L1 (Basic Controllers)** — with the GuardLogix safety variants in A/B also on the **Safety Systems** branch. FactoryTalk SCADA/HMI server (Group D) and Studio 5000 + engineering WS (Group E) live at **Purdue L3 (Site Operations)**. Stratix industrial switches (Group G) sit at **Purdue L3.5 (IT/OT Boundary)**. See [purdue-l1-basic-controllers-brief.md](purdue-l1-basic-controllers-brief.md), [purdue-l3-site-operations-brief.md](purdue-l3-site-operations-brief.md), [purdue-safety-systems-brief.md](purdue-safety-systems-brief.md), and [purdue-l35-it-ot-boundary-brief.md](purdue-l35-it-ot-boundary-brief.md) for cross-vendor views.
+
 ## Architecture grouping (drives the threat model, not the SKU)
 
-| Class | Products | Stack | Catalog depth |
-|---|---|---|---|
-| **A. ControlLogix / GuardLogix** | 1756-L8x (5580), 1756-L7x (5570), 1756-EN2T/EN2TR/EN3TR/EN4TR comms modules | VxWorks 6.x / 7.x on PPC, CIP over EtherNet/IP (TCP/44818, UDP/2222), embedded web (HTTP/80) | research only |
-| **B. CompactLogix / Compact GuardLogix** | 5380 (1769-L3xER), 5370 (1769-L1x/L2x/L3x) | VxWorks on ARM/PPC, same CIP/EtherNet/IP stack as Logix | research only |
-| **C. Micro800** | Micro820/830/850/870, 2080-LCxx | proprietary RTOS, CIP + Modbus TCP, embedded HTTP, USB | research only |
-| **D. FactoryTalk SCADA/HMI** | View SE/ME server, AssetCentre, Historian SE, Linx Gateway, ThinManager | Windows Server + .NET + MSSQL backend, RNA/FTLinx protocols | research only |
-| **E. Studio 5000 + engineering WS** | Studio 5000 Logix Designer, RSLinx Classic, FactoryTalk Linx, Emulate | Windows workstation, FactoryTalk Services Platform | research only |
-| **F. PowerFlex drives** | 525/527/753/755/755T, 6000T | embedded MCU + optional 20-COMM-E EtherNet/IP card, CIP, DPI | research only |
-| **G. Stratix switches** | 5700/5400/5410/5800/8000/8300 (Cisco IE OEM) | Cisco IOS or IOS-XE, SNMP, SSH, web | research only |
+| Class | Purdue layer | Products | Stack | Catalog depth |
+|---|---|---|---|---|
+| **A. ControlLogix / GuardLogix** | L1 Basic Controllers (GuardLogix → Safety) | 1756-L8x (5580), 1756-L7x (5570), 1756-EN2T/EN2TR/EN3TR/EN4TR comms modules | VxWorks 6.x / 7.x on PPC, CIP over EtherNet/IP (TCP/44818, UDP/2222), embedded web (HTTP/80) | research only |
+| **B. CompactLogix / Compact GuardLogix** | L1 Basic Controllers (Compact GuardLogix → Safety) | 5380 (1769-L3xER), 5370 (1769-L1x/L2x/L3x) | VxWorks on ARM/PPC, same CIP/EtherNet/IP stack as Logix | research only |
+| **C. Micro800** | L1 Basic Controllers | Micro820/830/850/870, 2080-LCxx | proprietary RTOS, CIP + Modbus TCP, embedded HTTP, USB | research only |
+| **D. FactoryTalk SCADA/HMI** | L3 Site Operations | View SE/ME server, AssetCentre, Historian SE, Linx Gateway, ThinManager | Windows Server + .NET + MSSQL backend, RNA/FTLinx protocols | research only |
+| **E. Studio 5000 + engineering WS** | L3 Site Operations (EWS) | Studio 5000 Logix Designer, RSLinx Classic, FactoryTalk Linx, Emulate | Windows workstation, FactoryTalk Services Platform | research only |
+| **F. PowerFlex drives** | L1 Basic Controllers | 525/527/753/755/755T, 6000T | embedded MCU + optional 20-COMM-E EtherNet/IP card, CIP, DPI | research only |
+| **G. Stratix switches** | L3.5 IT/OT Boundary | 5700/5400/5410/5800/8000/8300 (Cisco IE OEM) | Cisco IOS or IOS-XE, SNMP, SSH, web | research only |
 
 ---
 
-## Group A — ControlLogix / GuardLogix (highest blast radius)
+## Group A — ControlLogix / GuardLogix (highest blast radius) — Purdue L1 (Basic Controllers; GuardLogix → Safety)
 
 **Direct attack surface (per vendor docs + Claroty Team82 research; not yet verified against extracted firmware):**
 
@@ -41,7 +43,7 @@ Default factory state: CIP unauthenticated, web UI open, no CIP Security enforce
 
 ---
 
-## Group B — CompactLogix / Compact GuardLogix
+## Group B — CompactLogix / Compact GuardLogix — Purdue L1 (Basic Controllers; Compact GuardLogix → Safety)
 
 **Direct attack surface:** Identical CIP/EtherNet/IP stack to ControlLogix; integrated Ethernet on the controller itself (no separate EN2T module). Embedded web UI on TCP/80.
 
@@ -57,7 +59,7 @@ Default factory state: CIP unauthenticated, web UI open, no CIP Security enforce
 
 ---
 
-## Group C — Micro800
+## Group C — Micro800 — Purdue L1 (Basic Controllers)
 
 **Direct attack surface:** CIP + Modbus TCP, embedded HTTP/80, USB programming port. Connected Components Workbench (CCW) is the engineering tool. No keyswitch on entry-level models — mode change is purely software.
 
@@ -72,7 +74,7 @@ Default factory state: CIP unauthenticated, web UI open, no CIP Security enforce
 
 ---
 
-## Group D — FactoryTalk SCADA/HMI server (the Windows-side high-CVSS surface)
+## Group D — FactoryTalk SCADA/HMI server (the Windows-side high-CVSS surface) — Purdue L3 (Site Operations)
 
 **Direct attack surface (per Rockwell architecture docs):** Windows Server hosting FactoryTalk Directory, View SE Server, AssetCentre, Historian. RNA messaging, FactoryTalk Linx (TCP/3060 + dynamic), HTTP/HTTPS portal, SQL Server backend. AssetCentre stores PLC project archives + credentials.
 
@@ -90,7 +92,7 @@ Default factory state: CIP unauthenticated, web UI open, no CIP Security enforce
 
 ---
 
-## Group E — Studio 5000 + FactoryTalk Linx engineering workstation
+## Group E — Studio 5000 + FactoryTalk Linx engineering workstation — Purdue L3 (Site Operations, EWS)
 
 **Direct attack surface:** Windows workstation running Studio 5000 Logix Designer, FactoryTalk Linx / RSLinx Classic, FactoryTalk Services Platform. Driver shim that brokers CIP between the engineer and every controller on the network.
 
@@ -106,7 +108,7 @@ Default factory state: CIP unauthenticated, web UI open, no CIP Security enforce
 
 ---
 
-## Group F — PowerFlex drives
+## Group F — PowerFlex drives — Purdue L1 (Basic Controllers)
 
 **Direct attack surface:** Drive itself is bare-metal MCU; network exposure is through 20-COMM-E / embedded EtherNet/IP. CIP + DPI peripheral bus. No authentication on legacy 20-COMM-E.
 
@@ -121,7 +123,7 @@ Default factory state: CIP unauthenticated, web UI open, no CIP Security enforce
 
 ---
 
-## Group G — Stratix switches
+## Group G — Stratix switches — Purdue L3.5 (IT/OT Boundary)
 
 **Direct attack surface:** Cisco IE OEM running IOS/IOS-XE. SSH, SNMP, HTTPS web. Inherits Cisco IOS CVE surface entirely.
 

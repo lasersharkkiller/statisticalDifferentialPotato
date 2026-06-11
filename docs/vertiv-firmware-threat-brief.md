@@ -2,20 +2,22 @@
 
 **Scope:** 3 products with extracted firmware / ~43,131 unique hashes across 6 architecture classes (Groups D, E, F are research-only — extraction pending). Findings combine CVE research and direct examination of the extracted Avocent ACS 8000 and Liebert IntelliSlot IS-UNITY-DP rootfs (services, default configs, embedded resources); Geist PDU, NetSure DC power, and Vertiv management software entries are CVE/PSIRT research only.
 
+**Purdue layer mapping:** Avocent ACS 8000 (Group A), IntelliSlot Unity NMC (Group B), and Geist PDU NMCs (Group D) live at **Purdue L3.5 (IT/OT Boundary)** as serial-aggregator and SNMP-bridge devices. Liebert GXT5 UPS MCU (Group C) and NetSure DC power controllers (Group E) sit at the **Power Infrastructure** cross-cut (L0/L1-adjacent — not strictly Purdue L1). Vertiv management software (Group F) runs at **Purdue L3 (Site Operations)**. See [purdue-l35-it-ot-boundary-brief.md](purdue-l35-it-ot-boundary-brief.md) (includes the Power Infrastructure appendix) and [purdue-l3-site-operations-brief.md](purdue-l3-site-operations-brief.md) for cross-vendor views.
+
 ## Architecture grouping (drives the threat model, not the SKU)
 
-| Class | Products | Stack | Catalog depth |
-|---|---|---|---|
-| **A. Avocent ACS 8000 console server** | ACS 8000 (4/8/16/32/48-port) | ARM Linux + busybox + OpenSSH + lighttpd/nginx web UI + serial-port daemons (`portmgr`, `cycladesd`) | 34,689 hashes |
-| **B. Liebert IntelliSlot Unity NMC** | IS-UNITY-DP, IS-UNITY-LIFE, IS-UNITY-SNMP | ARM Linux + ext2 rootfs + busybox + Velocity protocol stack + SNMP/Modbus/BACnet daemons | 8,437 hashes |
-| **C. Bare-metal UPS MCU** | Liebert GXT5 Lithium-Ion UPS | Renesas/STM32 MCU, monolithic firmware blob | 5 hashes |
-| **D. Geist PDU NMCs** | Geist GU/GUL/I03/R-series Upgradeable PDUs | ARM Linux + Lua web UI ("Geist Manager"), SSH/SNMP/Modbus | research only |
-| **E. NetSure DC power controllers** | NetSure 211/501/701/801 (M830B / NCU+ / ACU+ controllers) | ARM Linux + proprietary "ACU" web UI, SNMP/Modbus over -48VDC plant | research only |
-| **F. Vertiv management software (Windows/Java)** | Vertiv Power Insight, Trellis Platform, Environet Alert, Avocent DSView | Windows .NET / Apache Tomcat / Postgres / Java | research only |
+| Class | Purdue layer | Products | Stack | Catalog depth |
+|---|---|---|---|---|
+| **A. Avocent ACS 8000 console server** | L3.5 IT/OT Boundary | ACS 8000 (4/8/16/32/48-port) | ARM Linux + busybox + OpenSSH + lighttpd/nginx web UI + serial-port daemons (`portmgr`, `cycladesd`) | 34,689 hashes |
+| **B. Liebert IntelliSlot Unity NMC** | L3.5 IT/OT Boundary | IS-UNITY-DP, IS-UNITY-LIFE, IS-UNITY-SNMP | ARM Linux + ext2 rootfs + busybox + Velocity protocol stack + SNMP/Modbus/BACnet daemons | 8,437 hashes |
+| **C. Bare-metal UPS MCU** | Power Infrastructure (L0/L1-adjacent) | Liebert GXT5 Lithium-Ion UPS | Renesas/STM32 MCU, monolithic firmware blob | 5 hashes |
+| **D. Geist PDU NMCs** | L3.5 IT/OT Boundary | Geist GU/GUL/I03/R-series Upgradeable PDUs | ARM Linux + Lua web UI ("Geist Manager"), SSH/SNMP/Modbus | research only |
+| **E. NetSure DC power controllers** | Power Infrastructure / L1-adjacent | NetSure 211/501/701/801 (M830B / NCU+ / ACU+ controllers) | ARM Linux + proprietary "ACU" web UI, SNMP/Modbus over -48VDC plant | research only |
+| **F. Vertiv management software (Windows/Java)** | L3 Site Operations | Vertiv Power Insight, Trellis Platform, Environet Alert, Avocent DSView | Windows .NET / Apache Tomcat / Postgres / Java | research only |
 
 ---
 
-## Group A — Avocent ACS 8000 (highest blast radius — serial console aggregator)
+## Group A — Avocent ACS 8000 (highest blast radius — serial console aggregator) — Purdue L3.5 (IT/OT Boundary)
 
 **Direct attack surface (verified via `etc/init.d` + `/usr/sbin` in the extracted ACS 8000 rootfs):**
 
@@ -38,7 +40,7 @@ The ACS 8000 brokers serial consoles for everything in the rack — routers, PDU
 
 ---
 
-## Group B — Liebert IntelliSlot IS-UNITY-DP NMC
+## Group B — Liebert IntelliSlot IS-UNITY-DP NMC — Purdue L3.5 (IT/OT Boundary)
 
 **Direct attack surface (verified in the extracted ext2 rootfs):**
 
@@ -61,7 +63,7 @@ The IS-UNITY-DP is the management plane for Liebert UPS, CRAC/CRAH units, and ch
 
 ---
 
-## Group C — Liebert GXT5 Lithium-Ion UPS (bare-metal MCU)
+## Group C — Liebert GXT5 Lithium-Ion UPS (bare-metal MCU) — Power Infrastructure (L0/L1-adjacent)
 
 Only 5 hashes — a monolithic MCU firmware blob with no network surface on the UPS itself; it reaches the network only via an attached IS-UNITY NMC.
 
@@ -75,7 +77,7 @@ Only 5 hashes — a monolithic MCU firmware blob with no network surface on the 
 
 ---
 
-## Group D — Geist PDU NMCs (research only — extraction pending)
+## Group D — Geist PDU NMCs (research only — extraction pending) — Purdue L3.5 (IT/OT Boundary)
 
 **Direct attack surface (per vendor documentation):** SSH, SNMP v1/v2c/v3, HTTP/HTTPS web UI ("Geist Manager"), Modbus TCP, optional BACnet/IP, EnergyWise. Default credentials historically `admin`/`admin`.
 
@@ -90,7 +92,7 @@ Only 5 hashes — a monolithic MCU firmware blob with no network surface on the 
 
 ---
 
-## Group E — NetSure DC power (research only — extraction pending)
+## Group E — NetSure DC power (research only — extraction pending) — Power Infrastructure / L1-adjacent
 
 NetSure controllers (M830B / NCU+ / ACU+) sit on -48VDC telecom plants and central offices. Vendor-documented services: SSH, HTTP/HTTPS, SNMP v1/v2c/v3, Modbus TCP, YDN23 (China telecom protocol). [CISA ICSA-22-242-15](https://www.cisa.gov/news-events/ics-advisories/icsa-22-242-15) covered the M830B controller for hard-coded credentials and improper auth.
 
@@ -98,7 +100,7 @@ NetSure controllers (M830B / NCU+ / ACU+) sit on -48VDC telecom plants and centr
 
 ---
 
-## Group F — Vertiv management software (the Windows/Java surface)
+## Group F — Vertiv management software (the Windows/Java surface) — Purdue L3 (Site Operations)
 
 | CVE | CVSS | Product | Vector |
 |---|---|---|---|

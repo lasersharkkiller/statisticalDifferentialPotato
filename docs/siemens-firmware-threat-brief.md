@@ -2,20 +2,22 @@
 
 **Scope:** 2 installation media / ~957,125 unique hashes (DVD1 STEP7+WinCC = 686,425; DVD2 HSP+Tools = 270,700) across 6 architecture classes. Findings combine CVE/PSIRT research with direct examination of the extracted TIA Portal V21 workstation media (installers, embedded resources, HSP archives). PLC, SCALANCE, and RUGGEDCOM device firmware is **not extracted** — those groups are research-only and rely on Siemens ProductCERT, CISA, and third-party research (Claroty Team82, Forescout Vedere, Armis, Dragos).
 
+**Purdue layer mapping:** TIA Portal engineering IDE (Group A), WinCC SCADA (Group B), and TIA Portal HSPs (Group C) live at **Purdue L3 (Site Operations)** — the engineering workstation + SCADA server tier. SIMATIC PLCs (Group D) sit at **Purdue L1 (Basic Controllers)**, with the F-CPU safety variants (S7-1500F) on the **Safety Systems** branch. SCALANCE switches/firewalls and RUGGEDCOM substation gear (Groups E/F) live at **Purdue L3.5 (IT/OT Boundary)**. See [purdue-l3-site-operations-brief.md](purdue-l3-site-operations-brief.md), [purdue-l1-basic-controllers-brief.md](purdue-l1-basic-controllers-brief.md), [purdue-safety-systems-brief.md](purdue-safety-systems-brief.md), and [purdue-l35-it-ot-boundary-brief.md](purdue-l35-it-ot-boundary-brief.md) for cross-vendor views.
+
 ## Architecture grouping (drives the threat model, not the SKU)
 
-| Class | Products | Stack | Catalog depth |
-|---|---|---|---|
-| **A. TIA Portal V21 engineering IDE** (DVD1) | STEP7 Basic/Professional, STEP7 Safety, Openness API, Automation License Manager | Windows .NET/WPF + MSI/MSP installers, license daemon, project-file handlers | ~686K hashes (workstation install tree) |
-| **B. WinCC SCADA / HMI server** (in DVD1) | WinCC Basic/Comfort/Advanced/Professional/Unified, Runtime, OPC UA server | Windows services (CCEServer, CCAgent), SQL Server backend, web client | subset of DVD1 |
-| **C. TIA Portal HSPs + tools** (DVD2) | Hardware Support Packages, IntegrityValidator, SIMATIC CAx data | Signed `.isp16` / `.sis8` containers + .NET tooling | 270,700 hashes |
-| **D. SIMATIC PLCs** (S7-1500/1200/300/400) | CPU 1500/1200/300/400, ET 200 distributed I/O | ADONIS RTOS (1500) / proprietary (1200) on PPC/ARM, S7comm/S7comm-Plus (102/TCP), PROFINET | research only |
-| **E. SCALANCE industrial switches** | XB-200, XC-200, XM-400, XR-500, S615 (firewall), W-700 (wireless) | Linux on MIPS/ARM, web UI, SNMP, SSH, Telnet | research only |
-| **F. RUGGEDCOM substation gear** | RSG2100, RST2228, RX1500, ROS / ROX II | ROS (proprietary) / ROX II (Linux), IEC 61850 stack | research only |
+| Class | Purdue layer | Products | Stack | Catalog depth |
+|---|---|---|---|---|
+| **A. TIA Portal V21 engineering IDE** (DVD1) | L3 Site Operations (EWS) | STEP7 Basic/Professional, STEP7 Safety, Openness API, Automation License Manager | Windows .NET/WPF + MSI/MSP installers, license daemon, project-file handlers | ~686K hashes (workstation install tree) |
+| **B. WinCC SCADA / HMI server** (in DVD1) | L3 Site Operations | WinCC Basic/Comfort/Advanced/Professional/Unified, Runtime, OPC UA server | Windows services (CCEServer, CCAgent), SQL Server backend, web client | subset of DVD1 |
+| **C. TIA Portal HSPs + tools** (DVD2) | L3 Site Operations | Hardware Support Packages, IntegrityValidator, SIMATIC CAx data | Signed `.isp16` / `.sis8` containers + .NET tooling | 270,700 hashes |
+| **D. SIMATIC PLCs** (S7-1500/1200/300/400) | L1 Basic Controllers (S7-1500F → Safety) | CPU 1500/1200/300/400, ET 200 distributed I/O | ADONIS RTOS (1500) / proprietary (1200) on PPC/ARM, S7comm/S7comm-Plus (102/TCP), PROFINET | research only |
+| **E. SCALANCE industrial switches** | L3.5 IT/OT Boundary | XB-200, XC-200, XM-400, XR-500, S615 (firewall), W-700 (wireless) | Linux on MIPS/ARM, web UI, SNMP, SSH, Telnet | research only |
+| **F. RUGGEDCOM substation gear** | L3.5 IT/OT Boundary | RSG2100, RST2228, RX1500, ROS / ROX II | ROS (proprietary) / ROX II (Linux), IEC 61850 stack | research only |
 
 ---
 
-## Group A — TIA Portal V21 engineering IDE (workstation foothold)
+## Group A — TIA Portal V21 engineering IDE (workstation foothold) — Purdue L3 (Site Operations, EWS)
 
 **Direct attack surface (from the extracted DVD1 install tree):**
 
@@ -40,7 +42,7 @@ The engineering workstation is the **single highest-value pivot in an OT network
 
 ---
 
-## Group B — WinCC SCADA (HMI server)
+## Group B — WinCC SCADA (HMI server) — Purdue L3 (Site Operations)
 
 **Direct attack surface (DVD1 install tree + Siemens documentation):**
 
@@ -64,7 +66,7 @@ WinCC is the historical Stuxnet target and remains the most-CVE'd HMI on the mar
 
 ---
 
-## Group C — Hardware Support Packages (DVD2)
+## Group C — Hardware Support Packages (DVD2) — Purdue L3 (Site Operations)
 
 **Direct attack surface (from the extracted DVD2 archives):**
 
@@ -77,7 +79,7 @@ HSPs are signed device-support bundles that the engineering workstation installs
 
 ---
 
-## Group D — SIMATIC PLCs (research only)
+## Group D — SIMATIC PLCs (research only) — Purdue L1 (Basic Controllers; S7-1500F → Safety)
 
 **Direct attack surface (vendor documentation + Claroty/Forescout research; firmware not extracted):**
 
@@ -99,7 +101,7 @@ HSPs are signed device-support bundles that the engineering workstation installs
 
 ---
 
-## Group E / F — SCALANCE switches and RUGGEDCOM (research only)
+## Group E / F — SCALANCE switches and RUGGEDCOM (research only) — Purdue L3.5 (IT/OT Boundary)
 
 ProductCERT publishes SCALANCE advisories roughly monthly. The recurring classes:
 

@@ -2,18 +2,20 @@
 
 **Scope:** 6 product lines / 14,255 unique hashes across 4 architecture classes (SEL-3355-2 industrial PC: 1,127; SEL-BaRT backup-recovery: 12,117; SEL Compass setup tool: 969; SEL-3300/3355 non-2: 16; Virtual Port Service 5828: 22). Findings combine CVE/PSIRT research with direct examination of the extracted Windows-side firmware and engineering-tool binaries (services, default configs, embedded resources). The relay (SEL-300/400/700) and RTAC (SEL-3530/3555) firmware is NOT in this extraction — those rows are research-only and explicitly marked.
 
+**Purdue layer mapping:** Industrial PCs and engineering software (Groups A/B) live at **Purdue L3 (Site Operations)** as the substation EWS / HMI host tier; protective relays and RTAC comms processors (Groups C/D) sit at **Purdue L1 (Basic Controllers)**. See [purdue-l3-site-operations-brief.md](purdue-l3-site-operations-brief.md) and [purdue-l1-basic-controllers-brief.md](purdue-l1-basic-controllers-brief.md) for cross-vendor views.
+
 ## Architecture grouping (drives the threat model, not the SKU)
 
-| Class | Products | Stack | Catalog depth |
-|---|---|---|---|
-| **A. SEL Industrial PCs** | SEL-3355-2, SEL-3355, SEL-3300 | Windows 10 IoT LTSC / Win Server, ruggedized substation HMI/SCADA host, runs SEL acSELerator + RTU clients | 1,143 hashes |
-| **B. SEL engineering software** | acSELerator QuickSet, SEL-BaRT, SEL Compass, Virtual Port Service 5828 | Windows .NET / native, serial-over-TCP virtualization, relay config & firmware-push tooling | 13,130 hashes |
-| **C. Protective relays (research only)** | SEL-300/351/387/400/421/451/487/700/751 series | Bare-metal embedded (proprietary RTOS), Fast Message / SEL ASCII / IEC 61850 GOOSE+MMS / DNP3 | not extracted |
-| **D. Communications processors (research only)** | SEL-3530 / SEL-3555 RTAC, SEL-2730M switch | Embedded Linux (RTAC OS), serves IEC 61850 / DNP3 / Modbus / IEC 60870-5-104 concentration | not extracted |
+| Class | Purdue layer | Products | Stack | Catalog depth |
+|---|---|---|---|---|
+| **A. SEL Industrial PCs** | L3 Site Operations | SEL-3355-2, SEL-3355, SEL-3300 | Windows 10 IoT LTSC / Win Server, ruggedized substation HMI/SCADA host, runs SEL acSELerator + RTU clients | 1,143 hashes |
+| **B. SEL engineering software** | L3 Site Operations | acSELerator QuickSet, SEL-BaRT, SEL Compass, Virtual Port Service 5828 | Windows .NET / native, serial-over-TCP virtualization, relay config & firmware-push tooling | 13,130 hashes |
+| **C. Protective relays (research only)** | L1 Basic Controllers | SEL-300/351/387/400/421/451/487/700/751 series | Bare-metal embedded (proprietary RTOS), Fast Message / SEL ASCII / IEC 61850 GOOSE+MMS / DNP3 | not extracted |
+| **D. Communications processors (research only)** | L1 Basic Controllers | SEL-3530 / SEL-3555 RTAC, SEL-2730M switch | Embedded Linux (RTAC OS), serves IEC 61850 / DNP3 / Modbus / IEC 60870-5-104 concentration | not extracted |
 
 ---
 
-## Group A — SEL Industrial PCs (3355/3300 substation HMI hosts)
+## Group A — SEL Industrial PCs (3355/3300 substation HMI hosts) — Purdue L3 (Site Operations)
 
 **Direct attack surface (verified via PE imports and embedded `.inf`/service configs in the extracted 3355-2 catalog):**
 
@@ -35,7 +37,7 @@ The 3355-2 ships as a ruggedized Windows IoT box. Embedded driver packages in th
 
 ---
 
-## Group B — SEL engineering software (acSELerator / BaRT / Compass / VPS)
+## Group B — SEL engineering software (acSELerator / BaRT / Compass / VPS) — Purdue L3 (Site Operations)
 
 **Direct attack surface (from the 12,117 BaRT hashes + 969 Compass hashes + 22 VPS binaries):**
 
@@ -54,7 +56,7 @@ SEL-BaRT is the relay backup/restore tool — it speaks SEL Fast Message and SEL
 
 ---
 
-## Group C — Protective relays (research only, firmware NOT extracted)
+## Group C — Protective relays (research only, firmware NOT extracted) — Purdue L1 (Basic Controllers)
 
 SEL relays (300/351/387/400/421/451/487/700/751 series) are bare-metal embedded with proprietary code-signed firmware. They expose:
 
@@ -72,7 +74,7 @@ SEL relays (300/351/387/400/421/451/487/700/751 series) are bare-metal embedded 
 
 ---
 
-## Group D — RTAC communications processors (research only)
+## Group D — RTAC communications processors (research only) — Purdue L1 (Basic Controllers)
 
 SEL-3530 / SEL-3555 RTAC runs an embedded Linux ("RTAC OS"). It concentrates protocols (DNP3 master/slave, IEC 61850 client, Modbus, IEC 60870-5-104) and runs IEC 61131-3 logic. Public CVE coverage in this family is sparse; the [CISA ICSA-23-194-02](https://www.cisa.gov/news-events/ics-advisories/icsa-23-194-02) RTAC advisory bundle is the public anchor. Attack-surface assumption: HTTPS web UI on TCP/443, SSH on TCP/22 (factory-disabled but operator-enabled in the field), DNP3 outstation, and the IEC 61850 client/server stack.
 

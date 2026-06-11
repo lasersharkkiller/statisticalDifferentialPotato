@@ -2,19 +2,21 @@
 
 **Scope:** Research-only brief covering 5 architecture classes spanning Honeywell Process Solutions (HPS), ControlEdge, Forge IIoT, Honeywell Building Technologies (HBT), and Safety Manager FSC. **Firmware extraction is pending** — no Honeywell binaries have been carved, hashed, or examined. Findings combine vendor PSIRT bulletins, CISA ICS advisories, Claroty Team82 ICEFALL research, and Dragos/Forescout DCS field telemetry. The brief primes the analyst queue for the moment Experion / ControlEdge / Saia / FSC firmware lands in `firmware-staging\Honeywell\`.
 
+**Purdue layer mapping:** Experion DCS controllers (Group A) and ControlEdge UOC/PLC/RTU (Group B) live at **Purdue L1 (Basic Controllers)** — Group A specifically as DCS process controllers. Honeywell Forge IIoT (Group C) sits at **Purdue L3 (Site Operations)** with cloud egress reaching L4. Honeywell Building Technologies (Group D) is a parallel **Building Automation** dimension that straddles L1/L2 with Niagara Fox + BACnet, not strictly Purdue ICS. Safety Manager FSC (Group E) is the **Safety Systems** branch (parallel to L1). See [purdue-l1-basic-controllers-brief.md](purdue-l1-basic-controllers-brief.md), [purdue-l3-site-operations-brief.md](purdue-l3-site-operations-brief.md), and [purdue-safety-systems-brief.md](purdue-safety-systems-brief.md) for cross-vendor views.
+
 ## Architecture grouping (drives the threat model, not the SKU)
 
-| Class | Products | Stack | Catalog depth |
-|---|---|---|---|
-| **A. Experion PKS DCS controllers** | C300, C200/E, ACE-T, Series-C I/O, FIM | VxWorks 6.x / pSOS on PowerPC + proprietary CEE control engine, Control Data Access (CDA) over UDP/55555 | research only |
-| **B. ControlEdge UOC / PLC / RTU** | UOC, ControlEdge 900 PLC, ControlEdge 2020 RTU | Embedded Linux (post-2018) + IEC-61131 runtime, OPC UA server, Modbus TCP, DNP3 (RTU) | research only |
-| **C. Honeywell Forge IIoT** | Forge cloud connectors, on-prem edge agents (Forge Performance+) | Windows / containerized .NET, MQTT/AMQP to Azure backplane, on-prem ETL | research only |
-| **D. Honeywell Building Technologies (HBT)** | Niagara-based controllers (Tridium-derived), Saia Burgess PCD3/PCD7, NOTIFIER fire panels, WEBs-AX | Java/Niagara Fox protocol (1911/4911), Saia S-Bus, BACnet/IP, proprietary fire-panel bus | research only |
-| **E. Safety Manager FSC (SIS)** | Safety Manager R200+, FSC10/20, QPP-quad processor | Proprietary safety OS on quad-redundant CPU, FSC-SafeNet (UDP/51966), serial diagnostic | research only |
+| Class | Purdue layer | Products | Stack | Catalog depth |
+|---|---|---|---|---|
+| **A. Experion PKS DCS controllers** | L1 Basic Controllers (DCS) | C300, C200/E, ACE-T, Series-C I/O, FIM | VxWorks 6.x / pSOS on PowerPC + proprietary CEE control engine, Control Data Access (CDA) over UDP/55555 | research only |
+| **B. ControlEdge UOC / PLC / RTU** | L1 Basic Controllers | UOC, ControlEdge 900 PLC, ControlEdge 2020 RTU | Embedded Linux (post-2018) + IEC-61131 runtime, OPC UA server, Modbus TCP, DNP3 (RTU) | research only |
+| **C. Honeywell Forge IIoT** | L3 Site Operations (+ L4 cloud) | Forge cloud connectors, on-prem edge agents (Forge Performance+) | Windows / containerized .NET, MQTT/AMQP to Azure backplane, on-prem ETL | research only |
+| **D. Honeywell Building Technologies (HBT)** | Building Automation (L1/L2 parallel) | Niagara-based controllers (Tridium-derived), Saia Burgess PCD3/PCD7, NOTIFIER fire panels, WEBs-AX | Java/Niagara Fox protocol (1911/4911), Saia S-Bus, BACnet/IP, proprietary fire-panel bus | research only |
+| **E. Safety Manager FSC (SIS)** | Safety Systems (parallel to L1) | Safety Manager R200+, FSC10/20, QPP-quad processor | Proprietary safety OS on quad-redundant CPU, FSC-SafeNet (UDP/51966), serial diagnostic | research only |
 
 ---
 
-## Group A — Experion PKS DCS controllers (highest blast radius)
+## Group A — Experion PKS DCS controllers (highest blast radius) — Purdue L1 (Basic Controllers, DCS)
 
 **Direct attack surface (per Honeywell HPS Network & Security Planning Guide + Claroty Team82 ICEFALL teardown):**
 
@@ -39,7 +41,7 @@ C300/C200E controllers historically ship without firmware signing and accept boo
 
 ---
 
-## Group B — ControlEdge UOC / PLC / RTU
+## Group B — ControlEdge UOC / PLC / RTU — Purdue L1 (Basic Controllers)
 
 **Direct attack surface (per Honeywell ControlEdge Network Planning Guide):**
 
@@ -59,7 +61,7 @@ OPC UA TCP/4840 (server), Modbus TCP/502, DNP3 (RTU variant, TCP/20000), embedde
 
 ---
 
-## Group C — Honeywell Forge IIoT (cloud + on-prem agent)
+## Group C — Honeywell Forge IIoT (cloud + on-prem agent) — Purdue L3 (Site Operations + L4 cloud)
 
 Forge is the "soft" pivot: customer-side agents brokering plant data into Azure-hosted analytics. Attack surface is closer to a normal Windows/Linux app stack than a controller.
 
@@ -77,7 +79,7 @@ Forge is the "soft" pivot: customer-side agents brokering plant data into Azure-
 
 ---
 
-## Group D — Honeywell Building Technologies (HBT)
+## Group D — Honeywell Building Technologies (HBT) — Building Automation (L1/L2 parallel)
 
 Niagara-derived controllers (Honeywell WEBs-AX is a Tridium OEM), Saia Burgess PCD3/PCD7 PLCs, NOTIFIER fire alarm panels. Same protocol family that Forescout's OT:ICEFALL / "Niagara" research repeatedly demolished.
 
@@ -98,7 +100,7 @@ Niagara-derived controllers (Honeywell WEBs-AX is a Tridium OEM), Saia Burgess P
 
 ---
 
-## Group E — Safety Manager FSC (SIS)
+## Group E — Safety Manager FSC (SIS) — Safety Systems (parallel to L1)
 
 The crown jewel: Safety Instrumented Systems. A successful tamper here is the [TRITON / TRISIS](https://www.dragos.com/threat/trisis/) class of incident (FireEye / Dragos 2017 — different vendor, Schneider Electric Triconex Tricon, but identical impact model).
 

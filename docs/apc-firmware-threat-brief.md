@@ -7,18 +7,20 @@ Findings combine CVE/PSIRT research and direct examination of the extracted NMC 
 *not* large-rootfs Linux devices — they are compact firmware blobs (proprietary RTOS / embedded
 Linux derivative) with an embedded web/SSH/SNMP stack.
 
+**Purdue layer mapping:** NMC2/NMC3/Rack PDU 2G live at **Purdue L3.5 (IT/OT Boundary)** as the SNMP+web bridge from corporate IT to OT power infrastructure; PowerChute / EcoStruxure IT runs at **Purdue L3 (Site Operations)**. See [purdue-l35-it-ot-boundary-brief.md](purdue-l35-it-ot-boundary-brief.md) and [purdue-l3-site-operations-brief.md](purdue-l3-site-operations-brief.md) for the cross-vendor views of those layers.
+
 ## Architecture grouping (drives the threat model, not the SKU)
 
-| Class | Products | Stack | Catalog depth |
-|---|---|---|---|
-| **A. NMC3 (modern)** | AP9640, AP9641, AP9643 | Signed firmware (ECDSA), embedded HTTPS/SSHv2/SNMPv3 web UI, "Trusted Platform" boot | 83 hashes |
-| **B. NMC2 (legacy)** | AP9630, AP9631, AP9635 | Older APC web/SSH stack (Mocana NanoSSL), TLStorm-vulnerable lineage, no enforced signing pre-6.8 | 86 hashes |
-| **C. Rack PDU 2G NMC** | AP86xx Switched / Metered switched (AP8941, AP8959, AP8861, AP8865 etc.) | NMC variant with outlet-control firmware path; HTTPS/SSH/SNMPv3 + per-outlet control plane | 72 hashes |
-| **D. Windows-side** | PowerChute Network Shutdown (PCNS), PowerChute Business / Personal, EcoStruxure IT Gateway / Expert | Java + Windows service stack the admin runs; reaches NMC via HTTPS/SNMP | research only |
+| Class | Purdue layer | Products | Stack | Catalog depth |
+|---|---|---|---|---|
+| **A. NMC3 (modern)** | L3.5 IT/OT Boundary | AP9640, AP9641, AP9643 | Signed firmware (ECDSA), embedded HTTPS/SSHv2/SNMPv3 web UI, "Trusted Platform" boot | 83 hashes |
+| **B. NMC2 (legacy)** | L3.5 IT/OT Boundary | AP9630, AP9631, AP9635 | Older APC web/SSH stack (Mocana NanoSSL), TLStorm-vulnerable lineage, no enforced signing pre-6.8 | 86 hashes |
+| **C. Rack PDU 2G NMC** | L3.5 IT/OT Boundary | AP86xx Switched / Metered switched (AP8941, AP8959, AP8861, AP8865 etc.) | NMC variant with outlet-control firmware path; HTTPS/SSH/SNMPv3 + per-outlet control plane | 72 hashes |
+| **D. Windows-side** | L3 Site Operations | PowerChute Network Shutdown (PCNS), PowerChute Business / Personal, EcoStruxure IT Gateway / Expert | Java + Windows service stack the admin runs; reaches NMC via HTTPS/SNMP | research only |
 
 ---
 
-## Group A — NMC3 AP964x (signed firmware, modern stack)
+## Group A — NMC3 AP964x (signed firmware, modern stack) — Purdue L3.5 (IT/OT Boundary)
 
 **Direct attack surface (verified via signed-image header + embedded web UI strings in the extracted AP964x firmware):**
 
@@ -41,7 +43,7 @@ The signed-image manifest shows ECDSA-P256 over the firmware payload; downgrade 
 
 ---
 
-## Group B — NMC2 AP963x (the TLStorm legacy)
+## Group B — NMC2 AP963x (the TLStorm legacy) — Purdue L3.5 (IT/OT Boundary)
 
 **Direct attack surface (verified via embedded strings + cgi-bin paths in extracted AP963x firmware):**
 
@@ -66,7 +68,7 @@ Default `apc`/`apc` credentials are baked into factory state. FTP-based firmware
 
 ---
 
-## Group C — Rack PDU 2G AP86xx
+## Group C — Rack PDU 2G AP86xx — Purdue L3.5 (IT/OT Boundary)
 
 The 72-hash AP86xx catalog is an NMC variant retargeted for switched/metered PDU outlet control. Stack is the same family as NMC2/NMC3, so the *same* TLStorm CVE class applies depending on which generation the AP86xx unit shipped with.
 
@@ -87,7 +89,7 @@ HTTPS/SSH/SNMPv3 web UI · per-outlet ON/OFF/CYCLE control endpoints · SNMP `ep
 
 ---
 
-## Group D — PowerChute / EcoStruxure IT (Windows-side)
+## Group D — PowerChute / EcoStruxure IT (Windows-side) — Purdue L3 (Site Operations)
 
 | CVE | CVSS | Product | Vector |
 |---|---|---|---|

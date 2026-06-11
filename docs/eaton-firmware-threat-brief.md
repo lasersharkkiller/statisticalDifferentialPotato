@@ -4,20 +4,22 @@
 Findings combine CVE research and direct examination of the extracted
 firmware (services, default configs, embedded resources).
 
+**Purdue layer mapping:** NMCs (Groups A/B/C) live at **Purdue L3.5 (IT/OT Boundary)** — the SNMP+web bridge from corporate IT into OT power infra. UPS internal MCUs (Group D) and PDU G3 (Group E) sit at the **Power Infrastructure** cross-cut (L0/L1-adjacent, not strictly Purdue L1). UPS Companion / IPM / Windows-side tooling (Group F) runs at **Purdue L3 (Site Operations)**. See [purdue-l35-it-ot-boundary-brief.md](purdue-l35-it-ot-boundary-brief.md) (includes the Power Infrastructure appendix), [purdue-l3-site-operations-brief.md](purdue-l3-site-operations-brief.md), and [purdue-l1-basic-controllers-brief.md](purdue-l1-basic-controllers-brief.md) for cross-vendor views.
+
 ## Architecture grouping (drives the threat model, not the SKU)
 
-| Class | Products | Stack | Catalog depth |
-|---|---|---|---|
-| **A. Modern Embedded Linux** (Yocto) | Network-M2 v3.1.15, Network-M3 v2.3.3, Industrial-Gateway-Card / -X2 / -M3, Rack PDU G4 v4.0.1, PXGMS, Power-Xpert-Gateway UPS/PDP Card | ARM Linux + UBIFS / RAUC, runs `sshd`/`snmpd`/`bacnetd`/`modbusd`/Lua web UI (`genepi`) | 3,800-5,800 hashes |
-| **B. ESP32 "USHA"** | BestLink, ConnectUPS, ConnectUPS-Web-SNMP-Card | ESP32 + flat HTML web UI, no real OS | 88-184 hashes (carved) |
-| **C. Legacy NMC** | Network-MS (ee-he/hf/jc/jl/kb/lc/ld/le), Industrial-Modbus-Card-Mini-Slot, X-Slot-Modbus | ARM/x86 proprietary `NmcKA`/`inmc` container, EOL | 2-7 hashes (opaque) |
-| **D. Bare-metal UPS MCU** | 5P / 5PX / 5SC / 9PX / 9SX / 9PXM / 9170+ / Blade / Ferrups | STM32 / Callisto chipset, .sta blocks | 6-96 hashes |
-| **E. PDU G3** | one SKU | STM32 with embedded SNMP MIBs + zipped Shark web UI | 14 hashes |
-| **F. Windows-side** | UPS Companion, IPM/IPP, RNDIS driver, PX-UPS driver, MIBs | Windows binaries the admin runs | small |
+| Class | Purdue layer | Products | Stack | Catalog depth |
+|---|---|---|---|---|
+| **A. Modern Embedded Linux** (Yocto) | L3.5 IT/OT Boundary | Network-M2 v3.1.15, Network-M3 v2.3.3, Industrial-Gateway-Card / -X2 / -M3, Rack PDU G4 v4.0.1, PXGMS, Power-Xpert-Gateway UPS/PDP Card | ARM Linux + UBIFS / RAUC, runs `sshd`/`snmpd`/`bacnetd`/`modbusd`/Lua web UI (`genepi`) | 3,800-5,800 hashes |
+| **B. ESP32 "USHA"** | L3.5 IT/OT Boundary | BestLink, ConnectUPS, ConnectUPS-Web-SNMP-Card | ESP32 + flat HTML web UI, no real OS | 88-184 hashes (carved) |
+| **C. Legacy NMC** | L3.5 IT/OT Boundary | Network-MS (ee-he/hf/jc/jl/kb/lc/ld/le), Industrial-Modbus-Card-Mini-Slot, X-Slot-Modbus | ARM/x86 proprietary `NmcKA`/`inmc` container, EOL | 2-7 hashes (opaque) |
+| **D. Bare-metal UPS MCU** | Power Infrastructure (L0/L1-adjacent) | 5P / 5PX / 5SC / 9PX / 9SX / 9PXM / 9170+ / Blade / Ferrups | STM32 / Callisto chipset, .sta blocks | 6-96 hashes |
+| **E. PDU G3** | Power Infrastructure / L1-adjacent | one SKU | STM32 with embedded SNMP MIBs + zipped Shark web UI | 14 hashes |
+| **F. Windows-side** | L3 Site Operations | UPS Companion, IPM/IPP, RNDIS driver, PX-UPS driver, MIBs | Windows binaries the admin runs | small |
 
 ---
 
-## Group A — Embedded Linux NMCs (highest blast radius)
+## Group A — Embedded Linux NMCs (highest blast radius) — Purdue L3.5 (IT/OT Boundary)
 
 **Direct attack surface (verified via `etc/init.d` + `/usr/sbin` in the extracted M2 rootfs):**
 
@@ -40,7 +42,7 @@ Default config files in the firmware show write-capable SNMP communities and a `
 
 ---
 
-## Group B — USHA ESP32 (older Allion-design NMCs)
+## Group B — USHA ESP32 (older Allion-design NMCs) — Purdue L3.5 (IT/OT Boundary)
 
 The carved HTML files (we sliced 80+ per device) reveal what the device exposes: `Menu.html`, `PSnmp.html`, `PTrap.html`, `PMail.html`, `PPasswd.html`, `PWDate.html`, `PIdent.html`. So web UI manages: SNMP communities, trap targets, SMTP for alerts, password change, time sync, identity.
 
@@ -54,7 +56,7 @@ The carved HTML files (we sliced 80+ per device) reveal what the device exposes:
 
 ---
 
-## Group C — Legacy NMC (NmcKA / inmc / X-Slot-Modbus)
+## Group C — Legacy NMC (NmcKA / inmc / X-Slot-Modbus) — Purdue L3.5 (IT/OT Boundary)
 
 7 Network-MS variants + Industrial-Modbus + X-Slot-Modbus. All EOL, all opaque proprietary containers. The X-Slot-Modbus firmware is literal 16-bit DOS boot code (we identified the `cli; cld; xor eax,eax` prelude). These cards typically sit on management LANs in HVAC/DC facilities.
 
@@ -62,7 +64,7 @@ The carved HTML files (we sliced 80+ per device) reveal what the device exposes:
 
 ---
 
-## Group D — Bare-metal UPS MCU (.sta family)
+## Group D — Bare-metal UPS MCU (.sta family) — Power Infrastructure (L0/L1-adjacent)
 
 The .sta blocks are flat memory segments for the UPS internal microcontrollers (Callisto chipset on 5PX G2). No network attack surface on the UPS *itself* — they reach the network only via a connected NMC.
 
@@ -76,7 +78,7 @@ The .sta blocks are flat memory segments for the UPS internal microcontrollers (
 
 ---
 
-## Group F — Windows side (the actual high-CVSS surface today)
+## Group F — Windows side (the actual high-CVSS surface today) — Purdue L3 (Site Operations)
 
 This is where the recent CVEs are concentrated:
 

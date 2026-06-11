@@ -2,18 +2,20 @@
 
 **Scope:** Schneider Electric's industrial portfolio excluding APC UPS subsidiary, spanning ~30+ product families across Modicon PLCs, EcoStruxure engineering software, Triconex SIS, Citect SCADA, and Sepam protective relays. **Firmware extraction is pending** — no binaries have been unpacked from `firmware-staging\Schneider\` at the time of writing; this brief is research-only and combines CVE/PSIRT history, Claroty/Forescout/Dragos research, and US-CERT/CISA advisory traffic to prime the future extraction queue. Architecture groups: 6. Unique-hash count: 0 (extraction pending).
 
+**Purdue layer mapping:** Modicon PLCs (Group A) live at **Purdue L1 (Basic Controllers)**, with Sepam relays (in Group E) also at L1. EcoStruxure Control Expert / Operator Terminal Expert (Group B), Citect SCADA (Group D), and EcoStruxure Power Operation (in Group E) live at **Purdue L3 (Site Operations)**. Triconex SIS (Group C) is the **Safety Systems** branch (parallel to L1) — TRITON's target. EcoStruxure cloud agents (Group F) sit at the **Purdue L3.5 (IT/OT Boundary)** with L4 cloud egress. See [purdue-l1-basic-controllers-brief.md](purdue-l1-basic-controllers-brief.md), [purdue-l3-site-operations-brief.md](purdue-l3-site-operations-brief.md), [purdue-safety-systems-brief.md](purdue-safety-systems-brief.md), and [purdue-l35-it-ot-boundary-brief.md](purdue-l35-it-ot-boundary-brief.md) for cross-vendor views.
+
 ## Architecture grouping (drives the threat model, not the SKU)
 
-| Class | Products | Stack | Catalog depth |
-|---|---|---|---|
-| A | Modicon M340 / M580 / Quantum / Premium / Momentum | VxWorks (M340/Quantum/Premium), Linux on ePAC coprocessor (M580), UMAS over Modbus/TCP 502 | research only |
-| B | EcoStruxure Control Expert (Unity Pro), Operator Terminal Expert (Vijeo Designer) | Windows engineering workstation, .NET + native, project files `.stu`/`.xef`/`.zef` | research only |
-| C | Triconex Tricon v10/v11, Trident, Tri-GP | Proprietary RTOS on MP/IOP, TriStation 1131 protocol UDP/1502, key-switch PROGRAM/RUN/REMOTE | research only |
-| D | Citect SCADA / Plant SCADA | Windows server, CTAPI, ANL files, embedded Cicode runtime | research only |
-| E | EcoStruxure Power Operation / Power Monitoring Expert; Sepam 20/40/60/80 relays | Windows SCADA stack; Sepam = ARM/firmware over Modbus, IEC 61850 on optional MES card | research only |
-| F | EcoStruxure cloud agents (Augmented Operator Advisor, Asset Advisor, Secure Connect Advisor) | x86/ARM Linux gateway + Azure IoT Hub egress (TCP 443/8883) | research only |
+| Class | Purdue layer | Products | Stack | Catalog depth |
+|---|---|---|---|---|
+| A | L1 Basic Controllers | Modicon M340 / M580 / Quantum / Premium / Momentum | VxWorks (M340/Quantum/Premium), Linux on ePAC coprocessor (M580), UMAS over Modbus/TCP 502 | research only |
+| B | L3 Site Operations (EWS) | EcoStruxure Control Expert (Unity Pro), Operator Terminal Expert (Vijeo Designer) | Windows engineering workstation, .NET + native, project files `.stu`/`.xef`/`.zef` | research only |
+| C | Safety Systems (parallel to L1) | Triconex Tricon v10/v11, Trident, Tri-GP | Proprietary RTOS on MP/IOP, TriStation 1131 protocol UDP/1502, key-switch PROGRAM/RUN/REMOTE | research only |
+| D | L3 Site Operations | Citect SCADA / Plant SCADA | Windows server, CTAPI, ANL files, embedded Cicode runtime | research only |
+| E | L3 (Power Operation) + L1 (Sepam) | EcoStruxure Power Operation / Power Monitoring Expert; Sepam 20/40/60/80 relays | Windows SCADA stack; Sepam = ARM/firmware over Modbus, IEC 61850 on optional MES card | research only |
+| F | L3.5 IT/OT Boundary (+ L4 cloud) | EcoStruxure cloud agents (Augmented Operator Advisor, Asset Advisor, Secure Connect Advisor) | x86/ARM Linux gateway + Azure IoT Hub egress (TCP 443/8883) | research only |
 
-## Group A — Modicon PLCs (M340 / M580 / Quantum / Premium / Momentum)
+## Group A — Modicon PLCs (M340 / M580 / Quantum / Premium / Momentum) — Purdue L1 (Basic Controllers)
 
 **Direct attack surface (per vendor docs):** Modbus/TCP 502, UMAS function code 0x5A tunneled over Modbus, FTP 21 (default-on for firmware download on legacy Quantum/M340), HTTP 80 embedded web server (FactoryCast), SNMP 161, BOOTP/DHCP, EtherNet/IP 44818 on -E variants, IPsec optional on M580. Historically ships with a hardcoded FTP recovery account and a UMAS reservation cookie that is trivially predictable.
 
@@ -29,7 +31,7 @@
 
 **Top attack vector (MITRE ATT&CK ICS):** [T0855 Unauthorized Command Message](https://attack.mitre.org/techniques/T0855/) via UMAS function 0x5A; supported by [T0843 Program Download](https://attack.mitre.org/techniques/T0843/).
 
-## Group B — EcoStruxure Control Expert + Operator Terminal Expert
+## Group B — EcoStruxure Control Expert + Operator Terminal Expert — Purdue L3 (Site Operations, EWS)
 
 **Direct attack surface (per vendor docs):** Windows engineering workstation; project files (`.stu`, `.xef`, `.zef`, `.apx`) are ZIP-archived XML with embedded compiled IL — historically deserialized without signature check. Talks to PLCs over UMAS/Modbus 502 and proprietary Schneider OFS OPC server. Vijeo Designer additionally exposes runtime download over TCP 6000.
 
@@ -44,7 +46,7 @@
 
 **Top attack vector (MITRE ATT&CK ICS):** [T0873 Project File Infection](https://attack.mitre.org/techniques/T0873/) — EWS opens a tampered `.stu`, attacker pivots to OT.
 
-## Group C — Triconex SIS (Tricon / Trident / Tri-GP)
+## Group C — Triconex SIS (Tricon / Trident / Tri-GP) — Safety Systems (parallel to L1)
 
 **Direct attack surface (per vendor docs and Dragos/Mandiant TRITON reports):** TriStation protocol UDP/1502 between TS1131 EWS and MP module; no authentication, no signing of downloaded function blocks. Key-switch (PROGRAM/RUN/REMOTE) is the only mandatory defense — TRITON exploited installations left in PROGRAM during commissioning. Tricon v10.0–10.4 has a documented memory-read primitive that the TRITON `trilog.exe` framework abused to inject the `imain.bin` implant onto the MP.
 
@@ -58,7 +60,7 @@
 
 **Top attack vector (MITRE ATT&CK ICS):** [T0857 System Firmware](https://attack.mitre.org/techniques/T0857/) — TRITON wrote a new firmware image to the SIS controller; combine with [T0858 Change Operating Mode](https://attack.mitre.org/techniques/T0858/).
 
-## Group D — Citect SCADA / Plant SCADA
+## Group D — Citect SCADA / Plant SCADA — Purdue L3 (Site Operations)
 
 **Direct attack surface (per vendor docs):** Citect server uses CTAPI on TCP 5482, IOServer on configurable port, Cicode runtime inside the server process. Project files (`.ctz`) are ZIPs with Cicode source — same project-file-infection class as Group B. Historically vulnerable ODBC stack and a documented stack overflow in the ANL parser.
 
@@ -72,7 +74,7 @@
 
 **Top attack vector (MITRE ATT&CK ICS):** [T0853 Scripting](https://attack.mitre.org/techniques/T0853/) — Cicode payload embedded in a tampered `.ctz` project.
 
-## Group E — EcoStruxure Power Operation / Power Monitoring Expert / Sepam relays
+## Group E — EcoStruxure Power Operation / Power Monitoring Expert / Sepam relays — Purdue L3 (Power Operation) + L1 (Sepam)
 
 **Direct attack surface (per vendor docs):** Power Operation = Windows SCADA stack (ex-Citect codebase). Sepam relays expose Modbus RTU/TCP for protection settings, IEC 61850 MMS on TCP 102 with optional MES card, and a serial console for firmware load. Sepam 20/40 series has a documented credentials-in-clear issue.
 
@@ -86,7 +88,7 @@
 
 **Top attack vector (MITRE ATT&CK ICS):** [T0836 Modify Parameter](https://attack.mitre.org/techniques/T0836/) — alter Sepam protective relay setpoints to defeat fault clearing.
 
-## Group F — EcoStruxure cloud agents
+## Group F — EcoStruxure cloud agents — Purdue L3.5 (IT/OT Boundary) + L4 cloud
 
 **Direct attack surface (per vendor docs):** Linux gateway (Augmented Operator Advisor / Secure Connect Advisor) phoning home to Azure IoT Hub on TCP 8883 (MQTT/TLS) and 443; bundled OpenSSL, BusyBox, and Node.js runtime — typical Linux-IoT supply-chain surface. Local config web UI on TCP 8080/8443.
 

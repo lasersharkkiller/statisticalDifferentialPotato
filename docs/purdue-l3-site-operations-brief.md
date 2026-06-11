@@ -1,164 +1,240 @@
 # Purdue Site Operations (L3) — Cross-Vendor Threat & Detection Brief
 
-**Scope:** Purdue Level 3 — "Site Operations" — is the OT domain controller tier where SCADA servers, engineering workstations (EWS), historians, asset/security management, power-infrastructure site servers, and substation industrial PCs reside. This brief cross-cuts Siemens (WinCC Unified, TIA Portal V18–V21), Rockwell Automation (FactoryTalk View SE, Studio 5000, RSLinx, FactoryTalk Services Platform, FactoryTalk Historian SE, FactoryTalk AssetCentre), Schneider Electric (EcoStruxure Power Operation, Citect SCADA, Control Expert, EcoStruxure Asset Advisor, PowerChute Network Shutdown), Honeywell (Experion PKS server + engineering tools, Uniformance PHD), Aveva (System Platform, Historian, Wonderware), OSIsoft PI (cross-vendor historian), SEL (acSELerator QuickSet, Compass, BaRT, ICS Studio + SEL-3355/3300 industrial PCs), and Eaton (Intelligent Power Manager, UPS Companion). L3 reaches L4 corporate IT only through the L3.5 DMZ, but pivots downward into L2 supervisory networks and L1 controllers via authenticated programming protocols (CIP, S7Comm, UMAS) and historian/OPC channels. Because L3 hosts authenticated sessions to controllers and centralized credentials to AssetCentre/Asset Advisor, compromise here is equivalent to "domain admin" of the plant.
+**Scope:** This brief covers Purdue Level 3 (Site Operations) — the "domain controller" tier of OT. Roles in scope: SCADA servers, plant historians, engineering workstations (EWS), asset/configuration management servers, power-monitoring SCADA, substation Industrial PCs, console aggregators, and Windows-side power-management agents. Source material is aggregated from the [Eaton brief](eaton-firmware-threat-brief.md) (Group F Windows-side), [APC brief](apc-firmware-threat-brief.md) (Group D PowerChute / EcoStruxure IT), [Vertiv brief](vertiv-firmware-threat-brief.md) (Group A ACS 8000 + Group F DSView/Trellis), [SEL brief](sel-firmware-threat-brief.md) (Group A SEL Industrial PCs + Group B acSELerator / BaRT / Compass / VPS), [Siemens brief](siemens-firmware-threat-brief.md) (TIA Portal V21 + WinCC), [Honeywell brief](honeywell-firmware-threat-brief.md) (Experion PKS + Forge), [Schneider brief](schneider-firmware-threat-brief.md) (Control Expert, Citect, Power Operation, Vijeo), and [Rockwell brief](rockwell-firmware-threat-brief.md) (Groups D + E: FactoryTalk + Studio 5000). Honeywell L3 content is research-only — firmware extraction is pending and is explicitly marked as such throughout.
 
 ## Architecture grouping (organized by ROLE within this layer, not by vendor)
 
-| Class (role) | Products (cross-vendor) | Stack (RTOS/protocol/OS) | Catalog depth |
+| Class (role) | Products (cross-vendor) | Stack | Catalog depth |
 |---|---|---|---|
-| SCADA Server | Siemens WinCC Unified, Rockwell FactoryTalk View SE Server, Schneider EcoStruxure Power Operation + Citect SCADA, Honeywell Experion PKS server, Aveva System Platform | Windows Server, OPC UA, FactoryTalk RNA, WinCC channels | Briefs exist (Siemens, Rockwell, Schneider, Honeywell) |
-| Engineering Workstation (EWS) | Siemens TIA Portal V18/V19/V20/V21, Rockwell Studio 5000 + RSLinx Classic + FactoryTalk Linx, Schneider EcoStruxure Control Expert (Unity Pro), SEL acSELerator QuickSet/BaRT/Compass/ICS Studio, Honeywell Experion Engineering Tools | Windows 10/11, S7Comm/CIP/UMAS/SEL Fast Message | Briefs exist (Siemens, Rockwell, Schneider, SEL) |
-| Historian | Rockwell FactoryTalk Historian SE, OSIsoft PI (cross-vendor), Honeywell Uniformance PHD, Aveva Historian | Windows Server + SQL Server, OPC UA, PI Connectors | Research only (OSIsoft PI) |
-| Asset / Security Management | Rockwell FactoryTalk AssetCentre, Schneider EcoStruxure Asset Advisor | Windows Server + SQL, agent-based collectors | Brief exists (Rockwell) |
-| Power-Infra Site Server | Schneider PowerChute Network Shutdown, Schneider PowerChute Business, Eaton Intelligent Power Manager (IPM), Eaton UPS Companion | Windows/Linux, SNMP, vendor REST + NUT/SSH | Briefs exist (Schneider, Eaton) |
-| Substation Industrial PC | SEL-3355-2 / SEL-3355 / SEL-3300 running substation HMI + acSELerator | Windows 10 IoT LTSC / Linux on SEL hardware, IEC 61850 MMS, DNP3, SEL Fast Message | Brief exists (SEL) |
+| **A. SCADA / HMI Server** | Siemens WinCC + WinCC Unified; Rockwell FactoryTalk View SE / View ME; Schneider Citect SCADA / Plant SCADA; Schneider EcoStruxure Power Operation / Power Monitoring Expert; Schneider Vijeo Designer (Operator Terminal Expert); Honeywell Experion PKS Server | Windows Server + .NET + MSSQL + Tomcat / IIS; RNA / CTAPI / OPC UA backends | see [siemens brief Group B](siemens-firmware-threat-brief.md), [rockwell brief Group D](rockwell-firmware-threat-brief.md), [schneider brief Groups B/D/E](schneider-firmware-threat-brief.md), [honeywell brief Group A](honeywell-firmware-threat-brief.md) |
+| **B. Engineering Workstation (EWS)** | Siemens TIA Portal V21 (STEP7 + Openness + ALM); Rockwell Studio 5000 + RSLinx + FactoryTalk Linx; Schneider EcoStruxure Control Expert; SEL acSELerator QuickSet + BaRT + Compass + Virtual Port Service 5828; SEL-3355-2 / 3355 / 3300 Industrial PCs | Windows 10 IoT / Win Server, .NET, MSI/MSP, vendor IDE + project-file handlers | see [siemens brief Group A](siemens-firmware-threat-brief.md), [rockwell brief Group E](rockwell-firmware-threat-brief.md), [schneider brief Group B](schneider-firmware-threat-brief.md), [sel brief Groups A+B](sel-firmware-threat-brief.md) |
+| **C. Asset / Config Management Server** | Rockwell FactoryTalk AssetCentre; Rockwell FactoryTalk Historian SE; Rockwell FactoryTalk Linx Gateway; Vertiv Avocent DSView; Vertiv Trellis Platform; Vertiv Environet Alert; Vertiv Power Insight | Windows Server + MSSQL / Postgres + Java/Tomcat, holds crown-jewel PLC project archives + credentials | see [rockwell brief Group D](rockwell-firmware-threat-brief.md), [vertiv brief Group F](vertiv-firmware-threat-brief.md) |
+| **D. Windows-side Power-Mgmt Agent** | Eaton UPS Companion, Eaton IPM/IPP, Eaton setUPS, Eaton MIBs/PX-UPS/RNDIS drivers; APC PowerChute Network Shutdown, PowerChute Business / Personal; Schneider EcoStruxure IT Gateway / Expert | Windows .NET / Java services that broker between OS and UPS NMC | see [eaton brief Group F](eaton-firmware-threat-brief.md), [apc brief Group D](apc-firmware-threat-brief.md) |
+| **E. Console / Serial Aggregator** | Vertiv Avocent ACS 8000 (4/8/16/32/48-port); SEL Virtual Port Service 5828 (serial-over-TCP) | ARM Linux + busybox + portmgr / cycladesd; Windows TCP-serial bridge | see [vertiv brief Group A](vertiv-firmware-threat-brief.md), [sel brief Group B](sel-firmware-threat-brief.md) |
 
-## Group 1 — SCADA Server
+---
 
-**Direct attack surface:** Windows Server hosting OPC UA endpoints (TCP/4840), FactoryTalk RNA (TCP/1330–1332), WinCC OA/Unified channels (HTTPS + WebSocket), Citect display client TCP/2080, Experion server-to-station traffic, SMB/RPC for redundant pair sync, RDP/WinRM for engineer access.
+## Group A — SCADA / HMI Server
 
-**Confirmed CVEs across vendors:**
+**Direct attack surface (cross-vendor):**
 
-| CVE | CVSS | Vendor | Product | Vector |
-|---|---|---|---|---|
-| [CVE-2024-21915](https://nvd.nist.gov/vuln/detail/CVE-2024-21915) | 9.0 | Rockwell | FactoryTalk Services Platform | Privilege escalation in FactoryTalk Service Platform ([ICSA-24-046-16](https://www.cisa.gov/news-events/ics-advisories/icsa-24-046-16)) |
-| [CVE-2023-46290](https://nvd.nist.gov/vuln/detail/CVE-2023-46290) | 8.1 | Rockwell | FactoryTalk Services Platform (underpins FactoryTalk View SE) | Improper authentication — unauthenticated actor can obtain Windows OS user token via FTSP web service ([ICSA-23-299-06](https://www.cisa.gov/news-events/ics-advisories/icsa-23-299-06)) |
-| OT:ICEFALL set | up to 9.8 | Honeywell | Experion PKS / CDA protocol | Lack of encryption + weak authentication in CDA between Experion server and C300 controllers ([Forescout OT:ICEFALL](https://www.forescout.com/research-labs/ot-icefall/)) |
-| Vendor PSIRT | n/a | Siemens | SIMATIC WinCC Unified | Multiple input validation / XSS issues — see [Siemens ProductCERT](https://cert-portal.siemens.com) advisories for SIMATIC WinCC Unified |
-| Vendor PSIRT | n/a | Schneider | EcoStruxure / Citect SCADA / Citect Anywhere | Historical buffer-overflow / web-client RCE family — see [Schneider Cybersecurity Notifications](https://www.se.com/ww/en/work/support/cybersecurity/security-notifications.jsp) |
-
-**Top attack vector (MITRE ATT&CK ICS):** [T0832 Manipulation of View](https://attack.mitre.org/techniques/T0832/) — tampered SCADA tags + suppressed alarms while a parallel [T0831 Manipulation of Control](https://attack.mitre.org/techniques/T0831/) writes setpoints downstream.
-
-## Group 2 — Engineering Workstation (EWS)
-
-**Direct attack surface:** Studio 5000 + RSLinx Classic (CIP over EtherNet/IP TCP/44818, UDP/2222), TIA Portal (S7Comm + S7CommPlus TCP/102), Control Expert (Modbus + UMAS TCP/502), acSELerator (SEL Fast Message + SSH), Experion Engineering Tools (HCI/CDA), local project file repositories on user profiles, FactoryTalk Linx as broker.
+```
+WinCC CCEServer/CCAgent · WinCC Unified Web Runtime (HTTPS/443) · OPC UA (TCP/4840) ·
+MSSQL backend (Stuxnet's path) · Rockwell RNA + FactoryTalk Linx (TCP/3060 + dynamic) ·
+Citect CTAPI (TCP/5482) + IOServer · Cicode runtime · Experion Control Data Access (UDP/55555) ·
+WebNavigator IIS app · Schneider OFS OPC server · Vijeo Designer runtime download (TCP/6000)
+```
 
 **Confirmed CVEs across vendors:**
 
 | CVE | CVSS | Vendor | Product | Vector |
 |---|---|---|---|---|
-| [CVE-2022-1161](https://nvd.nist.gov/vuln/detail/CVE-2022-1161) | 10.0 | Rockwell | ControlLogix / CompactLogix / GuardLogix via Studio 5000 | Stealthy logic injection — running bytecode differs from EWS view ([Claroty Team82](https://claroty.com/team82/research/hiding-code-on-rockwell-automation-plcs), [ICSA-22-090-05](https://www.cisa.gov/news-events/ics-advisories/icsa-22-090-05)) |
-| [CVE-2021-22681](https://nvd.nist.gov/vuln/detail/CVE-2021-22681) | 10.0 | Rockwell | Studio 5000 Logix Designer | Hardcoded crypto key ([ICSA-21-056-03](https://www.cisa.gov/news-events/ics-advisories/icsa-21-056-03)) |
-| [CVE-2018-7841](https://nvd.nist.gov/vuln/detail/CVE-2018-7841) | 9.8 | Schneider | Modicon via Control Expert/UMAS | UMAS auth bypass — EWS-issued program download |
-| [CVE-2021-22779](https://nvd.nist.gov/vuln/detail/CVE-2021-22779) | 8.1 | Schneider | Modicon M340/M580 via Control Expert | UMAS authentication bypass |
-| Evil PLC research | n/a | Rockwell / Siemens / Schneider | ControlLogix, TIA Portal, Control Expert | Weaponized PLC project file → RCE on EWS ([Claroty Team82](https://claroty.com/team82/research/evil-plc-attack-weaponizing-plcs-to-attack-engineering-workstations)) |
-| [ICSA-23-131-08](https://www.cisa.gov/news-events/ics-advisories/icsa-23-131-08) | up to 8.8 | SEL | acSELerator QuickSet | Multiple deserialization + path traversal flaws |
+| [Siemens ProductCERT WinCC web-client auth class](https://cert-portal.siemens.com/productcert/html/index.html) | 9.x | Siemens | WinCC | Improper auth in WinCC web client (V7.x family) |
+| [Siemens ProductCERT WinCC Unified Web Runtime class](https://cert-portal.siemens.com/productcert/html/index.html) | 8.x | Siemens | WinCC Unified | Path traversal in Unified Web Runtime |
+| [Siemens ProductCERT WinCC installer DLL-hijack class](https://cert-portal.siemens.com/productcert/html/index.html) | 7.8 | Siemens | WinCC | DLL hijack on install |
+| [CVE-2024-21914](https://nvd.nist.gov/vuln/detail/CVE-2024-21914) (ICSA-24-018-02) | 6.5 | Rockwell | FactoryTalk View SE | DoS via crafted message |
+| [Rockwell PSIRT — View SE project-import RCE family](https://www.rockwellautomation.com/en-us/trust-center/security-advisories.html) | high | Rockwell | FactoryTalk View SE | RCE via crafted HMI project import |
+| [ICSA-23-193-01](https://www.cisa.gov/news-events/ics-advisories/icsa-23-193-01) | varies | Rockwell | FactoryTalk View ME | Multiple unauth issues |
+| [CVE-2008-2639](https://nvd.nist.gov/vuln/detail/CVE-2008-2639) | 10.0 | Schneider | CitectSCADA | ODBC server stack overflow (Core Security) |
+| [CVE-2020-7548](https://nvd.nist.gov/vuln/detail/CVE-2020-7548) | 7.8 | Schneider | Citect Anywhere | Auth bypass |
+| [Schneider PSIRT — Plant SCADA path traversal family](https://www.se.com/ww/en/work/support/cybersecurity/vulnerability-policy.jsp) | n/a | Schneider | Plant SCADA (EcoStruxure) | Authenticated path traversal |
+| [CVE-2021-22722](https://nvd.nist.gov/vuln/detail/CVE-2021-22722) | 7.5 | Schneider | EcoStruxure Power Monitoring Expert | Improper privilege management |
+| [Schneider PSIRT — PME report-generator RCE family](https://www.se.com/ww/en/work/support/cybersecurity/vulnerability-policy.jsp) | n/a | Schneider | Power Monitoring Expert | RCE via report generator |
+| [CVE-2021-38397](https://nvd.nist.gov/vuln/detail/CVE-2021-38397) | 10.0 | Honeywell | Experion PKS / LX / PlantCruise | Unrestricted file upload → unauth RCE (research only) |
+| [CVE-2021-38395](https://nvd.nist.gov/vuln/detail/CVE-2021-38395) | 9.1 | Honeywell | Experion PKS / LX / PlantCruise | Argument injection in Honeywell-signed binary (research only) |
+| [ICSA-21-294-02](https://www.cisa.gov/news-events/ics-advisories/icsa-21-294-02) | Critical | Honeywell | Experion PKS Server | Upload / argument injection / DLL-hijack cluster (research only) |
+| [ICSA-23-061-02](https://www.cisa.gov/news-events/ics-advisories/icsa-23-061-02) | 9.x | Honeywell | Experion PKS / LX / PlantCruise | ICEFALL "Crystallized Insecurity" cluster (research only) |
 
-**Top attack vector (MITRE ATT&CK ICS):** [T0843 Program Download](https://attack.mitre.org/techniques/T0843/) — engineer's own signed session pushes attacker logic to L1; secondary [T0833 Modify Control Logic](https://attack.mitre.org/techniques/T0833/) and [T0858 Change Operating Mode](https://attack.mitre.org/techniques/T0858/) (RUN→PROGRAM).
+**Top attack vector (MITRE ATT&CK ICS):** [T0832 Manipulation of View](https://attack.mitre.org/techniques/T0832/) + [T0859 Valid Accounts](https://attack.mitre.org/techniques/T0859/) on the SCADA SQL backend (the Stuxnet WinCC path) — tamper tag values shown to the operator while logic runs free.
 
-## Group 3 — Historian
+---
 
-**Direct attack surface:** OSIsoft PI Server TCP/5450 (PI Data Archive), PI AF TCP/5457, FactoryTalk Historian SE on Windows + SQL Server, Uniformance PHD APIs, Aveva Historian SQL endpoints, OPC HDA/UA collectors that hold credentials to dozens of L2/L1 devices.
+## Group B — Engineering Workstation (EWS)
 
-**Confirmed CVEs across vendors:**
+**Direct attack surface (cross-vendor):**
 
-| CVE | CVSS | Vendor | Product | Vector |
-|---|---|---|---|---|
-| [CVE-2020-12021](https://nvd.nist.gov/vuln/detail/CVE-2020-12021) | 7.7 | OSIsoft | PI Web API 2019 | Stored XSS — authenticated attacker with PI Server write access executes arbitrary JS in the user's browser ([ICSA-20-163-01](https://www.cisa.gov/news-events/ics-advisories/icsa-20-163-01)) |
-| [CVE-2023-31274](https://nvd.nist.gov/vuln/detail/CVE-2023-31274) | 7.5 | Rockwell / AVEVA | FactoryTalk Historian SE (built on AVEVA PI Server) | Unauthenticated PI Message Subsystem memory-exhaustion DoS ([ICSA-24-130-01](https://www.cisa.gov/news-events/ics-advisories/icsa-24-130-01)) |
-| AVEVA PI PSIRT | n/a | AVEVA / OSIsoft | PI Server / PI Data Archive | Historical authentication-bypass and information-disclosure family — see [AVEVA Security Bulletins](https://www.aveva.com/en/support-and-success/cyber-security-updates/) and [ICSA-24-018-01 AVEVA PI Server](https://www.cisa.gov/news-events/ics-advisories/icsa-24-018-01) |
-| OT:ICEFALL set | up to 9.8 | Honeywell | Experion / Uniformance ecosystem | Outdated cryptography and unauthenticated services ([Forescout](https://www.forescout.com/research-labs/ot-icefall/)) |
-
-**Top attack vector (MITRE ATT&CK ICS):** [T0859 Valid Accounts](https://attack.mitre.org/techniques/T0859/) — historian service accounts have read access to most L2/L1 tags, ideal for [T0852 Screen Capture / collection](https://attack.mitre.org/techniques/T0852/)-style staging.
-
-## Group 4 — Asset / Security Management
-
-**Direct attack surface:** AssetCentre disaster-recovery agents that hold *plaintext or weakly-encrypted* PLC credentials to every controlled L1 device; SQL Server backends; agent collectors with WMI/SMB to every EWS; Asset Advisor cloud connector outbound to Schneider services.
-
-**Confirmed CVEs across vendors:**
-
-| CVE | CVSS | Vendor | Product | Vector |
-|---|---|---|---|---|
-| [CVE-2024-21915](https://nvd.nist.gov/vuln/detail/CVE-2024-21915) | 9.0 | Rockwell | FactoryTalk Services Platform (underpins AssetCentre) | Privilege escalation ([ICSA-24-046-16](https://www.cisa.gov/news-events/ics-advisories/icsa-24-046-16)) |
-| [CVE-2023-2071](https://nvd.nist.gov/vuln/detail/CVE-2023-2071) | 9.8 | Rockwell | FactoryTalk View Machine Edition (PanelView Plus) | Improper input validation → unauthenticated RCE via crafted CIP packets ([ICSA-23-264-06](https://www.cisa.gov/news-events/ics-advisories/icsa-23-264-06)) |
-| AssetCentre PSIRT | n/a | Rockwell | FactoryTalk AssetCentre | Credential-store / disaster-recovery agent issues — see [Rockwell Trust Center](https://www.rockwellautomation.com/en-us/trust-center.html) and [ICSA-21-091-01](https://www.cisa.gov/news-events/ics-advisories/icsa-21-091-01) |
-| Schneider PSIRT | n/a | Schneider | EcoStruxure Asset Advisor | Vendor-managed cloud connector — see [Schneider Cybersecurity Notifications](https://www.se.com/ww/en/work/support/cybersecurity/security-notifications.jsp) |
-
-**Top attack vector (MITRE ATT&CK ICS):** [T0812 Default Credentials](https://attack.mitre.org/techniques/T0812/) + [T0866 Exploitation of Remote Services](https://attack.mitre.org/techniques/T0866/) — recover the AssetCentre credential vault, then use those credentials to T0843 every controller in scope.
-
-## Group 5 — Power-Infra Site Server
-
-**Direct attack surface:** PowerChute Network Shutdown polling NMC2/NMC3 (TLStorm threat surface), Eaton IPM web UI (TCP/4679/4680), UPS Companion installer on Windows.
+```
+TIA Portal Openness API (.NET, PowerShell-callable) · Automation License Manager (TCP/4410) ·
+project-file handlers (.ap21/.zap21, .stu/.xef/.zef, .ACD, .aclx, .RDB) · Studio 5000 + RSLinx ·
+FactoryTalk Services Platform · Control Expert + Vijeo Designer · acSELerator QuickSet ·
+SEL-BaRT (Fast Message + ASCII serial-over-TCP firmware push) · SEL Compass updater ·
+Virtual Port Service 5828 TCP listener (serial bridge) · SMB · RDP · WinRM
+```
 
 **Confirmed CVEs across vendors:**
 
 | CVE | CVSS | Vendor | Product | Vector |
 |---|---|---|---|---|
-| [ICSA-21-110-06](https://www.cisa.gov/news-events/ics-advisories/icsa-21-110-06) | 9.8 | Eaton | Intelligent Power Manager <1.69 | Unauthenticated eval() RCE on management server |
-| [CVE-2025-59887](https://nvd.nist.gov/vuln/detail/CVE-2025-59887) | 7.8 | Eaton | UPS Companion (Windows) | Installer DLL hijack — local privilege escalation |
-| [CVE-2022-22805](https://nvd.nist.gov/vuln/detail/CVE-2022-22805) | 9.0 | APC (Schneider) | NMC2/NMC3 (consumed by PowerChute) | TLStorm — TLS reassembly RCE ([Armis](https://www.armis.com/research/tlstorm/)) |
+| [CVE-2024-49775](https://nvd.nist.gov/vuln/detail/CVE-2024-49775) | 7.8 | Siemens | TIA Portal (UMC) | Local privilege escalation via User Management Component |
+| [Siemens ProductCERT TIA Portal Openness class](https://cert-portal.siemens.com/productcert/html/index.html) | 7.x | Siemens | TIA Portal Openness | Project-file deserialization → code exec |
+| [Siemens ProductCERT Automation License Manager class](https://cert-portal.siemens.com/productcert/html/index.html) | 7.x | Siemens | Automation License Manager | LPE on ALM service |
+| [CVE-2021-22681](https://www.cisa.gov/news-events/ics-advisories/icsa-21-056-03) | 10.0 | Rockwell | Logix / Studio 5000 | Hardcoded crypto key → remote auth bypass to controller |
+| [CVE-2022-1161](https://claroty.com/team82/research/stealthy-rockwell-plc-hack) | 7.7 | Rockwell | Studio 5000 / CompactLogix 5380, ControlLogix 5580 | Stealth logic injection (view ≠ controller bytecode) |
+| [CVE-2024-45824](https://www.rockwellautomation.com/en-us/trust-center/security-advisories.html) | 9.8 | Rockwell | FactoryTalk View ME / Studio 5000 | Remote code injection via crafted project |
+| [CVE-2023-46290](https://nvd.nist.gov/vuln/detail/CVE-2023-46290) | 7.5 | Rockwell | FactoryTalk Services Platform | Improper auth, unauth user enumeration |
+| [CVE-2024-21915](https://www.cisa.gov/news-events/ics-advisories/icsa-24-018-01) | 9.8 | Rockwell | FactoryTalk Service Platform | Privilege escalation, affects Logix sessions |
+| [Rockwell PSIRT — Studio 5000 DLL hijack family](https://www.rockwellautomation.com/en-us/trust-center/security-advisories.html) | high | Rockwell | Studio 5000 Logix Designer | DLL hijack on launch |
+| [Claroty "Evil PLC" — Studio 5000](https://claroty.com/team82/research/white-papers/evil-plc-attack-weaponizing-plcs) | n/a | Rockwell | Studio 5000 | Weaponized PLC project file → RCE on EWS |
+| [CVE-2020-7559](https://nvd.nist.gov/vuln/detail/CVE-2020-7559) | 7.8 | Schneider | EcoStruxure Control Expert | DLL hijack at engineering workstation startup |
+| [CVE-2021-22779](https://nvd.nist.gov/vuln/detail/CVE-2021-22779) | 8.1 | Schneider | Control Expert ↔ PLC | UMAS session hijack from EWS (ModiPwn) |
+| [Schneider PSIRT 2023 Control Expert project-file RCE](https://www.se.com/ww/en/work/support/cybersecurity/vulnerability-policy.jsp) | n/a | Schneider | EcoStruxure Control Expert | RCE via crafted `.stu` project (Armis-class) |
+| [Claroty "Evil PLC" — Control Expert](https://claroty.com/team82/research/evil-plc-attack-weaponizing-plcs) | n/a | Schneider | Control Expert | Weaponized PLC pushes payload to EWS on upload |
+| [ICSA-23-131-08](https://www.cisa.gov/news-events/ics-advisories/icsa-23-131-08) | n/a | SEL | acSELerator QuickSet (SEL-5030), RTAC (SEL-5033), ICS Studio (SEL-5045) | CWE-276 insecure perms + CWE-22 path traversal + CWE-269 improper privilege mgmt |
+| [SEL Security Advisories index](https://selinc.com/support/security-advisories/) | n/a | SEL | acSELerator QuickSet | XXE on `.aclx` import → local file disclosure / SSRF |
+| [SEL Security Advisories index](https://selinc.com/support/security-advisories/) | n/a | SEL | SEL-5037 Grid Configurator | Cleartext / weakly-protected credential storage |
+| [SEL Security Advisories index](https://selinc.com/support/security-advisories/) | n/a | SEL | acSELerator Architect (SEL-5032) | Authorization / project-import handling weaknesses |
+| [ICSA-23-194-02](https://www.cisa.gov/news-events/ics-advisories/icsa-23-194-02) | n/a | SEL | RTAC + co-installed mgmt binaries | Multiple weaknesses in RTAC firmware and mgmt interfaces |
 
-**Top attack vector (MITRE ATT&CK ICS):** [T0813 Denial of Control](https://attack.mitre.org/techniques/T0813/) via coordinated UPS shutdown, or [T0884 Connection Proxy](https://attack.mitre.org/techniques/T0884/) using the management server as a Windows beachhead inside L3.
+**Top attack vector (MITRE ATT&CK ICS):** [T0843 Program Download](https://attack.mitre.org/techniques/T0843/) — the EWS is the single highest-value pivot in any OT network because it holds project files and the credentials/certs to push logic. Chains with [T0873 Project File Infection](https://attack.mitre.org/techniques/T0873/) and [T0853 Scripting](https://attack.mitre.org/techniques/T0853/) (Openness API / Cicode payloads in tampered project archives — Stuxnet shape, modernised). Forescout's OT:ICEFALL and Claroty's "Evil PLC" both centred this surface.
 
-## Group 6 — Substation Industrial PC
+---
 
-**Direct attack surface:** Windows 10 IoT LTSC on SEL-3355-2 with full HMI + acSELerator stack; IEC 61850 MMS (TCP/102) + DNP3 (TCP/20000) + SEL Fast Message to relays; engineer keyfobs/PIV; RTAC-adjacent.
+## Group C — Asset / Config Management Server
+
+**Direct attack surface (cross-vendor):**
+
+```
+FactoryTalk Directory + AssetCentre (project archives + encrypted PLC credential vault) ·
+FactoryTalk Historian SE · FactoryTalk Linx Gateway (TCP/3060) · DSView mgmt-plane (Java) ·
+Trellis Platform (Apache Tomcat + Postgres) · Environet Alert · Power Insight ·
+MSSQL backends · IIS / Tomcat admin endpoints · OPC HDA + A&E
+```
 
 **Confirmed CVEs across vendors:**
 
 | CVE | CVSS | Vendor | Product | Vector |
 |---|---|---|---|---|
-| [ICSA-23-131-08](https://www.cisa.gov/news-events/ics-advisories/icsa-23-131-08) | up to 8.8 | SEL | acSELerator QuickSet on SEL-3355 | Multiple flaws — deserialization / path traversal |
-| [ICSA-23-194-02](https://www.cisa.gov/news-events/ics-advisories/icsa-23-194-02) | up to 9.8 | SEL | RTAC family adjacent to substation PC | Authentication + memory-corruption issues |
-| Industroyer / Industroyer2 | n/a | n/a (TTPs) | Substation HMI/MMS | Breaker manipulation via IEC 61850 MMS ([Dragos](https://www.dragos.com/blog/industroyer2-and-incontroller-new-state-sponsored-cyber-capabilities-target-industrial-control-systems/)) |
+| [Rockwell PSIRT — AssetCentre deserialization RCE family](https://www.rockwellautomation.com/en-us/trust-center/security-advisories.html) | high | Rockwell | FactoryTalk AssetCentre | RCE via deserialization of project archive |
+| [CVE-2024-21915](https://www.cisa.gov/news-events/ics-advisories/icsa-24-018-01) | 9.8 | Rockwell | FactoryTalk Service Platform | Privilege escalation across FT user store |
+| [Vertiv PSIRT — Avocent DSView advisories](https://www.vertiv.com/en-us/support/security-advisories/) | n/a | Vertiv | Avocent DSView | Pre-auth deserialization / RCE per vendor advisory |
+| [CVE-2021-44228](https://nvd.nist.gov/vuln/detail/CVE-2021-44228) | 10.0 | Vertiv | Trellis 5.x (Tomcat) | Apache Log4j JNDI RCE (Log4Shell) on unpatched Trellis |
+| [Synopsys CyRC — Avocent / HPE KVM advisory](https://www.synopsys.com/blogs/software-security/) | n/a | Vertiv | Avocent KVM family (shared firmware) | Hardcoded creds + buffer overflow (unauth → root) |
 
-**Top attack vector (MITRE ATT&CK ICS):** [T0855 Unauthorized Command Message](https://attack.mitre.org/techniques/T0855/) — substation PC issues MMS breaker-open commands, mirroring Industroyer.
+**Top attack vector (MITRE ATT&CK ICS):** [T0866 Exploitation of Remote Services](https://attack.mitre.org/techniques/T0866/) → [T0852 Screen Capture / Theft of Operational Information](https://attack.mitre.org/techniques/T0852/). AssetCentre / DSView / Trellis hold credentials and trust to every device they manage — single compromise yields every PLC password and KVM session in the plant.
+
+---
+
+## Group D — Windows-side Power-Management Agent
+
+**Direct attack surface (cross-vendor):**
+
+```
+Eaton setUPS.exe / IPM / UPS Companion installer + LocalSystem services ·
+APC PowerChute Java mgmt agent + IIS local web mgmt · EcoStruxure IT Gateway (Java) ·
+HTTPS / SNMP outbound to NMC fleet · DLL search-order surface in installer paths
+```
+
+**Confirmed CVEs across vendors:**
+
+| CVE | CVSS | Vendor | Product | Vector |
+|---|---|---|---|---|
+| [CVE-2025-59887](https://www.thehackerwire.com/eaton-ups-companion-installer-rce-cve-2025-59887/) | 8.6 | Eaton | UPS Companion <3.0 (all versions) | DLL hijack RCE in installer |
+| [CVE-2025-59888](https://nvd.nist.gov/vuln/detail/CVE-2025-59888) | 6.7 | Eaton | UPS Companion <3.0 | Unquoted service path → SYSTEM |
+| [CVE-2020-6650](https://github.com/RavSS/Eaton-UPS-Companion-Exploit) | 7.x | Eaton | UPS Companion <1.06 | Plaintext HTTP update + `eval()` of response |
+| [IPM pre-1.69 (ICSA-21-110-06)](https://www.cisa.gov/news-events/ics-advisories/icsa-21-110-06) | 9.8 | Eaton | Intelligent Power Manager | Unauth eval injection RCE + unauth file upload + SQLi |
+| [CVE-2021-22812](https://nvd.nist.gov/vuln/detail/CVE-2021-22812) | 9.8 | APC / Schneider | PowerChute Business Edition | Unauth RCE via deserialization in management agent |
+| [CVE-2021-22813](https://nvd.nist.gov/vuln/detail/CVE-2021-22813) | 7.5 | APC / Schneider | PowerChute Business Edition | Auth bypass on local web mgmt |
+| [Schneider PSIRT — PowerChute Serial Shutdown LPE class](https://www.se.com/ww/en/work/support/cybersecurity/security-notifications.jsp) | 7.x | APC / Schneider | PowerChute Serial Shutdown | Local privesc via insecure dir / service-permissions |
+| [Schneider PSIRT — EcoStruxure IT Gateway mgmt-plane class](https://www.se.com/ww/en/work/support/cybersecurity/security-notifications.jsp) | 7.x | APC / Schneider | EcoStruxure IT Gateway | Auth / management-plane vuln class |
+
+**Top attack vector (MITRE ATT&CK ICS):** [T1574.001 DLL Search Order Hijacking](https://attack.mitre.org/techniques/T1574/001/) (Enterprise) chained into [T0857 System Firmware](https://attack.mitre.org/techniques/T0857/) — admin host runs a tampered installer → SYSTEM → push tampered firmware via the legitimate update channel to every UPS NMC the agent trusts.
+
+---
+
+## Group E — Console / Serial Aggregator
+
+**Direct attack surface (cross-vendor):**
+
+```
+Vertiv ACS 8000: sshd · lighttpd HTTPS · portslave / cycladesd serial multiplexer ·
+snmpd v1/v2c/v3 · strongSwan ipsec · root/admin default accounts.
+SEL VPS 5828: Windows TCP listener bridging to local COM ports · default bind / no auth class.
+```
+
+**Confirmed CVEs across vendors:**
+
+| CVE | CVSS | Vendor | Product | Vector |
+|---|---|---|---|---|
+| [ICSA-23-285-06](https://www.cisa.gov/news-events/ics-advisories/icsa-23-285-06) | n/a | Vertiv | Avocent ACS 8000 firmware ≤3.3.x | OS command injection + auth bypass + hardcoded root cred |
+| [Vertiv PSIRT — ACS 8000 advisories](https://www.vertiv.com/en-us/support/security-advisories/) | n/a | Vertiv | Avocent ACS 8000 | Hardcoded credential / insecure default |
+| [Nozomi Networks Labs — ACS 8000 research](https://www.nozominetworks.com/blog/) | n/a | Vertiv | Avocent ACS 8000 | Chained unauth → root via web UI + serial daemon |
+| [ICSA-23-131-08](https://www.cisa.gov/news-events/ics-advisories/icsa-23-131-08) | n/a | SEL | Virtual Port Service 5828 (co-installed mgmt class) | DLL search-order / writable install-path → LPE to SYSTEM (acSELerator family covered by same advisory) |
+
+**Top attack vector (MITRE ATT&CK ICS):** [T0822 External Remote Services](https://attack.mitre.org/techniques/T0822/) + [T0886 Remote Services](https://attack.mitre.org/techniques/T0886/) — every serial port the aggregator brokers becomes a console-level pivot into a downstream device, bypassing that device's own network ACLs. Honour ICSA-23-285-06's "blast radius = every cabled device" framing.
+
+---
 
 ## Logging matrix (highest priority for this layer)
 
 | # | Source | Event | What it catches | MITRE ATT&CK ICS |
 |---|---|---|---|---|
-| 1 | EWS Sysmon | Process create: Studio 5000 / TIA Portal / Control Expert / acSELerator launching outside business hours or by non-engineer SID | Stolen-credential program downloads, attacker-on-EWS | [T0859](https://attack.mitre.org/techniques/T0859/) Valid Accounts |
-| 2 | EWS Sysmon | Project file (.ACD, .ap18-21, .stu, .CXP, .rdb) opened from non-standard path / temp / network share | Evil PLC weaponized project staging | [T0863](https://attack.mitre.org/techniques/T0863/) User Execution |
-| 3 | SCADA server Windows Security | New Service / new scheduled task on WinCC / FT View SE / Experion server | Persistence on SCADA box | [T0859](https://attack.mitre.org/techniques/T0859/) Valid Accounts |
-| 4 | Network (Zeek/Suricata/Dragos/Claroty/Nozomi) | CIP/S7Comm/UMAS WRITE / STOP / DOWNLOAD originating from EWS subnet to L1 PLCs | Authenticated program download from L3 to L1 | [T0843](https://attack.mitre.org/techniques/T0843/) Program Download |
-| 5 | Network | RUN→PROGRAM mode change to controller | Mode change preceding logic tamper or CVE-2022-1161-style attacks | [T0858](https://attack.mitre.org/techniques/T0858/) Change Operating Mode |
-| 6 | FT AssetCentre / Asset Advisor audit | Bulk credential read / export / DR-archive download | Vault exfiltration → cross-controller takeover | [T0812](https://attack.mitre.org/techniques/T0812/) Default Credentials |
-| 7 | Historian (PI / FT Historian / PHD / Aveva) | New connector, new tag-pull credential, or off-hours bulk query | Reconnaissance + collection staging | [T0852](https://attack.mitre.org/techniques/T0852/) Screen Capture / collection |
-| 8 | OPC UA broker / FactoryTalk RNA | Anomalous client cert, unsigned client, lateral SCADA-to-SCADA channel | L3 lateral movement between SCADA servers | [T0830](https://attack.mitre.org/techniques/T0830/) Adversary-in-the-Middle |
+| 1 | **Sysmon on EWS hosts (TIA Portal / Studio 5000 / Control Expert / acSELerator / BaRT)** | EventID 1 ProcessCreate where ParentImage = `Siemens.Automation.*` / `RSLogix5000.exe` / `Studio5000.exe` / `RSLinx.exe` / `ControlExpert.exe` / `AcSELeratorQuickSet.exe` / `BaRT.exe` / `Compass.exe` AND child = `cmd.exe` / `powershell.exe` / `rundll32.exe` | Evil-PLC / Openness-API abuse / scripted PLC push | [T0853 Scripting](https://attack.mitre.org/techniques/T0853/) → [T0843 Program Download](https://attack.mitre.org/techniques/T0843/) |
+| 2 | Sysmon on EWS / SCADA / asset-mgmt hosts | EventID 7 ImageLoad — non-vendor DLLs loaded by `CCEServer.exe` / `Siemens.Automation.*.exe` / `FTAC.exe` / `ViewSE*.exe` / `Studio5000.exe` / `ControlExpert.exe` / `AcSELerator*.exe` / `setUPS*.exe` / `PowerChute*.exe` from user-writable paths | DLL search-order hijack class (WinCC installer, Studio 5000, Eaton UPS Companion CVE-2025-59887, acSELerator ICSA-23-131-08, Schneider CVE-2020-7559) | [T1574.001 DLL Search-Order Hijack](https://attack.mitre.org/techniques/T1574/001/) |
+| 3 | Sysmon EventID 11 (FileCreate) on EWS | `.stu` / `.xef` / `.zef` / `.ACD` / `.aclx` / `.RDB` / `.crd` / `.ctz` / `nmc_*.bin` / `apc_hw*.bin` created outside project directory or by non-engineer accounts | Project-file infection / staged tampered firmware (Evil-PLC, Cicode payload, NMC firmware staging) | [T0873 Project File Infection](https://attack.mitre.org/techniques/T0873/) + [T0857 System Firmware](https://attack.mitre.org/techniques/T0857/) |
+| 4 | **FactoryTalk Diagnostics + AssetCentre audit** | FT Directory `LogOn`/`LogOff` correlated with AssetCentre `CheckOut` of PLC project outside change-ticket window | Attacker pulling project to weaponize / credential mother-lode access | [T0866 Exploitation of Remote Services](https://attack.mitre.org/techniques/T0866/) |
+| 5 | **WinCC / Experion / Citect audit logs** | `User logon failed` × N then `success`; `Project loaded` / `PointParameterChange` / `Configuration changed` outside maintenance window | Brute force on SCADA + unauthorised project load + operator-action abuse | [T0859 Valid Accounts](https://attack.mitre.org/techniques/T0859/) + [T0832 Manipulation of View](https://attack.mitre.org/techniques/T0832/) |
+| 6 | **Network IDS (Suricata / Zeek)** | S7comm-Plus, UMAS function 0x5A, CIP service codes 0x4B/0x4C/0x4D (program download) + 0x6B (mode change), DNP3 FC 5/6, IEC 61850 MMS `write`, GOOSE from non-relay MACs — all sourced from any host outside the EWS VLAN | Cross-vendor unauthorised PLC programming / mode flip / breaker tamper | [T0843 Program Download](https://attack.mitre.org/techniques/T0843/) + [T0855 Unauthorized Command Message](https://attack.mitre.org/techniques/T0855/) |
+| 7 | Network IDS | Connections to **Virtual Port Service 5828** TCP listener or **ACS 8000 portmgr** from non-loopback / non-engineer IPs; `login.success` for `root` on ACS 8000 from any IP | Lateral relay/console access via serial-tunnel pivot | [T0822 External Remote Services](https://attack.mitre.org/techniques/T0822/) + [T0886 Remote Services](https://attack.mitre.org/techniques/T0886/) |
+| 8 | **Sysmon on power-mgmt + KVM-mgmt hosts (PowerChute / DSView / Trellis / Tomcat)** | EventID 1 where ParentImage = `tomcat*.exe` / `PowerChute*.exe` / `setUPS*.exe` / `IPM*.exe` AND child not in vendor allow-list | DSView pre-auth deserialization, Log4Shell on Trellis, PowerChute CVE-2021-22812 deserialization, Eaton UPS Companion installer RCE post-ex | [T1059 Command and Scripting Interpreter](https://attack.mitre.org/techniques/T1059/) (Enterprise) + [T0857 System Firmware](https://attack.mitre.org/techniques/T0857/) |
 
-**Secondary:** Siemens TIA Portal audit trail; Rockwell FactoryTalk Diagnostics; Schneider Control Expert audit log; Honeywell Experion event journal; SEL acSELerator audit trail; OSIsoft PI message log + PI Audit DB; Windows Event ID 4624/4672 on SCADA hosts; PowerShell ScriptBlock + AMSI on all EWS; OT-IDS alarm-rate anomalies; AppLocker/WDAC deny events for unsigned binaries in `C:\Program Files (x86)\Rockwell Software\` and `C:\Program Files\Siemens\Automation\`.
+**Secondary:**
+
+- Firewall egress: any outbound from L3 SCADA / EWS / asset-mgmt VLANs to non-RFC1918 destinations besides documented vendor cloud endpoints (Forge Azure tenants, Compass `updates.selinc.com`, Rockwell PSIRT mirror). Volt Typhoon's 2024 US-infrastructure campaign (CISA AA24-038A) used exactly this kind of callback path off the EWS.
+- Vendor-native audit feeds (turn on + forward via syslog): WinCC audit log; Experion Operator Action Journal + System Event Journal + Control Builder change tracking; FactoryTalk Diagnostics (`Audit`, `Security`, `Configuration` categories); SEL relay SER buffer / Audit log via Fast Message `HIS` / `MET`; ACS 8000 Data Buffering + Auditing.
+- Subscribe to ProductCERT-feeds with monthly review jobs: Siemens ProductCERT (2nd Tuesday), Rockwell Trust Center RSS, Schneider PSIRT bulletins, Honeywell PSIRT, SEL Security Advisories, Eaton PSIRT, APC / Schneider, Vertiv PSIRT.
+- Active Directory: monitor service accounts used by FactoryTalk, Citect, WinCC, Power Operation, ACS 8000 RADIUS clients for interactive logons — they should be service-only.
+
+---
 
 ## Cross-layer pivots
 
-1. **L4 → L3.5 → L3 SCADA server**: phished corporate user pivots through jump host in L3.5 DMZ, lands on a domain-joined SCADA server (WinCC Unified / FactoryTalk View SE) using stolen valid accounts ([T0822 External Remote Services](https://attack.mitre.org/techniques/T0822/)), then escalates via CVE-2024-21915 on FactoryTalk Services Platform.
-2. **L3 EWS → L1 PLC (the Stuxnet / Evil PLC path)**: attacker on Studio 5000 / TIA Portal / Control Expert uses the engineer's already-authenticated CIP/S7Comm/UMAS session to push tampered logic ([T0843](https://attack.mitre.org/techniques/T0843/) + [T0833](https://attack.mitre.org/techniques/T0833/)). Stealth amplified by CVE-2022-1161 (online view diverges from running bytecode). Reverse direction is Claroty's Evil PLC — a poisoned PLC project compromises the EWS on next upload.
-3. **L3 SCADA → L2 supervisory / L1 via OPC UA + FactoryTalk RNA**: compromised SCADA server abuses already-trusted OPC UA / RNA / WinCC channels to write setpoints across the supervisory bus ([T0831 Manipulation of Control](https://attack.mitre.org/techniques/T0831/), [T0836 Modify Parameter](https://attack.mitre.org/techniques/T0836/)) while suppressing alarms on the operator HMI ([T0832 Manipulation of View](https://attack.mitre.org/techniques/T0832/)).
-4. **L3 management → SIS (the TRITON pattern)**: co-resident management agent (AssetCentre, Asset Advisor, Experion engineering tools) reaches a Triconex Tricon or other SIS controller and tampers with safety firmware ([T0857 System Firmware](https://attack.mitre.org/techniques/T0857/), [T0879 Damage to Property](https://attack.mitre.org/techniques/T0879/)) — the XENOTIME TTP set ([Dragos](https://www.dragos.com/threat/xenotime/)).
-5. **L3.5 UPS/NMC → L3 SCADA**: TLStorm-class compromise of an APC NMC managed by PowerChute, or Eaton IPM RCE (ICSA-21-110-06), gives the attacker a Windows beachhead inside the L3 broadcast domain — used as [T0884 Connection Proxy](https://attack.mitre.org/techniques/T0884/) to reach SCADA without crossing the L3.5 firewall again.
+1. **L3 EWS → L1 PLC via authenticated CIP / S7Comm-Plus / UMAS write (Stuxnet model).** Compromise the engineering workstation (Studio 5000, TIA Portal Openness, Control Expert, acSELerator BaRT), then use the vendor's own programming protocol from a legitimate session to push tampered logic. Chains DLL-hijack + project-file infection on the EWS into [T0843 Program Download](https://attack.mitre.org/techniques/T0843/) at L1. CVE-2021-22681 (Rockwell hardcoded crypto key), CVE-2022-38465 (Siemens S7-1500 global private key), and CVE-2021-22779 (Schneider ModiPwn) all reduce this to a single-step pivot once the EWS is owned.
+
+2. **L3 historian → L4 corporate (the IT/OT data path attackers ride backward).** FactoryTalk Historian SE, WinCC archives, and Experion Forge OPC UA bridges all push plant data northbound through documented IT/OT seams. The same TLS / MQTT / Tomcat endpoints that publish historian data are the soft re-entry point: Log4Shell on Trellis ([CVE-2021-44228](https://nvd.nist.gov/vuln/detail/CVE-2021-44228)), Forge edge-agent OPC UA client misconfiguration, and FactoryTalk Service Platform privilege escalation ([CVE-2024-21915](https://www.cisa.gov/news-events/ics-advisories/icsa-24-018-01)) all enable corporate-to-historian pivots that then reach the L2 HMI / L1 controller plane. Maps to [T0884 Connection Proxy](https://attack.mitre.org/techniques/T0884/) + [T0866 Exploitation of Remote Services](https://attack.mitre.org/techniques/T0866/).
+
+3. **L3 AssetCentre → L1 mass-PLC config push (legitimate workflow, weaponized for tampering).** FactoryTalk AssetCentre is the disaster-recovery vault — it holds every PLC project archive + credentials in the plant. The Rockwell PSIRT AssetCentre deserialization family + [CVE-2024-21915](https://www.cisa.gov/news-events/ics-advisories/icsa-24-018-01) yield one-shot access to the entire fleet's program-download credential bundle, then attacker pushes tampered logic via the *normal* DR-restore workflow. Same model applies to SEL Compass-managed BaRT trees (silent relay-firmware tamper) and Schneider Secure Connect Advisor (cloud-pair token → on-prem PLC). [T0857 System Firmware](https://attack.mitre.org/techniques/T0857/) at fleet scale.
+
+4. **L3 SCADA → L2 HMI display tamper (Manipulation of View).** WinCC SQL backend compromise (Stuxnet's path) or Citect Cicode runtime exploitation rewrites tag values shown to operators while real process data deviates. Operators see green when valves are open. [T0832 Manipulation of View](https://attack.mitre.org/techniques/T0832/) is the precondition for any L1 manipulation that must remain undetected long enough to cause physical effect — CRASHOVERRIDE and TRITON both depended on it.
+
+---
 
 ## Sources
 
-- [CISA ICSA-24-046-16 — Rockwell FactoryTalk Service Platform (CVE-2024-21915)](https://www.cisa.gov/news-events/ics-advisories/icsa-24-046-16)
-- [CISA ICSA-23-299-06 — Rockwell FactoryTalk Services Platform (CVE-2023-46290)](https://www.cisa.gov/news-events/ics-advisories/icsa-23-299-06)
-- [CISA ICSA-22-090-05 — Rockwell Logix Controllers (CVE-2022-1161)](https://www.cisa.gov/news-events/ics-advisories/icsa-22-090-05)
-- [CISA ICSA-21-056-03 — Rockwell Studio 5000 (CVE-2021-22681)](https://www.cisa.gov/news-events/ics-advisories/icsa-21-056-03)
-- [CISA ICSA-21-091-01 — Rockwell FactoryTalk AssetCentre](https://www.cisa.gov/news-events/ics-advisories/icsa-21-091-01)
-- [CISA ICSA-23-264-06 — Rockwell FactoryTalk View Machine Edition (CVE-2023-2071)](https://www.cisa.gov/news-events/ics-advisories/icsa-23-264-06)
-- [CISA ICSA-23-131-08 — SEL acSELerator QuickSet](https://www.cisa.gov/news-events/ics-advisories/icsa-23-131-08)
-- [CISA ICSA-23-194-02 — SEL RTAC](https://www.cisa.gov/news-events/ics-advisories/icsa-23-194-02)
-- [CISA ICSA-21-110-06 — Eaton Intelligent Power Manager](https://www.cisa.gov/news-events/ics-advisories/icsa-21-110-06)
-- [CISA ICSA-24-130-01 — Rockwell FactoryTalk Historian SE (CVE-2023-31274)](https://www.cisa.gov/news-events/ics-advisories/icsa-24-130-01)
-- [CISA ICSA-24-018-01 — AVEVA PI Server](https://www.cisa.gov/news-events/ics-advisories/icsa-24-018-01)
-- [CISA ICSA-20-163-01 — OSIsoft PI Web API (CVE-2020-12021)](https://www.cisa.gov/news-events/ics-advisories/icsa-20-163-01)
-- [CISA AA24-038A — PRC State-Sponsored Actors (Volt Typhoon)](https://www.cisa.gov/news-events/cybersecurity-advisories/aa24-038a)
-- [NVD CVE-2022-1161 — Rockwell Logix stealthy logic injection](https://nvd.nist.gov/vuln/detail/CVE-2022-1161)
-- [NVD CVE-2018-7841 — Schneider UMAS](https://nvd.nist.gov/vuln/detail/CVE-2018-7841)
-- [NVD CVE-2021-22779 — Schneider Modicon UMAS](https://nvd.nist.gov/vuln/detail/CVE-2021-22779)
-- [NVD CVE-2023-46290 — Rockwell FactoryTalk Services Platform](https://nvd.nist.gov/vuln/detail/CVE-2023-46290)
-- [NVD CVE-2025-59887 — Eaton UPS Companion DLL hijack](https://nvd.nist.gov/vuln/detail/CVE-2025-59887)
-- [Claroty Team82 — Evil PLC Attack](https://claroty.com/team82/research/evil-plc-attack-weaponizing-plcs-to-attack-engineering-workstations)
-- [Claroty Team82 — Hiding Code on Rockwell PLCs (CVE-2022-1161)](https://claroty.com/team82/research/hiding-code-on-rockwell-automation-plcs)
-- [Armis — TLStorm research](https://www.armis.com/research/tlstorm/)
-- [Forescout — OT:ICEFALL](https://www.forescout.com/research-labs/ot-icefall/)
-- [Dragos — Industroyer2 / INCONTROLLER analysis](https://www.dragos.com/blog/industroyer2-and-incontroller-new-state-sponsored-cyber-capabilities-target-industrial-control-systems/)
-- [Dragos — XENOTIME threat group](https://www.dragos.com/threat/xenotime/)
-- [Siemens ProductCERT](https://cert-portal.siemens.com)
-- [Rockwell Automation Trust Center](https://www.rockwellautomation.com/en-us/trust-center.html)
-- [Schneider Electric Cybersecurity Notifications](https://www.se.com/ww/en/work/support/cybersecurity/security-notifications.jsp)
-- [Honeywell Product Security](https://www.honeywell.com/us/en/product-security)
-- [AVEVA Cyber Security Updates](https://www.aveva.com/en/support-and-success/cyber-security-updates/)
-- [SEL Security Advisories](https://selinc.com/support/security-advisories/)
-- [MITRE ATT&CK for ICS — techniques index](https://attack.mitre.org/techniques/ics/)
-- [ISA/IEC 62443 — Industrial automation and control systems security](https://www.isa.org/standards-and-publications/isa-standards/isa-iec-62443-series-of-standards)
-- [Purdue Enterprise Reference Architecture / ISA-95](https://www.isa.org/standards-and-publications/isa-standards/isa-95)
+- [CISA AA24-038A — Volt Typhoon US Critical Infrastructure](https://www.cisa.gov/news-events/cybersecurity-advisories/aa24-038a)
+- [CISA ICSA-21-056-03 — Rockwell Logix Controllers (CVE-2021-22681)](https://www.cisa.gov/news-events/ics-advisories/icsa-21-056-03)
+- [CISA ICSA-21-110-06 — Eaton IPM](https://www.cisa.gov/news-events/ics-advisories/icsa-21-110-06)
+- [CISA ICSA-21-294-02 — Honeywell Experion PKS upload / argument injection](https://www.cisa.gov/news-events/ics-advisories/icsa-21-294-02)
+- [CISA ICSA-23-061-02 — Honeywell Experion PKS / LX / PlantCruise (ICEFALL "Crystallized Insecurity")](https://www.cisa.gov/news-events/ics-advisories/icsa-23-061-02)
+- [CISA ICSA-23-131-08 — SEL acSELerator family](https://www.cisa.gov/news-events/ics-advisories/icsa-23-131-08)
+- [CISA ICSA-23-193-01 — Rockwell FactoryTalk View ME](https://www.cisa.gov/news-events/ics-advisories/icsa-23-193-01)
+- [CISA ICSA-23-194-02 — SEL Real-Time Automation Controller (RTAC)](https://www.cisa.gov/news-events/ics-advisories/icsa-23-194-02)
+- [CISA ICSA-23-285-06 — Vertiv Avocent ACS 8000](https://www.cisa.gov/news-events/ics-advisories/icsa-23-285-06)
+- [CISA ICSA-24-018-01 — Rockwell FactoryTalk Service Platform (CVE-2024-21915)](https://www.cisa.gov/news-events/ics-advisories/icsa-24-018-01)
+- [CISA/NSA/FBI/ASD — Best Practices for Event Logging and Threat Detection (2024)](https://www.cisa.gov/resources-tools/resources/best-practices-event-logging-and-threat-detection)
+- [Siemens ProductCERT advisory index](https://cert-portal.siemens.com/productcert/html/index.html)
+- [Rockwell Automation Trust Center — Security Advisories](https://www.rockwellautomation.com/en-us/trust-center/security-advisories.html)
+- [Schneider Electric Cybersecurity Support Portal / PSIRT](https://www.se.com/ww/en/work/support/cybersecurity/overview.jsp)
+- [Honeywell PSIRT / Security Notifications](https://www.honeywell.com/us/en/product-security)
+- [SEL Security Advisories index](https://selinc.com/support/security-advisories/)
+- [Vertiv PSIRT / security advisory index](https://www.vertiv.com/en-us/support/security-advisories/)
+- [Eaton PSIRT advisory index](https://www.eaton.com/us/en-us/company/news-insights/cybersecurity/security-notifications.html)
+- [Claroty Team82 — Evil PLC Attack (Rockwell + Schneider EcoStruxure Control Expert)](https://claroty.com/team82/research/white-papers/evil-plc-attack-weaponizing-plcs)
+- [Claroty Team82 — Stealthy Rockwell PLC Hack (CVE-2022-1161)](https://claroty.com/team82/research/stealthy-rockwell-plc-hack)
+- [Claroty Team82 — ICEFALL Continues: Broken Trust, Broken Code (Honeywell Experion)](https://claroty.com/team82/research/icefall-continues-broken-trust-broken-code)
+- [Claroty Team82 — ModiPwn research (CVE-2021-22779)](https://claroty.com/team82/research/the-race-to-native-code-execution-in-plcs)
+- [Forescout Vedere — OT:ICEFALL research](https://www.forescout.com/research-labs/ot-icefall/)
+- [Dragos — XENOTIME / TRITON profile (SIS engineering-tool archetype)](https://www.dragos.com/threat/xenotime/)
+- [Dragos — PIPEDREAM/CHERNOVITE analysis (engineering-workstation pivot)](https://www.dragos.com/blog/industry-news/chernovite-pipedream-malware-targeting-industrial-control-systems/)
+- [Mandiant — TRITON technical analysis](https://www.mandiant.com/resources/blog/attackers-deploy-new-ics-attack-framework-triton)
+- [Armis — research index](https://www.armis.com/research/)
+- [Nozomi Networks Labs — Avocent ACS 8000 research](https://www.nozominetworks.com/blog/)
+- [MITRE ATT&CK for ICS — T0843 Program Download](https://attack.mitre.org/techniques/T0843/)
+- [MITRE ATT&CK for ICS — T0857 System Firmware](https://attack.mitre.org/techniques/T0857/)
+- [MITRE ATT&CK for ICS — T0873 Project File Infection](https://attack.mitre.org/techniques/T0873/)
+- [MITRE ATT&CK for ICS — T0832 Manipulation of View](https://attack.mitre.org/techniques/T0832/)
+- [MITRE ATT&CK for ICS — T0866 Exploitation of Remote Services](https://attack.mitre.org/techniques/T0866/)
+- [MITRE ATT&CK for ICS — T0822 External Remote Services](https://attack.mitre.org/techniques/T0822/)
+- [MITRE ATT&CK for ICS — T0853 Scripting](https://attack.mitre.org/techniques/T0853/)
+- [MITRE ATT&CK for ICS — T0859 Valid Accounts](https://attack.mitre.org/techniques/T0859/)
+- [IEC 62443 / Purdue reference model](https://www.isa.org/standards-and-publications/isa-standards/isa-iec-62443-series-of-standards)
+- Internal: [Eaton brief](eaton-firmware-threat-brief.md), [APC brief](apc-firmware-threat-brief.md), [Vertiv brief](vertiv-firmware-threat-brief.md), [SEL brief](sel-firmware-threat-brief.md), [Siemens brief](siemens-firmware-threat-brief.md), [Honeywell brief](honeywell-firmware-threat-brief.md), [Schneider brief](schneider-firmware-threat-brief.md), [Rockwell brief](rockwell-firmware-threat-brief.md)

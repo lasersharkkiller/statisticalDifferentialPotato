@@ -38,7 +38,16 @@
 .PARAMETER PriorityMax
   Only act on entries with Priority <= this value (Direct mode).
 
-.PARAMETER WhatIf
+.PARAMETER SourceDir
+  In Drop mode, where to look for downloaded firmware files. Defaults to
+  firmware-staging\APC\incoming\. Set to e.g. $HOME\Downloads to ingest
+  browser-downloaded files directly without manual move.
+
+.PARAMETER KeepSource
+  In Drop mode, copy files into staging instead of moving them. Recommended
+  when SourceDir is the user's Downloads folder so the original is kept.
+
+.PARAMETER WhatIfMode
   Print what would happen without downloading or moving anything.
 #>
 
@@ -48,6 +57,8 @@ param(
     [string]$StagingRoot  = (Join-Path (Split-Path $PSCommandPath -Parent | Split-Path -Parent) '..\firmware-staging\APC'),
     [ValidateSet('Direct','Drop','List')] [string]$Mode = 'List',
     [int]$PriorityMax = 99,
+    [string]$SourceDir,
+    [switch]$KeepSource,
     [switch]$WhatIfMode
 )
 
@@ -62,7 +73,14 @@ if (-not (Test-Path -LiteralPath $StagingRoot)) {
 
 $ManifestPath = (Resolve-Path -LiteralPath $ManifestPath).ProviderPath
 $StagingRoot  = (Resolve-Path -LiteralPath $StagingRoot).ProviderPath
-$IncomingDir  = Join-Path $StagingRoot 'incoming'
+$IncomingDir  = if ($SourceDir) {
+    if (-not (Test-Path -LiteralPath $SourceDir)) {
+        throw "SourceDir not found: $SourceDir"
+    }
+    (Resolve-Path -LiteralPath $SourceDir).ProviderPath
+} else {
+    Join-Path $StagingRoot 'incoming'
+}
 
 $Manifest = Import-Csv -LiteralPath $ManifestPath
 
@@ -132,7 +150,23 @@ function Move-FromIncoming {
     $rawDir = Get-TargetRawDir -Entry $Entry
     $dest = Join-Path $rawDir $Entry.Filename
     if (Test-Path -LiteralPath $dest) {
-        Write-Host ("  [warn] dest already exists, archiving incoming copy: {0}" -f $Entry.Filename) -ForegroundColor Yellow
+        # Compare hashes; if identical, skip silently. Otherwise warn but
+        # NEVER touch the source under -KeepSource (the source is the user's
+        # downloads folder; renaming their files there would be hostile).
+        $srcHash  = (Get-FileHash -LiteralPath $src  -Algorithm SHA256).Hash
+        $destHash = (Get-FileHash -LiteralPath $dest -Algorithm SHA256).Hash
+        if ($srcHash -eq $destHash) {
+            Write-Host ("  [skip] already present (identical hash): {0}" -f $Entry.Filename) -ForegroundColor DarkGray
+            return @{ Status = 'skip-identical' }
+        }
+        if ($KeepSource) {
+            Write-Host ("  [warn] dest exists with different hash, leaving source untouched: {0}" -f $Entry.Filename) -ForegroundColor Yellow
+            Write-Host ("         existing: {0}" -f $destHash.Substring(0,16)) -ForegroundColor DarkYellow
+            Write-Host ("         new:      {0}" -f $srcHash.Substring(0,16)) -ForegroundColor DarkYellow
+            Write-Host ("         resolve manually: archive existing as <name>.vN.ext then move new in") -ForegroundColor DarkYellow
+            return @{ Status = 'dest-exists-different' }
+        }
+        Write-Host ("  [warn] dest exists with different hash, archiving incoming copy: {0}" -f $Entry.Filename) -ForegroundColor Yellow
         Move-Item -LiteralPath $src -Destination ("{0}.dup.{1}" -f $src, (Get-Date -Format yyyyMMddHHmmss))
         return @{ Status = 'dup-archived' }
     }
@@ -141,14 +175,22 @@ function Move-FromIncoming {
         return @{ Status = 'hash-mismatch' }
     }
     if ($WhatIfMode) {
-        Write-Host ("  [dryrun] would move {0} -> {1}" -f $src, $dest) -ForegroundColor Cyan
+        $verb = if ($KeepSource) { 'copy' } else { 'move' }
+        Write-Host ("  [dryrun] would {0} {1} -> {2}" -f $verb, $src, $dest) -ForegroundColor Cyan
         return @{ Status = 'dryrun' }
     }
     New-Item -ItemType Directory -Force -Path $rawDir | Out-Null
-    Move-Item -LiteralPath $src -Destination $dest
-    $size = (Get-Item -LiteralPath $dest).Length
-    Write-Host ("  [move] {0:N0} bytes -> {1}" -f $size, $dest) -ForegroundColor Green
-    return @{ Status = 'moved'; Path = $dest; Bytes = $size }
+    if ($KeepSource) {
+        Copy-Item -LiteralPath $src -Destination $dest
+        $size = (Get-Item -LiteralPath $dest).Length
+        Write-Host ("  [copy] {0:N0} bytes -> {1}" -f $size, $dest) -ForegroundColor Green
+        return @{ Status = 'copied'; Path = $dest; Bytes = $size }
+    } else {
+        Move-Item -LiteralPath $src -Destination $dest
+        $size = (Get-Item -LiteralPath $dest).Length
+        Write-Host ("  [move] {0:N0} bytes -> {1}" -f $size, $dest) -ForegroundColor Green
+        return @{ Status = 'moved'; Path = $dest; Bytes = $size }
+    }
 }
 
 # ----------------------------------------------------------------------
@@ -200,14 +242,23 @@ switch ($Mode) {
         }
         Write-Host ("`nMoved {0} file(s) from incoming/" -f $moved) -ForegroundColor Green
 
-        # Surface unrecognized files in incoming/ so user can update the manifest
+        # Surface firmware-shaped files in SourceDir not matched by the
+        # manifest. Filter aggressively by extension AND by APC-related
+        # name prefix so personal/unrelated files in $HOME\Downloads don't
+        # leak into the output when SourceDir points there.
         $known = @($Manifest | Where-Object { ([int]$_.Priority -le $PriorityMax) } | Select-Object -ExpandProperty Filename)
+        $firmwareExt = @('.exe','.zip','.nmc3','.bin','.fw','.enc','.cab','.msi')
+        $apcKeyword  = @('apc','sumx','rpdu','nmc','smart-ups','smartups','symmetra','galaxy','easy-ups','easyups','back-ups','backups','powerchute','pcss','pcns','ecostruxure','netbotz','inrow','apc_hw','sfnmc','sfpcns','sfpcbe','sfitgw','spd-pcss')
         $unknown = Get-ChildItem -LiteralPath $IncomingDir -File -ErrorAction SilentlyContinue |
-                   Where-Object { $known -notcontains $_.Name }
+                   Where-Object {
+                       $name = $_.Name.ToLowerInvariant()
+                       ($known -notcontains $_.Name) -and
+                       ($firmwareExt -contains $_.Extension.ToLowerInvariant()) -and
+                       ($apcKeyword | Where-Object { $name -like "*$_*" })
+                   }
         if ($unknown) {
-            Write-Host "`nUnknown files in incoming/ (not in manifest):" -ForegroundColor Yellow
+            Write-Host "`nAPC-shaped files not in manifest (consider adding):" -ForegroundColor Yellow
             $unknown | ForEach-Object { Write-Host ("  {0}" -f $_.Name) }
-            Write-Host "Add manifest entries for these or remove them from incoming/."
         }
     }
 }

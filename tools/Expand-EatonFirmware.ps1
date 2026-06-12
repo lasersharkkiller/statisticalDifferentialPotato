@@ -180,15 +180,18 @@ if (-not $sevenZip) {
 
 function Find-InstallerCandidates {
     param([string]$Root)
-    # Any .exe file >=2MB that doesn't yet have a sibling -unpacked dir is a
+    # Any .exe file >=1MB that doesn't yet have a sibling -unpacked dir is a
     # candidate. The extraction loop attempts 7z on each and cleans up empty
     # output, so this can be inclusive without polluting the catalog with
     # false positives. Replaces an older "must be alone with sidecars" rule
     # that missed Intel/SEL driver installers shipped alongside HTML+CSS+GIF
-    # documentation in the same dir.
+    # documentation in the same dir. Threshold was dropped from 2MB to 1MB
+    # after APC NMC1 firmware (apc_hw02_aos394_sumx393.exe, 1.7MB) — a real
+    # InstallShield wrapper carrying 3 .bin firmware payloads — slipped under
+    # the 2MB floor and got skipped, yielding 1 catalog row instead of 8.
     $cands = New-Object System.Collections.Generic.List[System.IO.FileInfo]
     $all = @(Get-ChildItem -LiteralPath $Root -Recurse -File -Filter '*.exe' -ErrorAction SilentlyContinue |
-             Where-Object { $_.Length -gt 2MB })
+             Where-Object { $_.Length -gt 1MB })
     foreach ($e in $all) {
         # sta-unpacked = Eaton .sta block dirs; skip
         if ($e.DirectoryName -match 'sta-unpacked($|[\\/])') { continue }
@@ -226,7 +229,7 @@ if ($installerCandidates.Count -gt 0) {
                     New-Item -ItemType Directory -Path $unpackDir -Force | Out-Null
                     if (-not $Quiet) { Write-Host ("  Extracting {0} ..." -f $exe.Name) -ForegroundColor DarkGray }
                     & $sevenZip x -y "-o$unpackDir" "$($exe.FullName)" *>$null
-                    # Inclusive heuristic now tries 7z on every >2MB .exe;
+                    # Inclusive heuristic now tries 7z on every >1MB .exe;
                     # most are real installers but non-installers produce
                     # near-empty output. Clean up if 7z extracted nothing
                     # useful (only .pdb / readme-style residue) so we don't

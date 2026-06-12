@@ -7,6 +7,19 @@ Findings combine CVE/PSIRT research and direct examination of the extracted NMC 
 *not* large-rootfs Linux devices — they are compact firmware blobs (proprietary RTOS / embedded
 Linux derivative) with an embedded web/SSH/SNMP stack.
 
+**Known coverage gap — Smart-UPS internal MCU firmware (Smart-UPS / SRT / SRTL family).**
+The UPS controller firmware running on the Smart-UPS Online SRT board (SRT5KRMXLI, SRT5KXLT,
+SRT5KRMXLT30, and the rest of the SRT/SRTL line) is **NOT** in this catalog. The staging folder
+exists at `firmware-staging/APC/UPS/Smart-UPS-Online-SRT/raw/` but no binaries have been pulled
+yet. When extracted, this becomes a "Group E. Smart-UPS internal MCU" class — directly analogous
+to [Eaton brief Group D](eaton-firmware-threat-brief.md) (bare-metal UPS MCU `.sta` family).
+This gap matters because **CVE-2022-0715 — the third TLStorm CVE — targets the Smart-UPS internal
+firmware specifically, not the NMC**: it's the signature-check bypass on the firmware-upgrade
+path. Groups A and B reference it as the persistence anchor for the TLStorm chain, but the brief
+has no hashes to match a Smart-UPS internal firmware image against until SRT/SRTL firmware lands
+in staging. See [the Smart-UPS-Online-SRT staging README](../../firmware-staging/APC/UPS/Smart-UPS-Online-SRT/README.md)
+for download pointers and extraction notes.
+
 **Purdue layer mapping:** NMC2/NMC3/Rack PDU 2G live at **Purdue L3.5 (IT/OT Boundary)** as the SNMP+web bridge from corporate IT to OT power infrastructure; PowerChute / EcoStruxure IT runs at **Purdue L3 (Site Operations)**. See [purdue-l35-it-ot-boundary-brief.md](purdue-l35-it-ot-boundary-brief.md) and [purdue-l3-site-operations-brief.md](purdue-l3-site-operations-brief.md) for the cross-vendor views of those layers.
 
 ## Architecture grouping (drives the threat model, not the SKU)

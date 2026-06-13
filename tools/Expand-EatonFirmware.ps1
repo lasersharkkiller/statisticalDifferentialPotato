@@ -191,7 +191,7 @@ function Find-InstallerCandidates {
     # the 2MB floor and got skipped, yielding 1 catalog row instead of 8.
     $cands = New-Object System.Collections.Generic.List[System.IO.FileInfo]
     $all = @(Get-ChildItem -LiteralPath $Root -Recurse -File -Filter '*.exe' -ErrorAction SilentlyContinue |
-             Where-Object { $_.Length -gt 1MB })
+             Where-Object { $_.Length -ge 1MB })
     foreach ($e in $all) {
         # sta-unpacked = Eaton .sta block dirs; skip
         if ($e.DirectoryName -match 'sta-unpacked($|[\\/])') { continue }
@@ -357,7 +357,11 @@ if ($wslAvailable) {
             # .iso added for Siemens TIA Portal + similar installers; 7z
             # handles ISO 9660 / UDF / hybrid natively.
             $isContainer = $_.Extension -in @('.tar','.fw','.img','.rom','.nmc3','.spkg','.fl','.iso')
-            $isBigBin    = $_.Extension -in @('.bin','.gz','.xz') -and $_.Length -gt 1MB
+            # -ge 1MB (not -gt): APC NMC1 apc_hw02_aos_202.bin is exactly
+            # 1048576 bytes (1MB sharp) — a strict-greater-than test ties on
+            # the boundary and misses the file. Inclusive matches user intent
+            # of "at least 1 MB".
+            $isBigBin    = $_.Extension -in @('.bin','.gz','.xz') -and $_.Length -ge 1MB
             $isUsha      = $_.Extension -ieq '.bin' -and (Test-IsUshaFirmware $_)
             $isContainer -or $isBigBin -or $isUsha
         })

@@ -1,7 +1,7 @@
 # APC by Schneider Electric Firmware Attack Surface & Detection Brief
 
 **Scope:** ~5 product lines (NMC2 AP9630/9631/9635, NMC3 AP9640/9641/9643, Rack PDU 2G AP86xx, NMC1 AP9617/9618/9619, Smart-UPS SRT/SRTL/SMT/SMC/SMX/XU/XP family) /
-20,859 unique hashes across 5 architecture classes (plus a 6th Power Infrastructure / L0-L1-adjacent class for the Smart-UPS internal MCU).
+20,906 unique hashes across 5 architecture classes (plus a 6th Power Infrastructure / L0-L1-adjacent class for the Smart-UPS internal MCU).
 Findings combine CVE/PSIRT research and direct examination of the extracted NMC firmware
 (catalog inventory, signed-image headers, embedded web UI strings) plus the full Smart-UPS
 Wizard payload extraction. APC management cards are *not* large-rootfs Linux devices — they
@@ -32,7 +32,7 @@ for download pointers and extraction notes.
 | **B. NMC2 (legacy)** | L3.5 IT/OT Boundary | AP9630, AP9631, AP9635 | Older APC web/SSH stack (Mocana NanoSSL), TLStorm-vulnerable lineage, no enforced signing pre-6.8 | 85 hashes |
 | **C. Rack PDU 2G NMC** | L3.5 IT/OT Boundary (with L1 outlet-actuation control plane) | AP86xx Switched / Metered switched (AP8941, AP8959, AP8861, AP8865 etc.) | NMC variant with outlet-control firmware path; HTTPS/SSH/SNMPv3 + per-outlet control plane | 71 hashes |
 | **D. Windows-side** | L3 Site Operations (PCNS server); L4 corp-IT (PowerChute Personal/Business on user PCs); L3↔L4/L5 (EcoStruxure IT Expert cloud) | PowerChute Network Shutdown (PCNS), PowerChute Business / Personal, PowerChute Serial Shutdown (PCSS), EcoStruxure IT Gateway / Expert | Java + Windows service stack the admin runs; reaches NMC via HTTPS/SNMP | 4,083 rows (PCSS) |
-| **E. NMC1 (legacy)** | L3.5 IT/OT Boundary | AP9617, AP9618, AP9619 | hw02 family, AOS proprietary RTOS, FTP-based unsigned firmware upgrade (`upgrd_util.exe` + `winftp32.dll`), pre-TLStorm signing era | 8 files (3 firmware payloads + upgrade tooling) |
+| **E. NMC1 (legacy)** | L3.5 IT/OT Boundary | AP9617, AP9618, AP9619 | hw02 family, AOS proprietary RTOS, FTP-based unsigned firmware upgrade (`upgrd_util.exe` + `winftp32.dll`), pre-TLStorm signing era | 69 files (3 `.bin` payloads + binwalk-carved PEM certs + DER private keys + SUMX-bundled MIB XML/GIF archive + upgrade tooling) |
 | **F. Smart-UPS internal MCU** | Power Infrastructure (L0/L1-adjacent) | SRT5KRMXLI, SRT5KXLT, SRT5KRMXLT30, SRT3000RMXLI, SRT8KXLI, SRT10KXLI, SRTL3K/5K/6KRMXLI (Li-Ion), SMT1500RM2UC, SMC1500, SMX/XU/XP | APC proprietary Cadillac/CBL chipset; `.enc` signed payload post-CVE-2022-0715, raw `.bin` pre-fix; Cadillac CBL `.img` updater is binwalk-opaque | 20,369 rows (Smart-UPS Wizard) |
 
 ---
@@ -123,7 +123,7 @@ If a Windows admin host runs PowerChute / EcoStruxure IT below the current PSIRT
 
 ## Group E — NMC1 AP961x (legacy NMC, pre-TLStorm signing era) — Purdue L3.5 (IT/OT Boundary)
 
-The 8-file NMC1 catalog covers AP9617 / AP9618 / AP9619 — the original hw02-family management cards that pre-date the signed-firmware regime entirely. The catalog includes the three firmware payloads (`apc_hw02_aos_202.bin`, `apc_hw02_aos_394.bin`, `apc_hw02_sumx_393.bin` — AOS 2.0.2, AOS 3.9.4, and the SUMX 3.9.3 UPS application module) plus the FTP-based upgrade tooling (`upgrd_util.exe`, `winftp32.dll`, `config.txt`, `go.bat`, `iplist.txt`). These cards run an APC proprietary AOS RTOS — there is no embedded Linux, no ECDSA signing, no Trusted Platform boot. They are directly analogous to [Eaton brief Group C](eaton-firmware-threat-brief.md) (Legacy NMC NmcKA / inmc family).
+The 69-file NMC1 catalog covers AP9617 / AP9618 / AP9619 — the original hw02-family management cards that pre-date the signed-firmware regime entirely. The catalog includes the three firmware payloads (`apc_hw02_aos_202.bin`, `apc_hw02_aos_394.bin`, `apc_hw02_sumx_393.bin` — AOS 2.0.2, AOS 3.9.4, and the SUMX 3.9.3 UPS application module), the FTP-based upgrade tooling (`upgrd_util.exe`, `winftp32.dll`, `config.txt`, `go.bat`, `iplist.txt`), and — critically — the **discrete inner artifacts** that binwalk surfaced from inside the `.bin` payloads: **device-shipped PEM certificates, DER-encoded private keys**, the SUMX SNMP MIB definitions (a ZIP archive of XML files named per UPS model + sensor — `power_ups_mxsu_3h.xml`, `env_mon_emups_3b.xml`, `env_sensor_inpint_3b.xml`, etc.), embedded web-UI HTML pages, and the GIF icon set rendered in the legacy web UI. These cards run an APC proprietary AOS RTOS — there is no embedded Linux, no ECDSA signing, no Trusted Platform boot. They are directly analogous to [Eaton brief Group C](eaton-firmware-threat-brief.md) (Legacy NMC NmcKA / inmc family).
 
 **Direct attack surface (verified via extracted hw02 payload + upgrade-utility strings):**
 
@@ -137,6 +137,7 @@ SNMPv1/v2c (community public/private) · default `apc`/`apc` web UI superuser ·
 - **Unsigned FTP firmware push.** `upgrd_util.exe` drives `winftp32.dll` to PUT the raw `apc_hw02_*.bin` payload over FTP. There is no signature check on the card — any `.bin` of the right header shape is accepted as legitimate firmware. This is the pre-CVE-2022-0715 baseline behavior: the bug class doesn't need a CVE because there is no signing to bypass.
 - **SNMPv1 default communities + Telnet/HTTP cleartext.** Credentials and config writes traverse the wire in plaintext; sniff anywhere on the management LAN.
 - **Cannot be patched to a signed-firmware state.** Latest AOS for hw02 is 3.9.4 / SUMX 3.9.3 — APC never backported signed-firmware support to NMC1. The only defense is network isolation and detection.
+- **Inner-artifact hash matching as a defense.** Because the binwalk pass surfaced device-shipped PEM certs, DER private keys, and the SUMX MIB XML files as individual catalog rows, the differential analysis stage can hash-match *inner* artifacts — not just the outer `.bin`. An attacker who repacks a `.bin` to preserve the outer hash (padding tricks, mid-file substitution) still trips a per-cert / per-MIB mismatch. The cert/key set is especially diagnostic: a single PEM swap is enough to fail the match and is unrecoverable without re-flashing.
 
 **Top attack vector (MITRE ATT&CK ICS):** [T0857 System Firmware](https://attack.mitre.org/techniques/T0857/) via unauthenticated FTP push — no exploit chain required, the upgrade path *itself* is the persistence mechanism. Chains naturally with [T0812 Default Credentials](https://attack.mitre.org/techniques/T0812/) for the first hop.
 
@@ -193,9 +194,11 @@ Top 8 — ordered by detection value per ingest dollar:
 
 4. **PowerChute / Smart-UPS Wizard as the lateral path.** PowerChute and wizard hosts hold credentials/TLS trust to every NMC they manage, plus direct flash-channel access to every Smart-UPS internal MCU they serve. CVE-2021-22812 deserialization on PowerChute Business Edition → push tampered NMC firmware (Groups A/B/C/E) via the legitimate update channel → CVE-2022-0715-style persistence on every card, and via the wizard flash channel → tampered Cadillac/CBL payload on every Smart-UPS (Group F).
 
-5. **NMC1 hw02 cannot be patched to a signed-firmware state.** The 8-file Group E catalog represents the highest-trust deployable firmware APC ever shipped for AP9617/18/19 — and it still has no signing, no TLS, and default `apc`/`apc`. Treat any AP961x card on a routable LAN as already compromised for threat-modeling purposes; isolation is the only mitigation.
+5. **NMC1 hw02 cannot be patched to a signed-firmware state.** The 69-file Group E catalog represents the highest-trust deployable firmware APC ever shipped for AP9617/18/19 — and it still has no signing, no TLS, and default `apc`/`apc`. Treat any AP961x card on a routable LAN as already compromised for threat-modeling purposes; isolation is the only mitigation.
 
 6. **Cadillac CBL `.img` updater is binwalk-opaque.** Do not chase further extraction — track the single SHA-256 from the Smart-UPS Wizard distribution. Any divergence from the wizard-shipped hash on an admin host = tampering, full stop. This is the cheapest high-signal detection in the entire Group F surface.
+
+7. **Device-shipped PEM certs + SUMX MIB definitions are now IOC anchors.** The binwalk deep-extract of the three NMC1 `.bin` payloads put the PEM certificates, DER-encoded private keys, and SUMX SNMP MIB XML files into the catalog as **individual rows**. This is exactly the artifact set that shows up in published APC NMC compromise reports — tampered certs (re-issued so an attacker's MITM cert validates) and modified MIB definitions (to redefine OIDs, hide compromised state, or misreport battery/load telemetry). Differential analysis on the Group E catalog can now detect either tamper class **even when the outer `.bin` hash is preserved**. Treat any PEM / DER / MIB-XML hash mismatch on a deployed AP961x card as a CRITICAL IOC and trigger isolation + forensic capture immediately.
 
 ---
 

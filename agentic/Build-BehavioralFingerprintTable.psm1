@@ -967,8 +967,29 @@ function Write-DetailedReportHtml {
   .summary-card { background:white; padding:15px; border-radius:5px; box-shadow:0 1px 3px rgba(0,0,0,.1); margin-bottom:20px; }
   .hash-cell { font-family: 'Consolas','Monaco',monospace; font-size:.85rem; }
   .chip { display:inline-block; padding:2px 6px; margin:2px; background:#eef2ff; color:#3730a3; border:1px solid #c7d2fe; border-radius:4px; font-size:.78rem; word-break:break-all; }
+  /* Default (verdict-unknown context) chip palette - red MITRE / yellow cmd */
   .chip-mitre { background:#fee2e2; color:#991b1b; border-color:#fca5a5; }
   .chip-cmd { background:#fef3c7; color:#92400e; border-color:#fcd34d; font-family:'Consolas','Monaco',monospace; }
+
+  /* Verdict-aware chip recoloring: when a detail panel is wrapped in
+     .vctx-clean / -suspicious / -malicious, all chips inside take the
+     palette appropriate for that verdict. msiexec.exe etc. on a clean
+     baseline row -> green chips (normal envelope), not red/yellow alerts. */
+  .vctx-clean .chip            { background:#dcfce7; color:#166534; border-color:#86efac; }
+  .vctx-clean .chip-mitre      { background:#dcfce7; color:#166534; border-color:#86efac; }
+  .vctx-clean .chip-cmd        { background:#dcfce7; color:#166534; border-color:#86efac; font-family:'Consolas','Monaco',monospace; }
+
+  .vctx-suspicious .chip       { background:#fef9c3; color:#854d0e; border-color:#fde047; }
+  .vctx-suspicious .chip-mitre { background:#fef3c7; color:#92400e; border-color:#fcd34d; }
+  .vctx-suspicious .chip-cmd   { background:#fef9c3; color:#854d0e; border-color:#fde047; font-family:'Consolas','Monaco',monospace; }
+
+  .vctx-malicious .chip        { background:#fee2e2; color:#991b1b; border-color:#fca5a5; }
+  .vctx-malicious .chip-mitre  { background:#fecaca; color:#7f1d1d; border-color:#f87171; }
+  .vctx-malicious .chip-cmd    { background:#fee2e2; color:#991b1b; border-color:#fca5a5; font-family:'Consolas','Monaco',monospace; }
+
+  .vctx-unknown .chip          { background:#e0e7ff; color:#3730a3; border-color:#c7d2fe; }
+  .vctx-unknown .chip-mitre    { background:#e0e7ff; color:#3730a3; border-color:#c7d2fe; }
+  .vctx-unknown .chip-cmd      { background:#e2e8f0; color:#334155; border-color:#cbd5e1; font-family:'Consolas','Monaco',monospace; }
   .verdict-clean      { background:#dcfce7; color:#166534; padding:2px 6px; border-radius:4px; font-size:.78rem; }
   .verdict-suspicious { background:#fef3c7; color:#92400e; padding:2px 6px; border-radius:4px; font-size:.78rem; }
   .verdict-malicious  { background:#fee2e2; color:#991b1b; padding:2px 6px; border-radius:4px; font-size:.78rem; }
@@ -1045,6 +1066,12 @@ function Write-DetailedReportHtml {
   MITRE ATT&amp;CK techniques, Sigma rules, YARA rules. Use the per-column filter inputs (under the
   column headers) to narrow by File Name, OS, Signer, or Verdict independently. Multi-term searches are
   AND-joined (e.g. <code>iFix 8.8.8.8</code> finds iFIX binaries that contacted 8.8.8.8 in sandbox).
+  <br><strong>Chip color = row verdict:</strong>
+  <span class='badge bg-success'>green = clean baseline</span> (this IS normal for this binary) ·
+  <span class='badge bg-warning text-dark'>yellow = suspicious</span> ·
+  <span class='badge bg-danger'>red = malicious</span> ·
+  <span class='badge bg-primary'>blue = unknown</span>.
+  In a known-good NSRL / OT vendor report the typical chip color is green - msiexec.exe MITRE techniques on a clean row are informational baseline, not alert.
 </div>
 
 <table id='fp-table' class='table table-striped table-hover' style='width:100%'>
@@ -1122,7 +1149,14 @@ function Write-DetailedReportHtml {
       ['Yara Tags',          chips(r.yara, '')]
     ];
     var open = ['Parent Processes','Child Processes','Command Executions','MITRE Techniques'];
-    var out = '<div class="p-3">';
+    // Map row verdict to chip-color context class. msiexec.exe etc. on a
+    // clean baseline row get green chips ("this IS normal for this binary")
+    // rather than the malware-report-style red MITRE / yellow cmd alerts.
+    var vctx = 'vctx-unknown';
+    if (r.verdict === 'Clean')      vctx = 'vctx-clean';
+    if (r.verdict === 'Suspicious') vctx = 'vctx-suspicious';
+    if (r.verdict === 'Malicious')  vctx = 'vctx-malicious';
+    var out = '<div class="p-3 ' + vctx + '">';
     sections.forEach(function(s){
       var isOpen = open.indexOf(s[0]) >= 0;
       out += '<details'+(isOpen?' open':'')+'><summary>'+s[0]+'</summary><div class="col-section">'+s[1]+'</div></details>';

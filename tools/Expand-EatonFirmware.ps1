@@ -356,14 +356,37 @@ if ($wslAvailable) {
             # with embedded kernel + gzipped rootfs + DER private keys.
             # .iso added for Siemens TIA Portal + similar installers; 7z
             # handles ISO 9660 / UDF / hybrid natively.
-            $isContainer = $_.Extension -in @('.tar','.fw','.img','.rom','.nmc3','.spkg','.fl','.iso')
+            # .run added for Linux self-extracting installers (Makeself /
+            # BitRock-style); Inductive Automation Ignition Gateway Linux
+            # installer is a 2GB Makeself archive carrying bundled JRE +
+            # install tree.
+            $isContainer = $_.Extension -in @('.tar','.fw','.img','.rom','.nmc3','.spkg','.fl','.iso','.run')
             # -ge 1MB (not -gt): APC NMC1 apc_hw02_aos_202.bin is exactly
             # 1048576 bytes (1MB sharp) — a strict-greater-than test ties on
             # the boundary and misses the file. Inclusive matches user intent
             # of "at least 1 MB".
             $isBigBin    = $_.Extension -in @('.bin','.gz','.xz') -and $_.Length -ge 1MB
             $isUsha      = $_.Extension -ieq '.bin' -and (Test-IsUshaFirmware $_)
-            $isContainer -or $isBigBin -or $isUsha
+            # 7z output convention: when a PE file is unpacked, the bulk
+            # payload often comes out named "[0]", "[1]", etc. — no extension
+            # at all. Maple Systems EBPro_Setup_v61001510.exe (1.9GB BitRock
+            # InstallBuilder wrapper) is the canonical example: Step 4 7z
+            # produces a 1.9GB [0] slice that binwalk cracks into MSI +
+            # signed PE + DER cert + JPEG content but Step 6 was missing it
+            # because the slice has no extension. Match basename "[\d+]".
+            $isSlice     = $_.Name -match '^\[\d+\]$' -and $_.Length -ge 1MB
+            # Big .exe files Step 4 couldn't crack (7z returns "Cannot open
+            # the file as archive" on certain InstallShield bundles):
+            # Maple Systems MAPware-7000 setup.exe is 733MB and 7z bails.
+            # Treat any .exe >= 100MB without a -unpacked sibling as a Step 6
+            # candidate so binwalk can carve embedded payloads (.cab, MSI,
+            # signed PE, etc.) that an InstallShield wrapper hides.
+            $isBigOpaqueExe = $false
+            if ($_.Extension -ieq '.exe' -and $_.Length -ge 100MB) {
+                $sibUnpack = Join-Path $_.DirectoryName ($_.BaseName + '-unpacked')
+                $isBigOpaqueExe = -not (Test-Path -LiteralPath $sibUnpack)
+            }
+            return ($isContainer -or $isBigBin -or $isUsha -or $isSlice -or $isBigOpaqueExe)
         })
     if (-not $Quiet) {
         Write-Host ""

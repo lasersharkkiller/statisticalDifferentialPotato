@@ -167,6 +167,21 @@ extract_one() {
                 rm -rf "$out"; return 0
             fi
             ;;
+        *"Makeself"*|*"self-executable archive"*)
+            # Linux self-extracting archive (Makeself / BitRock-style).
+            # Inductive Automation Ignition Gateway Linux installer is a
+            # 2 GB Makeself archive carrying the bundled JRE + entire
+            # Ignition install tree. --noexec --target extracts the inner
+            # payload without running the installer logic. The payload is
+            # itself a tar.gz that the bash recursion will then unpack via
+            # its gzip + tar handlers.
+            out="$outdir/makeself"
+            mkdir -p "$out"
+            sh "$input" --noexec --target "$out" >/dev/null 2>&1 || true
+            if [ -z "$(ls -A "$out" 2>/dev/null)" ]; then
+                rm -rf "$out"; return 0
+            fi
+            ;;
         *"DOS/MBR boot sector"*)
             # FAT12/16/32 volume. 7z handles all variants. Reports non-zero
             # exit on volumes without a real MBR (Eaton's .data_img has none)

@@ -13,6 +13,7 @@ Import-Module -Name ".\baseline\VTBaseline.psm1"
 Import-Module -Name ".\baseline\AptMasterIntelVT.psm1"
 Import-Module -Name ".\baseline\OtBaseline.psm1"
 Import-Module -Name ".\agentic\Build-VTFidelityIndex.psm1"
+Import-Module -Name ".\agentic\Build-BehavioralFingerprintTable.psm1"
 Import-Module -Name ".\purpleTeaming\GetVTDetectionsFromList.psm1"
 Import-Module -Name ".\baseline\OrganizeBaselines.psm1"
 Import-Module -Name ".\purpleTeaming\GetDedupHashesToSha256.psm1"
@@ -51,6 +52,9 @@ Write-Host "1e) Pull VT YARA + Sigma Detections for a List of Hashes" -Foregroun
 Write-Host "1f) Organize Local Baselines (move + dedupe across categories)" -ForegroundColor DarkCyan
 Write-Host "1g) Dedup IOC List by SHA256 (normalize MD5/SHA1 -> SHA256 via VT)" -ForegroundColor DarkCyan
 Write-Host "1h) Filter MalwareBazaar Hashes from IOC List" -ForegroundColor DarkCyan
+Write-Host "1i) Build Behavioral Fingerprint Tables  (per-dataset known-good 'what is normal' reference)" -ForegroundColor DarkCyan
+Write-Host "     -> Inverse-differential complement to the malware/APT Detailed_Report.html" -ForegroundColor DarkGray
+Write-Host "     -> Generates Master_Intel.csv + Detailed_Report.html + behaviors_index.json per dataset" -ForegroundColor DarkGray
 Write-Host ""
 
 # -- GROUP 2: Static/Dynamic Differentials ------------------------------------
@@ -178,6 +182,9 @@ elseif ($functionChoice -eq "1g") {
 }
 elseif ($functionChoice -eq "1h") {
     Get-RemoveMalwareBazaarEntries
+}
+elseif ($functionChoice -eq "1i") {
+    Build-BehavioralFingerprintTable
 }
 
 # -- GROUP 2: Static/Dynamic Differentials ------------------------------------

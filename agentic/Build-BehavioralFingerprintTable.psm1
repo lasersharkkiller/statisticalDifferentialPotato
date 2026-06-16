@@ -1038,6 +1038,15 @@ function Write-DetailedReportHtml {
   <span class='text-muted small ms-3'>Click any row to expand the full behavior detail.</span>
 </div>
 
+<div class='alert alert-info py-2 px-3 mb-3 small'>
+  <strong>Search tips:</strong> the global search box (top right of table) hits every behavioral dimension —
+  hash, filename, signer, OS, verdict, parent/child processes, command lines, files opened/written/dropped,
+  registry keys, DNS lookups, IPs, HTTP destinations, modules loaded, mutexes, services, scheduled tasks,
+  MITRE ATT&amp;CK techniques, Sigma rules, YARA rules. Use the per-column filter inputs (under the
+  column headers) to narrow by File Name, OS, Signer, or Verdict independently. Multi-term searches are
+  AND-joined (e.g. <code>iFix 8.8.8.8</code> finds iFIX binaries that contacted 8.8.8.8 in sandbox).
+</div>
+
 <table id='fp-table' class='table table-striped table-hover' style='width:100%'>
   <thead>
     <tr>
@@ -1122,6 +1131,21 @@ function Write-DetailedReportHtml {
     return out;
   }
   var data = decodePayload();
+  // searchBlob = every multi-value behavioral dimension joined into one string,
+  // exposed as a hidden DataTables column. The default global search hits all
+  // columns including hidden ones, so concatenating here makes the entire
+  // expanded-row detail searchable (DNS, IPs, parents, children, DLLs, MITRE,
+  // registry keys, mutexes, services, scheduled tasks, sigma, yara, cmd lines).
+  function buildSearchBlob(r){
+    var parts = [
+      r.hash, r.file, r.os, r.signer, r.verdict, r.type, r.first, r.path
+    ];
+    var multi = ['parents','children','cmds','f_open','f_write','f_drop',
+                 'rk_set','rk_open','rk_del','dns','ip','http','modules',
+                 'mutex','svc','sched','mitre','sigma','yara'];
+    multi.forEach(function(k){ if (r[k] && r[k].length) parts.push(r[k].join(' ')); });
+    return parts.filter(Boolean).join(' ').toLowerCase();
+  }
   var rows = data.map(function(r){ return [
     '<span class="dt-control">+</span>',
     hashCell(r.hash),
@@ -1134,22 +1158,66 @@ function Write-DetailedReportHtml {
     esc(r.type),
     r.size || '',
     esc(r.first),
-    esc(r.path)
+    esc(r.path),
+    buildSearchBlob(r)
   ]; });
   var table = new DataTable('#fp-table', {
     data: rows,
     columns: [
-      { className:'dt-control', orderable:false, defaultContent:'+' },
+      { className:'dt-control', orderable:false, defaultContent:'+', searchable:false },
       { title:'Hash' }, { title:'File Name' }, { title:'OS Name' },
       { title:'Signer' }, { title:'Verdict' },
       { title:'Detections' }, { title:'Engines' },
       { title:'Type', visible:false },
       { title:'Size', visible:false },
       { title:'First Seen', visible:false },
-      { title:'Path', visible:false }
+      { title:'Path', visible:false },
+      { title:'AllBehaviors', visible:false, orderable:false }
     ],
     pageLength: 25,
-    order: [[5,'asc'],[2,'asc']]
+    order: [[5,'asc'],[2,'asc']],
+    language: {
+      search: '',
+      searchPlaceholder: 'Search hash, filename, signer, DNS, IP, parent/child process, DLL, registry key, MITRE technique...'
+    },
+    initComplete: function(){
+      // Per-column filter inputs in a second header row (under the column titles).
+      // Only attach to visible-by-default columns; the hidden columns are covered
+      // by the global search via the AllBehaviors blob. Vanilla JS — DataTables 2
+      // is not jQuery-dependent.
+      var api = this.api();
+      var filterCols = [2,3,4,5]; // File Name, OS Name, Signer, Verdict
+      var thead = document.querySelector('#fp-table thead');
+      if (!thead) return;
+      var filterRow = document.createElement('tr');
+      filterRow.className = 'col-filters';
+      var visibleColumnCount = api.columns().visible().toArray().filter(Boolean).length;
+      // Build one <th> per visible column so the alignment matches.
+      api.columns().every(function(){
+        var idx = this.index();
+        if (!this.visible()) return;
+        var th = document.createElement('th');
+        if (filterCols.indexOf(idx) >= 0) {
+          var title = (this.header().textContent || '').trim();
+          var input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'form-control form-control-sm col-filter';
+          input.dataset.col = idx;
+          input.placeholder = 'Filter ' + title + '...';
+          input.addEventListener('keyup', function(){
+            var col = api.column(idx);
+            if (col.search() !== this.value) col.search(this.value).draw();
+          });
+          input.addEventListener('change', function(){
+            var col = api.column(idx);
+            if (col.search() !== this.value) col.search(this.value).draw();
+          });
+          th.appendChild(input);
+        }
+        filterRow.appendChild(th);
+      });
+      thead.appendChild(filterRow);
+    }
   });
   // Expand-on-click
   document.querySelector('#fp-table tbody').addEventListener('click', function(ev){

@@ -213,7 +213,9 @@ function Get-ThreatActorIOCs {
             @{ Name = "APT1"; Country = "China"; Type = "APT"; Aliases = @("APT1", "Comment Crew", "Comment Panda"); LinkedTools = @("PoisonIvy", "PlugX") },
             @{ Name = "APT10"; Country = "China"; Type = "APT"; Aliases = @("APT10", "Stone Panda", "MenuPass"); LinkedTools = @("PlugX", "QuasarRAT", "Chisel") },
             @{ Name = "APT27"; Country = "China"; Type = "APT"; Aliases = @("APT27", "Emissary Panda", "LuckyMouse"); LinkedTools = @("PlugX", "HyperBro", "Fscan") },
+            @{ Name = "APT30"; Country = "China"; Type = "APT"; Aliases = @("APT30", "Naikon", "Lotus Panda"); LinkedTools = @("PlugX", "Sumatra") },
             @{ Name = "APT31"; Country = "China"; Type = "APT"; Aliases = @("APT31", "Zirconium", "Judgment Panda"); LinkedTools = @("SOGU", "LuckyBird") },
+            @{ Name = "APT40"; Country = "China"; Type = "APT"; Aliases = @("APT40", "Leviathan", "Hainan Xiandun", "Kryptonite Panda", "TEMP.Periscope", "MUDCARP", "Bronze Mohawk", "GADOLINIUM"); LinkedTools = @("AIRBREAK", "ScanBox", "China Chopper") },
             @{ Name = "APT41"; Country = "China"; Type = "APT"; Aliases = @("APT41", "Barium", "Winnti", "Wicked Panda"); LinkedTools = @("ShadowPad", "Cobalt Strike", "Winnti", "EarthWorm") },
             @{ Name = "Aquatic Panda"; Country = "China"; Type = "APT"; Aliases = @("Aquatic Panda", "Earth Lusca"); LinkedTools = @("ShadowPad", "Winnti") },
             @{ Name = "BlackTech"; Country = "China"; Type = "APT"; Aliases = @("BlackTech", "Palmerworm"); LinkedTools = @("Kivars", "Pled", "Consock") },
@@ -230,6 +232,7 @@ function Get-ThreatActorIOCs {
             @{ Name = "APT33"; Country = "Iran"; Type = "APT"; Aliases = @("APT33", "Elfin", "Holmium") },
             @{ Name = "APT34 (OilRig)"; Country = "Iran"; Type = "APT"; Aliases = @("APT34", "OilRig", "Helix Kitten") },
             @{ Name = "APT35 (Charming Kitten)"; Country = "Iran"; Type = "APT"; Aliases = @("APT35", "Charming Kitten", "Phosphorus") },
+            @{ Name = "APT39"; Country = "Iran"; Type = "APT"; Aliases = @("APT39", "Chafer", "Remix Kitten", "ITG07"); LinkedTools = @("Remexi") },
             @{ Name = "APT42"; Country = "Iran"; Type = "APT"; Aliases = @("APT42", "Mint Sandstorm", "TA453") },
             @{ Name = "Cleaver"; Country = "Iran"; Type = "APT"; Aliases = @("Cleaver", "Operation Cleaver") },
             @{ Name = "CyberAv3ngers"; Country = "Iran"; Type = "APT"; Aliases = @("CyberAv3ngers") },
@@ -241,7 +244,7 @@ function Get-ThreatActorIOCs {
             @{ Name = "APT37"; Country = "NorthKorea"; Type = "APT"; Aliases = @("APT37", "Reaper", "ScarCruft") },
             @{ Name = "APT38"; Country = "NorthKorea"; Type = "APT"; Aliases = @("APT38", "BlueNoroff", "BeagleBoyz") },
             @{ Name = "Famous Chollima"; Country = "NorthKorea"; Type = "APT"; Aliases = @("Famous Chollima", "Nickel Tapestry") },
-            @{ Name = "Kimsuky"; Country = "NorthKorea"; Type = "APT"; Aliases = @("Kimsuky", "Velvet Chollima", "Black Banshee") },
+            @{ Name = "Kimsuky"; Country = "NorthKorea"; Type = "APT"; Aliases = @("Kimsuky", "APT43", "Velvet Chollima", "Black Banshee", "Thallium", "Sparkling Pisces") },
             @{ Name = "Lazarus"; Country = "NorthKorea"; Type = "APT"; Aliases = @("Lazarus Group", "Hidden Cobra", "Zinc"); LinkedTools = @("Manuscrypt", "Mimikatz") },
             @{ Name = "Konni Group"; Country = "NorthKorea"; Type = "APT"; Aliases = @("Konni Group", "TA406"); LinkedTools = @("Konni RAT", "Amadey") },
             @{ Name = "UNC5454"; Country = "NorthKorea"; Type = "APT"; Aliases = @("UNC5454") },
@@ -251,7 +254,7 @@ function Get-ThreatActorIOCs {
             @{ Name = "APT28"; Country = "Russia"; Type = "APT"; Aliases = @("APT28", "Fancy Bear", "Forest Blizzard"); LinkedTools = @("Mimikatz", "Impacket", "Chisel") },
             @{ Name = "APT29"; Country = "Russia"; Type = "APT"; Aliases = @("APT29", "Cozy Bear", "Midnight Blizzard") },
             @{ Name = "Gamaredon"; Country = "Russia"; Type = "APT"; Aliases = @("Gamaredon", "Primitive Bear", "Shuckworm") },
-            @{ Name = "Sandworm"; Country = "Russia"; Type = "APT"; Aliases = @("Sandworm", "Voodoo Bear", "Seashell Blizzard"); LinkedTools = @("DynoWiper", "BlackEnergy", "Industroyer", "Chisel") },
+            @{ Name = "Sandworm"; Country = "Russia"; Type = "APT"; Aliases = @("Sandworm", "APT44", "Voodoo Bear", "Seashell Blizzard", "Iridium", "Telebots", "UAC-0113"); LinkedTools = @("DynoWiper", "BlackEnergy", "Industroyer", "Chisel", "WAVESIGN", "Infamous Chisel") },
             @{ Name = "Silence"; Country = "Russia"; Type = "APT"; Aliases = @("Silence", "Whisper Spider") },
             @{ Name = "Star Blizzard"; Country = "Russia"; Type = "APT"; Aliases = @("Star Blizzard", "ColdRiver", "Callisto") },
             @{ Name = "Turla"; Country = "Russia"; Type = "APT"; Aliases = @("Turla", "Venomous Bear", "Waterbug") },
@@ -262,6 +265,9 @@ function Get-ThreatActorIOCs {
             @{ Name = "APT32"; Country = "Vietnam"; Type = "APT"; Aliases = @("APT32", "OceanLotus"); LinkedTools = @("Cobalt Strike", "Kerrdown") },
             @{ Name = "Blind Eagle"; Country = "SouthAmerica"; Type = "APT"; Aliases = @("Blind Eagle", "APT-C-36") },
             @{ Name = "Huna"; Country = "Vietnam"; Type = "APT"; Aliases = @("Huna", "Huna Phishing", "PXA Stealer Group"); LinkedTools = @("PureRAT", "PureLogs", "PXA Stealer", "PureHVNC") },
+
+            # === PAKISTAN ===
+            @{ Name = "APT36"; Country = "Pakistan"; Type = "APT"; Aliases = @("APT36", "Transparent Tribe", "Mythic Leopard", "Earth Karkaddan", "ProjectM", "COPPER FIELDSTONE"); LinkedTools = @("Crimson RAT", "Capra RAT", "ObliqueRAT", "ElizaRAT", "Poseidon") },
 
             # === E-CRIME ===
             @{ Name = "TA584"; Country = "eCrime"; Type = "APT"; Aliases = @("TA584", "Storm-0900", "UNC4122"); LinkedTools = @("Tsundere Bot", "XWorm", "SharpHide", "ClickFix") },
@@ -481,6 +487,8 @@ function Get-ThreatActorIOCs {
             # --- Sandworm ---
             @{ Name = "BlackEnergy";      Type = "Malware"; Aliases = @("BlackEnergy", "BlackEnergy2", "BlackEnergy3", "Quedagh", "Backdoor.Quedagh") },
             @{ Name = "Industroyer";      Type = "Malware"; Aliases = @("Industroyer", "Industroyer2", "CrashOverride", "Crash Override") },
+            @{ Name = "WAVESIGN";         Type = "Malware"; Aliases = @("WAVESIGN", "Wave Sign", "Wavesign") },
+            @{ Name = "Infamous Chisel";  Type = "Malware"; Aliases = @("Infamous Chisel", "InfamousChisel") },
             # --- APT1 ---
             @{ Name = "PoisonIvy";        Type = "Malware"; Aliases = @("PoisonIvy", "Poison Ivy", "Backdoor.PoisonIvy") },
 

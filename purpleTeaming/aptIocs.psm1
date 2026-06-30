@@ -189,7 +189,7 @@ function Get-ThreatActorIOCs {
         [switch]$EnableThreatFox = $true,
         [switch]$EnableMalwareBazaar = $true,
         [switch]$EnableURLhaus = $false,
-        [switch]$EnableOTX = $false
+        [switch]$EnableOTX = $true
     )
 
     process {

@@ -897,8 +897,15 @@ function Get-ThreatActorIOCs {
 
                 $UniqueSet | Export-Csv -Path $OutFile -NoTypeInformation -Encoding UTF8
 
+                # Report actual unique additions, not the raw pre-dedup pull
+                # count. The community feeds (ThreatFox, MalwareBazaar, etc.)
+                # return all tag-matching IOCs every run, so $Raw_IOCs.Count is
+                # an inbound-volume number and most rows usually collide with
+                # existing values - showing it as "New" is misleading.
+                $priorTotal = if ($ExistingData) { @($ExistingData).Count } else { 0 }
+                $actualNew  = $UniqueSet.Count - $priorTotal
                 Write-Host " -> SAVED: $OutFile" -ForegroundColor Cyan
-                Write-Host "    New: $($Raw_IOCs.Count) | Total: $($UniqueSet.Count)" -ForegroundColor Gray
+                Write-Host ("    New: {0} | Fetched: {1} | Total: {2}" -f $actualNew, $Raw_IOCs.Count, $UniqueSet.Count) -ForegroundColor Gray
             } else {
                 Write-Host " -> No new data found. Existing data preserved." -ForegroundColor Gray
             }

@@ -253,10 +253,15 @@ function Get-AptHashRecords {
         if (-not $row.IOCType -or -not $row.IOCValue) { continue }
         $type  = ($row.IOCType).Trim().ToUpperInvariant()
         $value = ($row.IOCValue).Trim()
+        # Cybersixgill (and some other feeds) emit IOCType="Hash" without
+        # specifying which hash algorithm. Accept any of MD5 / SHA1 / SHA256
+        # by length; VT's /v3/files/{hash} endpoint auto-detects all three.
+        $hashRe = '^[0-9a-fA-F]{32}$|^[0-9a-fA-F]{40}$|^[0-9a-fA-F]{64}$'
         $valid = switch ($type) {
             'SHA256' { $value -match '^[0-9a-fA-F]{64}$' }
             'SHA1'   { $value -match '^[0-9a-fA-F]{40}$' }
             'MD5'    { $value -match '^[0-9a-fA-F]{32}$' }
+            'HASH'   { $value -match $hashRe }
             default  { $false }
         }
         if (-not $valid) { continue }

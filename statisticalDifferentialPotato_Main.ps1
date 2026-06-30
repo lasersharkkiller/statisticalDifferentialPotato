@@ -18,6 +18,7 @@ Import-Module -Name ".\purpleTeaming\GetVTDetectionsFromList.psm1"
 Import-Module -Name ".\baseline\OrganizeBaselines.psm1"
 Import-Module -Name ".\purpleTeaming\GetDedupHashesToSha256.psm1"
 Import-Module -Name ".\purpleTeaming\GetRemoveMalwareBazaarEntries.psm1"
+Import-Module -Name ".\purpleTeaming\aptIocs.psm1"
 
 # Group 2: Static/Dynamic Differentials (was Group 16 in Loaded-Potato)
 Import-Module -Name ".\baseline\maliciousDifferential.psm1"
@@ -55,6 +56,9 @@ Write-Host "1h) Filter MalwareBazaar Hashes from IOC List" -ForegroundColor Dark
 Write-Host "1i) Build Behavioral Fingerprint Tables  (per-dataset known-good 'what is normal' reference)" -ForegroundColor DarkCyan
 Write-Host "     -> Inverse-differential complement to the malware/APT Detailed_Report.html" -ForegroundColor DarkGray
 Write-Host "     -> Generates Master_Intel.csv + Detailed_Report.html + behaviors_index.json per dataset" -ForegroundColor DarkGray
+Write-Host "1j) Harvest IOCs per Threat Actor / Malware Family  (VT Intel + ThreatFox + MalwareBazaar + URLhaus + OTX + Cybersixgill)" -ForegroundColor DarkCyan
+Write-Host "     -> Populates apt\APTs\<Country>\<Actor>\<Actor>_Master_Intel.csv from threat-intel feeds" -ForegroundColor DarkGray
+Write-Host "     -> Run BEFORE 1a's 'Pull VT Metadata for ...' submenu options" -ForegroundColor DarkGray
 Write-Host ""
 
 # -- GROUP 2: Static/Dynamic Differentials ------------------------------------
@@ -185,6 +189,28 @@ elseif ($functionChoice -eq "1h") {
 }
 elseif ($functionChoice -eq "1i") {
     Build-BehavioralFingerprintTable
+}
+elseif ($functionChoice -eq "1j") {
+    Write-Host ""
+    Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkCyan
+    Write-Host "  $([char]27)[4m|        1j) Harvest IOCs per Threat Actor      |$([char]27)[24m" -ForegroundColor DarkCyan
+    Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkCyan
+    Write-Host "   1) Harvest ALL actors + malware families in MasterConfig" -ForegroundColor DarkCyan
+    Write-Host "   2) Harvest a SPECIFIC actor or malware family (prompted)"  -ForegroundColor DarkCyan
+    Write-Host ""
+    $jChoice = (Read-Host "Please enter a 1j sub-option").Trim()
+    if ($jChoice -eq "1") {
+        Get-ThreatActorIOCs
+    } elseif ($jChoice -eq "2") {
+        $actor = (Read-Host "Enter the actor/family Name (must match MasterConfig.Name exactly, e.g. UNC5792)").Trim()
+        if ($actor) {
+            Get-ThreatActorIOCs -SpecificActor $actor
+        } else {
+            Write-Host "[WARN] No actor entered - aborting 1j." -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "[WARN] Unrecognized 1j sub-option - aborting." -ForegroundColor Yellow
+    }
 }
 
 # -- GROUP 2: Static/Dynamic Differentials ------------------------------------

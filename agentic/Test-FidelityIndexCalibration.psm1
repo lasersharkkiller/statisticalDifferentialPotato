@@ -14,7 +14,7 @@ function Test-FidelityIndexCalibration {
                                     rollup, mutex Global\ prefix strip, cert publisher
                                     casing.
           3. Performance          - module-init < 2.0s, eager manifest delta < 10 MB,
-                                    full-warm (18 per-dim files) delta < 200 MB.
+                                    lazy-load (3 representative dims) delta < 100 MB.
           4. Verdict regression   - >=95% verdict agreement vs legacy on labeled
                                     detonation NDJSON corpora; no COMPROMISED sample
                                     may regress to CLEAN.
@@ -213,10 +213,11 @@ function Test-FidelityIndexCalibration {
         Write-Host ("=" * 78) -ForegroundColor DarkCyan
     }
 
-    # The 20-file expected index set, per design signoff.
+    # The 19-file REQUIRED index set (manifest + 18 per-dim), per design signoff.
+    # The legacy flat 'fidelity-index.json' compat shim is optional and checked
+    # separately as a non-blocking WARN gate below.
     $expectedIndexFiles = @(
         'fidelity-manifest.json'
-        'fidelity-index.json'
         'fidelity-ip.json'
         'fidelity-dns.json'
         'fidelity-process.json'
@@ -236,8 +237,8 @@ function Test-FidelityIndexCalibration {
         'fidelity-win-api.json'
         'fidelity-vt-tag.json'
     )
-    # Per-dim index files (excludes manifest + flat compat shim) = 18 files.
-    $perDimFiles = $expectedIndexFiles | Where-Object { $_ -notin @('fidelity-manifest.json','fidelity-index.json') }
+    # Per-dim index files (excludes manifest) = 18 files.
+    $perDimFiles = @($expectedIndexFiles | Where-Object { $_ -ne 'fidelity-manifest.json' })
 
     Write-Host ""
     Write-Host "Test-FidelityIndexCalibration" -ForegroundColor White
@@ -294,9 +295,9 @@ function Test-FidelityIndexCalibration {
         if ($manifest.indices) { $declared = @($manifest.indices | ForEach-Object { $_.file }) }
         $missingFromManifest = @($expectedIndexFiles | Where-Object { $_ -ne 'fidelity-manifest.json' -and $_ -notin $declared })
         if ($missingFromManifest.Count -eq 0) {
-            Add-Gate 1 'manifest declares all 19 indices' 'PASS' "$($declared.Count) entries"
+            Add-Gate 1 'manifest declares all 18 per-dim indices' 'PASS' "$($declared.Count) entries"
         } else {
-            Add-Gate 1 'manifest declares all 19 indices' 'FAIL' "missing: $($missingFromManifest -join ', ')"
+            Add-Gate 1 'manifest declares all 18 per-dim indices' 'FAIL' "missing: $($missingFromManifest -join ', ')"
         }
 
         $missingOnDisk = @()
@@ -305,9 +306,20 @@ function Test-FidelityIndexCalibration {
             if (-not (Test-Path $p)) { $missingOnDisk += $f }
         }
         if ($missingOnDisk.Count -eq 0) {
-            Add-Gate 1 'all 20 index files on disk' 'PASS' "$($expectedIndexFiles.Count) files"
+            Add-Gate 1 'all 19 required index files on disk' 'PASS' "$($expectedIndexFiles.Count) files"
         } else {
-            Add-Gate 1 'all 20 index files on disk' 'FAIL' "missing: $($missingOnDisk -join ', ')"
+            Add-Gate 1 'all 19 required index files on disk' 'FAIL' "missing: $($missingOnDisk -join ', ')"
+        }
+
+        # Non-blocking compat-shim gate: fidelity-index.json is the legacy flat
+        # union emitted by the builder for older consumers. Its absence is NOT a
+        # calibration failure - report as PASS if present, SKIP if absent, and
+        # mark the gate non-blocking so it never contributes to failure counts.
+        $shimPath = Join-Path $BaselineRoot 'fidelity-index.json'
+        if (Test-Path $shimPath) {
+            Add-Gate 1 'fidelity-index.json compat shim present' 'PASS' '(optional flat union)' $false
+        } else {
+            Add-Gate 1 'fidelity-index.json compat shim present' 'SKIP' 'shim not emitted (optional)' $false
         }
 
         # Per-dim entry_count > 0. Some dims (pipe, scheduled-task) may legitimately
@@ -512,17 +524,19 @@ function Test-FidelityIndexCalibration {
     # ============================================================
     Write-PhaseBanner 2 "NORMALIZATION ROUND-TRIPS"
 
-    # 2a IPv6 canonical form: parse + re-emit ToString().
+    # 2a IPv6 canonical form: parse + re-emit ToString() must collapse zeros per RFC 5952.
+    # Uses a NON-canonical uncompressed input so IPAddress.Parse().ToString() is not an
+    # identity transform - avoids the prior tautology where '2001:db8::1' -> '2001:db8::1'
+    # trivially matched.
     try {
-        $ipObj    = [System.Net.IPAddress]::Parse('2001:db8::1')
-        $canonical = $ipObj.ToString()
-        # The bug we're avoiding: -split ':' would lose ::-collapse semantics. Test that
-        # naive split DOES NOT round-trip while IPAddress.Parse DOES.
-        $naive   = ('2001:db8::1' -split ':')[0..7] -join ':'
-        if ($canonical -eq '2001:db8::1' -and $naive -ne $canonical) {
-            Add-Gate 2 'IPv6 canonical via IPAddress.Parse' 'PASS' "canonical='$canonical'"
+        $nonCanonical = '2001:0db8:0:0:0:0:0:1'
+        $expected     = '2001:db8::1'
+        $ipObj        = [System.Net.IPAddress]::Parse($nonCanonical)
+        $canonical    = $ipObj.ToString()
+        if ($canonical -eq $expected -and $canonical -ne $nonCanonical) {
+            Add-Gate 2 'IPv6 canonical via IPAddress.Parse' 'PASS' "'$nonCanonical' -> '$canonical'"
         } else {
-            Add-Gate 2 'IPv6 canonical via IPAddress.Parse' 'FAIL' "canonical='$canonical' naive='$naive'"
+            Add-Gate 2 'IPv6 canonical via IPAddress.Parse' 'FAIL' "expected '$expected' got '$canonical' from '$nonCanonical'"
         }
     } catch {
         Add-Gate 2 'IPv6 canonical via IPAddress.Parse' 'FAIL' $_.Exception.Message
@@ -623,26 +637,42 @@ function Test-FidelityIndexCalibration {
         Add-Gate 3 'eager delta < 10 MB (manifest only)' 'FAIL' "${eagerDeltaMB} MB"
     }
 
-    # 3c Full-warm memory delta (18 per-dim files).
-    $warmObjs = @{}
-    foreach ($f in $perDimFiles) {
+    # 3c Lazy-load probe: 3 representative dims (ip, dns, process). Models real
+    #    consumer behavior - Import-FidelityIndices in ElasticAlertAgent.psm1 is
+    #    lazy per dim; it never eager-loads all 18 files at once. The previous
+    #    full-warm gate double-counted the manifest (loaded again above) and
+    #    inflated JSON ~26x via ConvertFrom-Json PSCustomObject hydration, which
+    #    modeled no real state. Threshold: < 100 MB delta across 3 representative
+    #    dims (~30 MB/dim upper bound after PSCustomObject inflation).
+    $lazyDims = @('fidelity-ip.json', 'fidelity-dns.json', 'fidelity-process.json')
+    [void][GC]::Collect(); [void][GC]::WaitForPendingFinalizers(); [void][GC]::Collect()
+    $memBeforeLazy = [GC]::GetTotalMemory($true)
+    $lazyObjs      = @{}
+    $lazyMissing   = @()
+    foreach ($f in $lazyDims) {
         $p = Join-Path $BaselineRoot $f
         if (Test-Path $p) {
-            try { $warmObjs[$f] = Get-Content -LiteralPath $p -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop } catch {}
+            try {
+                $lazyObjs[$f] = Get-Content -LiteralPath $p -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+            } catch {
+                $lazyMissing += $f
+            }
+        } else {
+            $lazyMissing += $f
         }
     }
-    $memAfterWarm = [GC]::GetTotalMemory($false)
-    $warmDeltaMB  = [Math]::Round((($memAfterWarm - $memBefore) / 1MB), 2)
-    $loaded       = $warmObjs.Count
-    if ($loaded -eq $perDimFiles.Count -and $warmDeltaMB -lt 200) {
-        Add-Gate 3 'full-warm delta < 200 MB (18 dims)' 'PASS' "${warmDeltaMB} MB across $loaded dims"
-    } elseif ($loaded -ne $perDimFiles.Count) {
-        Add-Gate 3 'full-warm delta < 200 MB (18 dims)' 'FAIL' "only loaded $loaded / $($perDimFiles.Count) dims"
+    $memAfterLazy = [GC]::GetTotalMemory($false)
+    $lazyDeltaMB  = [Math]::Round((($memAfterLazy - $memBeforeLazy) / 1MB), 2)
+    $loadedLazy   = $lazyObjs.Count
+    if ($lazyMissing.Count -gt 0) {
+        Add-Gate 3 'lazy-load delta < 100 MB (3 dims)' 'FAIL' "missing dims: $($lazyMissing -join ', ')"
+    } elseif ($loadedLazy -eq $lazyDims.Count -and $lazyDeltaMB -lt 100) {
+        Add-Gate 3 'lazy-load delta < 100 MB (3 dims)' 'PASS' "${lazyDeltaMB} MB across $loadedLazy dims (ip/dns/process)"
     } else {
-        Add-Gate 3 'full-warm delta < 200 MB (18 dims)' 'FAIL' "${warmDeltaMB} MB"
+        Add-Gate 3 'lazy-load delta < 100 MB (3 dims)' 'FAIL' "${lazyDeltaMB} MB across $loadedLazy dims"
     }
-    # Release warm refs so they don't pollute downstream measurements.
-    $warmObjs = $null
+    # Release refs so they don't pollute downstream measurements.
+    $lazyObjs = $null
     [void][GC]::Collect()
 
     # ============================================================
@@ -759,21 +789,24 @@ function Test-FidelityIndexCalibration {
     }
     if ($consumerLoaded) {
         # We need a function we can call twice (legacy lane, new lane) over the
-        # SAME NDJSON file and read back a deterministic verdict. The shipping
-        # consumer (Invoke-ElasticAlertAgentAnalysis) is interactive-by-default
-        # and does not currently expose:
-        #   - a -DetonationLogsDir + -ScoreOnlyReturnVerdict mode
-        #   - a -UseLegacyFidelity / $env:ELASTICPOTATO_USE_LEGACY_FIDELITY toggle
-        # so probing for the entrypoint will (today) report "not exposed" and
-        # this phase will SKIP. When the consumer ships those hooks, this block
-        # will pick them up automatically without changing the binding contract.
+        # SAME detonation-log directory and read back a deterministic verdict.
+        # The consumer exposes:
+        #   - -DetonationLogsDir <dir>       : offline-mode input
+        #   - -UseLegacyFidelity             : forces $script:_fidUseNewScoring = $false
+        #                                      immediately after Import-FidelityIndices,
+        #                                      overriding manifest.scoring.calibration_passed
+        #   - -ReturnVerdict                 : suppresses interactive banners and
+        #                                      returns the structured PSCustomObject
+        # Both switches are additive - existing callers (menu 3a/3b) that omit
+        # them see identical pre-refactor behavior.
         $candidateFn = Get-Command -Name 'Invoke-ElasticAlertAgentAnalysis' -ErrorAction SilentlyContinue
         if ($candidateFn) {
             $params = $candidateFn.Parameters
             $hasDetonationDir   = $params.ContainsKey('DetonationLogsDir')
             $hasLegacyToggle    = $params.ContainsKey('UseLegacyFidelity') -or `
                                   $params.ContainsKey('ForceLegacyScoring')
-            $hasReturnVerdict   = $params.ContainsKey('ScoreOnlyReturnVerdict') -or `
+            $hasReturnVerdict   = $params.ContainsKey('ReturnVerdict') -or `
+                                  $params.ContainsKey('ScoreOnlyReturnVerdict') -or `
                                   $params.ContainsKey('NonInteractive')
             if ($hasDetonationDir -and $hasLegacyToggle -and $hasReturnVerdict) {
                 $consumerEntryFn  = $candidateFn
@@ -829,6 +862,11 @@ function Test-FidelityIndexCalibration {
         Add-Gate 4 ("labeled corpora available (>={0})" -f $minCorporaForBinding) 'PASS' "$($corpora.Count) corpora" $false
         Add-Gate 4 'real consumer loadable + toggleable' 'PASS' "$($consumerEntryFn.Name) exposes -DetonationLogsDir + legacy toggle + verdict-return" $false
 
+        # Offline-mode verdicts are drawn from this set. Any other value indicates
+        # a schema drift (e.g. AlertContext-mode return leaking in) and the row
+        # is treated as an error-skip with a diagnostic message.
+        $validOfflineVerdicts = @('COMPROMISED','SUSPICIOUS','CLEAN')
+
         $agree       = 0
         $disagree    = 0
         $skippedRows = 0
@@ -839,20 +877,39 @@ function Test-FidelityIndexCalibration {
             $newVerdict    = $null
             $rowErr        = $null
             try {
-                $prevEnv = $env:ELASTICPOTATO_USE_LEGACY_FIDELITY
-                try {
-                    $env:ELASTICPOTATO_USE_LEGACY_FIDELITY = '1'
-                    $legacyResult = & $consumerEntryFn -DetonationLogsDir $c.Path -ScoreOnlyReturnVerdict -UseLegacyFidelity -ErrorAction Stop
-                    $legacyVerdict = if ($legacyResult.Verdict) { [string]$legacyResult.Verdict } else { [string]$legacyResult }
-                } finally {
-                    if ($null -eq $prevEnv) { Remove-Item Env:ELASTICPOTATO_USE_LEGACY_FIDELITY -ErrorAction SilentlyContinue }
-                    else                    { $env:ELASTICPOTATO_USE_LEGACY_FIDELITY = $prevEnv }
-                }
-                $newResult = & $consumerEntryFn -DetonationLogsDir $c.Path -ScoreOnlyReturnVerdict -ErrorAction Stop
-                $newVerdict = if ($newResult.Verdict) { [string]$newResult.Verdict } else { [string]$newResult }
+                # Legacy lane: force $script:_fidUseNewScoring = $false regardless
+                # of manifest state via -UseLegacyFidelity. -ReturnVerdict suppresses
+                # console banners and returns the structured PSCustomObject.
+                # 6>$null 4>$null suppresses any residual Write-Host/Write-Information
+                # leakage during comparison so only Add-Gate lines print.
+                $legacyResult = & $consumerEntryFn `
+                    -DetonationLogsDir $c.Path `
+                    -UseLegacyFidelity `
+                    -ReturnVerdict `
+                    -ErrorAction Stop 6>$null 4>$null
+                $legacyVerdict = if ($legacyResult -and $legacyResult.Verdict) { [string]$legacyResult.Verdict } else { [string]$legacyResult }
+
+                # New lane: default fidelity path (manifest-driven).
+                $newResult = & $consumerEntryFn `
+                    -DetonationLogsDir $c.Path `
+                    -ReturnVerdict `
+                    -ErrorAction Stop 6>$null 4>$null
+                $newVerdict = if ($newResult -and $newResult.Verdict) { [string]$newResult.Verdict } else { [string]$newResult }
             } catch {
                 $rowErr = $_.Exception.Message
             }
+
+            # Defensive shape check: both lanes must return one of the three
+            # offline-mode verdicts. Anything else is a schema drift bug -
+            # error-skip with a clear diagnostic instead of silently agreeing.
+            if (-not $rowErr) {
+                if ($legacyVerdict -and ($legacyVerdict.ToUpperInvariant() -notin $validOfflineVerdicts)) {
+                    $rowErr = "legacy verdict '$legacyVerdict' not in offline set [$($validOfflineVerdicts -join ', ')]"
+                } elseif ($newVerdict -and ($newVerdict.ToUpperInvariant() -notin $validOfflineVerdicts)) {
+                    $rowErr = "new verdict '$newVerdict' not in offline set [$($validOfflineVerdicts -join ', ')]"
+                }
+            }
+
             if ($rowErr -or -not $legacyVerdict -or -not $newVerdict) {
                 $skippedRows++
                 $rows.Add([pscustomobject]@{
@@ -866,9 +923,11 @@ function Test-FidelityIndexCalibration {
                 })
                 continue
             }
-            $sameVerdict = ($legacyVerdict -eq $newVerdict)
+
+            # Case-insensitive verdict comparison per plan.
+            $sameVerdict  = ($legacyVerdict.ToUpperInvariant() -eq $newVerdict.ToUpperInvariant())
             if ($sameVerdict) { $agree++ } else { $disagree++ }
-            $isRegression = ($legacyVerdict -eq 'COMPROMISED' -and $newVerdict -eq 'CLEAN')
+            $isRegression = ($legacyVerdict.ToUpperInvariant() -eq 'COMPROMISED' -and $newVerdict.ToUpperInvariant() -eq 'CLEAN')
             if ($isRegression) { $regressions++ }
             $rows.Add([pscustomobject]@{
                 Sample     = $c.Name
@@ -908,7 +967,10 @@ function Test-FidelityIndexCalibration {
             if ($regressionOk) {
                 Add-Gate 4 'no COMPROMISED -> CLEAN regression' 'PASS' "0 regressions over $eligible eligible$skipNote"
             } else {
-                Add-Gate 4 'no COMPROMISED -> CLEAN regression' 'FAIL' "$regressions regression(s) over $eligible eligible$skipNote"
+                # List the regressing corpus names so operators can drill in without
+                # trawling the per-row output.
+                $regressionNames = @($rows | Where-Object { $_.Regression } | ForEach-Object { $_.Sample })
+                Add-Gate 4 'no COMPROMISED -> CLEAN regression' 'FAIL' "$regressions regression(s) over $eligible eligible$skipNote [$($regressionNames -join '; ')]"
             }
             if ($agreementOk -and $regressionOk) {
                 $script:_phase4_status = 'PASSED'

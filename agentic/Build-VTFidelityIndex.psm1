@@ -502,8 +502,27 @@ function Build-VTFidelityIndex {
         'vt-tag'            = 'enrichment'
     }
 
+    # Disk layout on VirusTotal-behaviors/:
+    #   malicious/          = flat, ~19629 files today, MALICIOUS
+    #   NSRL/<OS>/          = per-OS subfolders (Debian-13, Ubuntu-24.04,
+    #                         Windows-11, etc.), GOODWARE
+    #   OT/<vendor>/        = per-OT-vendor subfolders, GOODWARE
+    #   localBaseline/<bucket>/ = drivers/, SignedVerified/, unsignedWin/,
+    #                             unsignedLinux/, unverified/ subfolders,
+    #                             GOODWARE - the legacy sub-bucket names
+    #                             lived here all along
+    #   apt-master-intel/<Country>/<Actor>/ or /Malware Families/<Family>/
+    #                         = per-actor and per-family subfolders,
+    #                           GOODWARE by design (represents observed
+    #                           APT infrastructure - the 'known-shape'
+    #                           side of the differential math per the
+    #                           corpus-normalization design)
+    #
+    # Both goodware and malicious buckets NEED -Recurse now that the
+    # sub-bucket organization is nested, not flat. Previous flat globs
+    # returned 0 files silently and skipped the whole goodware side.
     $malCats  = @("malicious")
-    $goodCats = @("SignedVerified","unsignedWin","unsignedLinux","unverified","drivers")
+    $goodCats = @("NSRL","OT","localBaseline","apt-master-intel")
     $allCats  = $malCats + $goodCats
 
     $totalFiles = 0; $totalProcessed = 0
@@ -511,7 +530,7 @@ function Build-VTFidelityIndex {
     foreach ($cat in $allCats) {
         $catPath = Join-Path $behRoot $cat
         if (-not (Test-Path $catPath)) { Write-Host "  [skip] $cat (not found)" -ForegroundColor DarkGray; continue }
-        $files = Get-ChildItem $catPath -Filter "*.json" -ErrorAction SilentlyContinue
+        $files = Get-ChildItem $catPath -Filter "*.json" -Recurse -ErrorAction SilentlyContinue
         $totalFiles += $files.Count
         $isMalicious = $malCats -contains $cat
         $processed = 0

@@ -95,10 +95,54 @@ function Build-VTFidelityIndex {
     $script:_vtfi_procDirs    = @{}
     $script:_vtfi_maxLN       = $MaxLegitNames
 
+    # Sandbox-artifact scrubber state (process-baseline D field).
+    $script:_vtfi_scrubDropped = 0                 # total sandbox-artifact paths rejected
+    $script:_vtfi_scrubProcs   = @{}               # process-name -> drop count (for distinct-M metric)
+    # Compile the sandbox-artifact rejection regex ONCE per build. Kept in exact lockstep with the runtime
+    # consumer filter in elasticPotato\agentic\ElasticAlertAgent.psm1 ($sandboxOnlyTokens + $sandboxRx,
+    # located inside the process-baseline masquerade check; grep for $sandboxOnlyTokens if the location has
+    # drifted). Any pattern change here MUST be mirrored there and vice versa.
+    # Patterns per spec:
+    #   ^%[a-z]+%                                                     - ANY VT/sandbox env-macro token
+    #                                                                   (%samplepath%, %tempfile%, %datafile%,
+    #                                                                    %userprofile%, %localappdata%, %appdata%,
+    #                                                                    %public%, %homepath%, %allusersprofile%,
+    #                                                                    %windir%, ...) - never a real install dir
+    #   ^c:\users\(user|admin|administrator|analyst|sandbox|malware)\ - known sandbox VM usernames.
+    #     NOTE: 'administrator' is a real interactive user on Windows Server workloads, so this arm will
+    #     scrub legitimate paths like c:\users\administrator\downloads\foo on Server. Trade-off accepted
+    #     because the VT corpus is sandbox-heavy and administrator observations are almost entirely
+    #     detonation-VM noise. Operators on Server-heavy corpora who want to preserve those paths would
+    #     need to fork this regex (no -SandboxUsernames parameter today).
+    #   ^c:\users\[^\]+\desktop($|\)                                  - ANY user's Desktop = sample staging
+    #   ^c:\users\[^\]+\appdata\local\temp($|\)                       - ANY user's local Temp = sandbox scratch
+    # IgnoreCase is set so the regex itself owns case-insensitivity. Callers still lowercase $dir/$kd for
+    # OTHER reasons (stored D-list normalization, non-regex string comparisons downstream) - do NOT remove
+    # those .ToLower() calls just because the regex tolerates mixed case.
+    $script:_vtfi_sandboxArtifactRx = [regex]::new(
+        '^%[a-z]+%|^c:\\users\\(user|admin|administrator|analyst|sandbox|malware)\\|^c:\\users\\[^\\]+\\desktop($|\\)|^c:\\users\\[^\\]+\\appdata\\local\\temp($|\\)',
+        ([System.Text.RegularExpressions.RegexOptions]::Compiled -bor [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    )
+
     # Corpus-wide M / G totals (incremented once per processed file)
     $script:_vtfi_Mtotal = 0
     $script:_vtfi_Gtotal = 0
     $script:_vtfi_GoodwareSubcorpora = @{}  # cat -> file count
+
+    # -------------------------------------------------------------------------
+    # Test-IsSandboxArtifactPath: returns $true if $Path is a VT sandbox
+    # detonation-VM artifact that must not enter the process-baseline D field.
+    # Preserves REAL user paths like c:\users\bob\downloads (only rejects the
+    # sandbox-username set and generic Desktop/AppData\Local\Temp patterns).
+    # Case-insensitive (regex owns it) - caller does not need to lowercase.
+    # Paired with runtime filter in elasticPotato\agentic\ElasticAlertAgent.psm1
+    # ($sandboxOnlyTokens + $sandboxRx - grep for the symbol names, not a line number).
+    # -------------------------------------------------------------------------
+    function Test-IsSandboxArtifactPath {
+        param([string]$Path)
+        if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
+        return $script:_vtfi_sandboxArtifactRx.IsMatch($Path)
+    }
 
     function Update-ProcBaseline {
         param([string]$Name, [string]$FullPath, [bool]$IsMalicious, [string]$Signer)
@@ -109,6 +153,19 @@ function Build-VTFidelityIndex {
             $script:_vtfi_procG[$Name] = [int]($script:_vtfi_procG[$Name]) + 1
             if ($FullPath -and $FullPath -match '\\') {
                 $dir = [System.IO.Path]::GetDirectoryName($FullPath).ToLower().TrimEnd('\')
+                # Reject VT sandbox-VM artifact paths BEFORE the length gate: e.g. bare '%samplepath%'
+                # (len 12) would otherwise slip past. The goodware count above stands (the process WAS
+                # seen in goodware) - only the untrusted directory string is dropped. Signer branch is
+                # also skipped: a sandbox-only observation should not seed Signers from this call.
+                # HOT PATH: called ~once per processes_created entry across ~500k behavior JSONs. Skip
+                # the Test-IsSandboxArtifactPath wrapper (function-call overhead ~10-50us per call
+                # x millions of calls) and hit the compiled regex directly. Test-IsSandboxArtifactPath
+                # remains available for tests and external callers.
+                if ($dir -and $script:_vtfi_sandboxArtifactRx.IsMatch($dir)) {
+                    $script:_vtfi_scrubDropped++
+                    $script:_vtfi_scrubProcs[$Name] = [int]($script:_vtfi_scrubProcs[$Name]) + 1
+                    return
+                }
                 if ($dir -and $dir.Length -gt 2) {
                     $existing = $script:_vtfi_procDirs[$Name]
                     $parts = if ($existing) { $existing -split '\|' } else { @() }
@@ -1160,6 +1217,7 @@ function Build-VTFidelityIndex {
     }
     ([PSCustomObject]$procOut) | ConvertTo-Json -Depth 4 -Compress | Set-Content -Path $procOutFile -Encoding UTF8
     Write-Host "    process-baseline.json written ($([Math]::Round((Get-Item $procOutFile).Length / 1MB, 2)) MB, $($procOut.Count) entries)" -ForegroundColor Green
+    Write-Host "    [Scrub] Dropped $($script:_vtfi_scrubDropped) sandbox-artifact paths across $($script:_vtfi_scrubProcs.Count) distinct process names during build" -ForegroundColor DarkYellow
 
     # -----------------------------------------------------------------------
     # Final report
@@ -1187,6 +1245,8 @@ function Build-VTFidelityIndex {
     $script:_vtfi_procG = $null; $script:_vtfi_procM = $null
     $script:_vtfi_procSigners = $null; $script:_vtfi_procDirs = $null
     $script:_vtfi_maxLN = $null
+    $script:_vtfi_scrubDropped = $null; $script:_vtfi_scrubProcs = $null
+    $script:_vtfi_sandboxArtifactRx = $null
     $script:_vtfi_Mtotal = $null; $script:_vtfi_Gtotal = $null
     $script:_vtfi_GoodwareSubcorpora = $null
     $script:_vtfi_dimMeta = $null
@@ -1206,4 +1266,63 @@ function Build-VTFidelityIndex {
         BuildSeconds   = [Math]::Round($elapsed.TotalSeconds)
         BlockingZeroDims = $blockingZero
     }
+}
+
+# ---------------------------------------------------------------------------
+# Invoke-ProcessBaselineScrub
+#
+# One-shot retroactive cleanup for a process-baseline.json that was built
+# BEFORE the sandbox-artifact scrub landed. Reads the JSON, filters the
+# D-list of every process entry through the same regex that Build-VTFidelityIndex
+# now applies at build time, then writes the file back in-place. Runs in
+# seconds vs. a ~10-minute full rebuild.
+#
+# Use this when:
+#   - You upgraded elasticPotato\agentic\ElasticAlertAgent.psm1 but do NOT want
+#     to re-run Build-VTFidelityIndex right now, AND
+#   - You want stale baseline D-lists cleaned up so downstream masquerade checks
+#     see a scrubbed picture instead of relying on the runtime defense-in-depth
+#     filter alone.
+#
+# The regex is duplicated from Build-VTFidelityIndex's $script:_vtfi_sandboxArtifactRx
+# so this helper is self-contained. If you change one, change both (see the
+# "MUST be mirrored" contract on the builder regex).
+# ---------------------------------------------------------------------------
+function Invoke-ProcessBaselineScrub {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+    if (-not (Test-Path -LiteralPath $Path)) {
+        Write-Error "process-baseline.json not found at: $Path"
+        return
+    }
+    $rx = [regex]::new(
+        '^%[a-z]+%|^c:\\users\\(user|admin|administrator|analyst|sandbox|malware)\\|^c:\\users\\[^\\]+\\desktop($|\\)|^c:\\users\\[^\\]+\\appdata\\local\\temp($|\\)',
+        ([System.Text.RegularExpressions.RegexOptions]::Compiled -bor [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    )
+    $raw = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
+    $obj = $raw | ConvertFrom-Json
+    $totalDropped = 0
+    $procsTouched = 0
+    $out = [ordered]@{}
+    foreach ($prop in $obj.PSObject.Properties) {
+        $entry = $prop.Value
+        $before = @($entry.D)
+        $after = @($before | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and -not $rx.IsMatch(([string]$_).ToLower()) })
+        $dropped = $before.Count - $after.Count
+        if ($dropped -gt 0) {
+            $totalDropped += $dropped
+            $procsTouched++
+        }
+        $out[$prop.Name] = [PSCustomObject]@{
+            G = $entry.G
+            M = $entry.M
+            S = @($entry.S)
+            D = $after
+        }
+    }
+    ([PSCustomObject]$out) | ConvertTo-Json -Depth 4 -Compress | Set-Content -LiteralPath $Path -Encoding UTF8
+    Write-Host "[Scrub] Rewrote $Path : dropped $totalDropped sandbox-artifact paths across $procsTouched process entries" -ForegroundColor Green
 }

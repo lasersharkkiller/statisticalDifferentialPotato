@@ -802,12 +802,23 @@ function Test-FidelityIndexCalibration {
         $candidateFn = Get-Command -Name 'Invoke-ElasticAlertAgentAnalysis' -ErrorAction SilentlyContinue
         if ($candidateFn) {
             $params = $candidateFn.Parameters
-            $hasDetonationDir   = $params.ContainsKey('DetonationLogsDir')
-            $hasLegacyToggle    = $params.ContainsKey('UseLegacyFidelity') -or `
-                                  $params.ContainsKey('ForceLegacyScoring')
-            $hasReturnVerdict   = $params.ContainsKey('ReturnVerdict') -or `
-                                  $params.ContainsKey('ScoreOnlyReturnVerdict') -or `
-                                  $params.ContainsKey('NonInteractive')
+            # Walk canonical parameter names + aliases. The consumer exposes
+            # -ReturnVerdict as an [Alias('ReturnVerdict')] on the canonical
+            # -SuppressVerdictBanner; ContainsKey only matches canonical keys,
+            # so alias-only checks would report a false negative.
+            $hasParamOrAlias = {
+                param($paramMap, [string[]]$candidates)
+                foreach ($c in $candidates) {
+                    if ($paramMap.ContainsKey($c)) { return $true }
+                    foreach ($p in $paramMap.Values) {
+                        if ($p.Aliases -contains $c) { return $true }
+                    }
+                }
+                return $false
+            }
+            $hasDetonationDir = & $hasParamOrAlias $params @('DetonationLogsDir')
+            $hasLegacyToggle  = & $hasParamOrAlias $params @('UseLegacyFidelity','ForceLegacyScoring')
+            $hasReturnVerdict = & $hasParamOrAlias $params @('SuppressVerdictBanner','ReturnVerdict','ScoreOnlyReturnVerdict','NonInteractive')
             if ($hasDetonationDir -and $hasLegacyToggle -and $hasReturnVerdict) {
                 $consumerEntryFn  = $candidateFn
                 $consumerToggleOk = $true

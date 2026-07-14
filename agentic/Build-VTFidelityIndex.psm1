@@ -529,7 +529,15 @@ function Build-VTFidelityIndex {
 
     foreach ($cat in $allCats) {
         $catPath = Join-Path $behRoot $cat
-        if (-not (Test-Path $catPath)) { Write-Host "  [skip] $cat (not found)" -ForegroundColor DarkGray; continue }
+        if (-not (Test-Path $catPath)) {
+            $isGoodCat = -not ($malCats -contains $cat)
+            $color = if ($isGoodCat) { 'Yellow' } else { 'DarkGray' }
+            Write-Host "  [skip] $cat (not found at $catPath)" -ForegroundColor $color
+            if ($isGoodCat) {
+                Write-Warning "Goodware category '$cat' missing under $behRoot -- process-baseline will be starved for this bucket."
+            }
+            continue
+        }
         $files = Get-ChildItem $catPath -Filter "*.json" -Recurse -ErrorAction SilentlyContinue
         $totalFiles += $files.Count
         $isMalicious = $malCats -contains $cat
@@ -654,12 +662,21 @@ function Build-VTFidelityIndex {
                 # ----- processes -----
                 if ($d.processes_created) {
                     $d.processes_created | ForEach-Object {
-                        $cleanPath = $_.Trim('"')
-                        $pn = [System.IO.Path]::GetFileName($cleanPath)
+                        $raw = "$_".Trim().Trim('"')
+                        # VT processes_created is often the full command line, not a bare exe path.
+                        # Feeding "C:\Windows\System32\svchost.exe -k netsvcs" whole to GetFileName
+                        # yields 'svchost.exe -k netsvcs' as a bogus process name, and GetDirectoryName
+                        # produces garbage residue that pollutes the D-list. Extract the executable
+                        # token first: leading quoted "path" wins; otherwise the first whitespace-
+                        # delimited token. Fallback to $raw if neither pattern matches.
+                        $exe = if ($raw -match '^"([^"]+)"') { $Matches[1] }
+                               elseif ($raw -match '^(\S+)')  { $Matches[1] }
+                               else { $raw }
+                        $pn = [System.IO.Path]::GetFileName($exe)
                         if ($pn) {
                             $pnl = $pn.ToLower()
                             Update-Index        -Value $pnl -Dimension "process" -IsMalicious $isMalicious -LegitName $legitName
-                            Update-ProcBaseline -Name  $pnl -FullPath $cleanPath -IsMalicious $isMalicious -Signer $legitSigner
+                            Update-ProcBaseline -Name  $pnl -FullPath $exe -IsMalicious $isMalicious -Signer $legitSigner
                         }
                     }
                 }
@@ -1218,9 +1235,25 @@ function Build-VTFidelityIndex {
     ([PSCustomObject]$flatOut) | ConvertTo-Json -Depth 20 -Compress | Set-Content -Path $outFile -Encoding UTF8
     Write-Host "    fidelity-index.json (compat shim) written ($([Math]::Round((Get-Item $outFile).Length / 1MB, 2)) MB)" -ForegroundColor Green
 
-    # Process baseline (UNCHANGED)
+    # Process baseline emit. Fail-loud sentinel: if procG is empty but the
+    # walker DID see goodware (Gtotal > 0), that is a contradiction we must
+    # surface rather than silently overwrite process-baseline.json with '{}'.
+    # Prior incident (2026-07-13 18:03 build): Gtotal=132675 but on-disk
+    # process-baseline.json was 4 bytes '{}'. Root cause never conclusively
+    # identified; the guard below turns any future recurrence into a hard
+    # abort with enough diagnostic state to root-cause it (procG.Count,
+    # procM.Count, Gtotal, Mtotal). Existing tracked baseline is preserved.
     $procOutFile = Join-Path $BaselineRoot "process-baseline.json"
-    Write-Host "`n  Building process baseline from $($script:_vtfi_procG.Count) known-good process names..." -ForegroundColor DarkCyan
+    $procGCount = $script:_vtfi_procG.Count
+    $procMCount = $script:_vtfi_procM.Count
+    Write-Host "`n  Building process baseline from $procGCount known-good process names..." -ForegroundColor DarkCyan
+    if ($procGCount -eq 0 -and $Gtotal -gt 0) {
+        Write-Warning ("process-baseline emit aborted: _vtfi_procG.Count=0 but Gtotal=$Gtotal " +
+                       "(walker processed goodware but registered zero goodware process names). " +
+                       "State: procM.Count=$procMCount, Mtotal=$Mtotal, scrubDropped=$($script:_vtfi_scrubDropped). " +
+                       "Preserving existing $procOutFile on disk instead of overwriting with '{}'.")
+        throw "process-baseline emit invariant violated: procG empty despite Gtotal>0. Refusing to overwrite $procOutFile."
+    }
     $procOut = @{}
     foreach ($pn in $script:_vtfi_procG.Keys) {
         $gVal = [int]($script:_vtfi_procG[$pn])

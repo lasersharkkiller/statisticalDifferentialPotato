@@ -662,16 +662,24 @@ function Build-VTFidelityIndex {
                 # ----- processes -----
                 if ($d.processes_created) {
                     $d.processes_created | ForEach-Object {
-                        $raw = "$_".Trim().Trim('"')
                         # VT processes_created is often the full command line, not a bare exe path.
                         # Feeding "C:\Windows\System32\svchost.exe -k netsvcs" whole to GetFileName
                         # yields 'svchost.exe -k netsvcs' as a bogus process name, and GetDirectoryName
                         # produces garbage residue that pollutes the D-list. Extract the executable
-                        # token first: leading quoted "path" wins; otherwise the first whitespace-
-                        # delimited token. Fallback to $raw if neither pattern matches.
-                        $exe = if ($raw -match '^"([^"]+)"') { $Matches[1] }
-                               elseif ($raw -match '^(\S+)')  { $Matches[1] }
+                        # token: prefer leading "quoted path" (handles paths with spaces like
+                        # "C:\Program Files\App\foo.exe /arg"); otherwise take chars up to the first
+                        # whitespace OR embedded '"' (handles mid-string quotes that abut a subsequent
+                        # quoted argument, e.g. rundll32.exe" "C:\...\x.dll",#1 — stops at the middle
+                        # quote instead of grabbing 'rundll32.exe"' with a trailing quote).
+                        # NOTE: only .Trim() outer whitespace, NOT .Trim('"') — the leading quote is
+                        # load-bearing for the ^"([^"]+)" branch on quoted paths with args.
+                        $raw = "$_".Trim()
+                        $exe = if ($raw -match '^"([^"]+)"')      { $Matches[1] }
+                               elseif ($raw -match '^([^\s"]+)')  { $Matches[1] }
                                else { $raw }
+                        # Final belt-and-braces cleanup: strip any leading/trailing quotes and
+                        # whitespace that survived (e.g. fallback branch on a lone-quote input).
+                        $exe = $exe.Trim().Trim('"').Trim()
                         $pn = [System.IO.Path]::GetFileName($exe)
                         if ($pn) {
                             $pnl = $pn.ToLower()

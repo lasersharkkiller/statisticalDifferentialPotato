@@ -29,14 +29,34 @@
 #>
 
 function ConvertTo-HashIocType {
-    param([string]$Type)
-    if (-not $Type) { return $null }
+    # Normalize a feed-supplied IOC type label to a canonical hash
+    # algorithm. When the feed returns the generic label "Hash" (notably
+    # Cybersixgill's ioc_type), classify by Value length so downstream
+    # consumers (1a -> 7 VT pulls, fidelity index, differential analysis)
+    # see SHA256 / SHA1 / MD5 instead of a generic label they all drop.
+    # Returns the sentinel "Hash:SHA256+MD5" for 96-char concatenated
+    # values; the caller is expected to split that into two rows.
+    param(
+        [string]$Type,
+        [string]$Value
+    )
+    if (-not $Type) { $Type = '' }
     $t = $Type.ToLowerInvariant()
 
     if ($t -match "sha256") { return "SHA256" }
     if ($t -match "sha1")   { return "SHA1" }
     if ($t -match "md5")    { return "MD5" }
-    if ($t -match "hash")   { return "Hash" }
+
+    if (($t -match "hash") -or (-not $t)) {
+        if ($Value) {
+            $v = $Value.Trim()
+            if ($v -match '^[0-9a-fA-F]{64}$') { return "SHA256" }
+            if ($v -match '^[0-9a-fA-F]{40}$') { return "SHA1" }
+            if ($v -match '^[0-9a-fA-F]{32}$') { return "MD5" }
+            if ($v -match '^[0-9a-fA-F]{96}$') { return "Hash:SHA256+MD5" }
+        }
+        return "Hash"
+    }
 
     return $Type
 }
@@ -839,7 +859,30 @@ function Get-ThreatActorIOCs {
                 $UniqueUnknownHashes = @()
 
                 foreach ($Row in $Raw_IOCs) {
-                    $Row.IOCType = ConvertTo-HashIocType $Row.IOCType
+                    $Row.IOCType = ConvertTo-HashIocType $Row.IOCType $Row.IOCValue
+
+                    if ($Row.IOCType -eq "Hash:SHA256+MD5") {
+                        # Feed quirk - some sources concatenate SHA256 (64) and
+                        # MD5 (32) into a single 96-char IOCValue. Split into
+                        # two proper rows and wire the cache so the MD5 row
+                        # upgrades to its SHA256 sibling on the next pass.
+                        $rawConcat = $Row.IOCValue
+                        $sha       = $rawConcat.Substring(0,64)
+                        $md5       = $rawConcat.Substring(64,32)
+                        $splitNote = if ($Row.Context) { "$($Row.Context) (split from SHA256+MD5 concat)" } else { "(split from SHA256+MD5 concat)" }
+                        $FinalList += [PSCustomObject]@{
+                            Date=$Row.Date; Source=$Row.Source; Actor=$Row.Actor;
+                            IOCType="SHA256"; IOCValue=$sha;
+                            Context=$splitNote; Link=$Row.Link
+                        }
+                        $FinalList += [PSCustomObject]@{
+                            Date=$Row.Date; Source=$Row.Source; Actor=$Row.Actor;
+                            IOCType="MD5"; IOCValue=$md5;
+                            Context=$splitNote; Link=$Row.Link
+                        }
+                        if (-not $HashCache.ContainsKey($md5)) { $HashCache[$md5] = $sha }
+                        continue
+                    }
 
                     if ($Row.IOCType -eq "SHA256") {
                         $FinalList += $Row

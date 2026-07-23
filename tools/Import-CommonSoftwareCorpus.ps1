@@ -44,8 +44,11 @@
     or when hashing an existing install (e.g. VCRedist post-install).
 
 .PARAMETER OsName
-    OsName value written to the CSV. Default: 'Windows 11'. Must match a value
-    handled by Get-NSRLOsSlug in VTBaseline.psm1.
+    OsName value written to the CSV. If omitted, auto-detected by matching the
+    running OS against distinct OsName values in NSRL\nsrl_reduced.csv (e.g.
+    'Windows 11 Version 25H2 X64' on a Win 11 host, 'Ubuntu 24.04 LTS' on
+    Noble). Warns (does not block) if you pass an OsName not present in the
+    NSRL corpus.
 
 .PARAMETER CsvPath
     Destination CSV. Default: NSRL\nsrl_common_software.csv relative to repo root.
@@ -71,12 +74,184 @@ param(
     [Parameter(Mandatory)][string]$PackageId,
     [string]$InstallPath,
     [switch]$SkipInstall,
-    [string]$OsName = 'Windows 11',
+    # OsName written to the CSV. If omitted, auto-detected from the running
+    # OS + matched against distinct OsName values in NSRL\nsrl_reduced.csv.
+    # Must match exactly what nsrl_reduced.csv uses so Get-VTBaseline -OsFilter
+    # can route the new rows through the same per-OS bucket as the NIST base.
+    [string]$OsName,
     [string]$CsvPath,
     [switch]$Force
 )
 
 $ErrorActionPreference = 'Stop'
+
+# ---------- OsName auto-detect helper -----------------------------------------
+function Resolve-DefaultOsName {
+    <#
+    .SYNOPSIS
+        Read NSRL\nsrl_reduced.csv, detect the running OS, return the matching
+        OsName value (exact string as written in the NSRL corpus).
+    .DESCRIPTION
+        NSRL OsName strings are precise ('Windows 11 Version 25H2 X64',
+        'Windows Server 2025', 'Ubuntu 24.04 LTS', 'Debian 13'). A user
+        passing a shorter form like 'Windows 11' would fail the -OsFilter
+        match in Get-VTBaseline. This helper picks the closest match by:
+          1. Enumerate distinct OsName values in nsrl_reduced.csv.
+          2. Detect current OS via Win32_OperatingSystem (Windows) or
+             /etc/os-release (Linux).
+          3. Score each OsName against the detected product string; return
+             the top-scoring match, or $null if nothing matches confidently.
+        Returns $null on any failure - caller must fall back to explicit
+        -OsName or fail cleanly.
+    .PARAMETER RepoRoot
+        Repo root (contains NSRL\ subfolder).
+    #>
+    [OutputType([string])]
+    param([string]$RepoRoot)
+
+    $csv = Join-Path $RepoRoot 'NSRL\nsrl_reduced.csv'
+    if (-not (Test-Path -LiteralPath $csv)) { return $null }
+
+    $osNames = @()
+    try {
+        $osNames = @(Import-Csv -LiteralPath $csv |
+                     Where-Object { $_.OsName } |
+                     Select-Object -ExpandProperty OsName |
+                     Sort-Object -Unique)
+    } catch { return $null }
+    if ($osNames.Count -eq 0) { return $null }
+
+    # Detect current-OS caption. Windows path first (most common). PS 6+
+    # cross-platform Linux fallback via /etc/os-release. macOS is unsupported
+    # (no macOS OsName in NSRL corpus).
+    $productCaption = $null
+    if ($env:OS -eq 'Windows_NT' -or ($PSVersionTable.Platform -in @($null,'Win32NT'))) {
+        try {
+            $os = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
+            $productCaption = "$($os.Caption)"
+        } catch {
+            # Registry fallback. NOTE: HKLM ProductName has a decade-old bug
+            # where Windows 11 still reads "Windows 10 Pro" through at least
+            # build 26200. If CurrentBuild >= 22000 we synthesize a Windows 11
+            # caption from EditionID; if CurrentBuild >= 10240 we synthesize
+            # a Windows 10 caption; otherwise fall back to raw ProductName.
+            try {
+                $reg = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -ErrorAction Stop
+                $build = 0
+                if ($reg.PSObject.Properties['CurrentBuild']) {
+                    [int]::TryParse("$($reg.CurrentBuild)", [ref]$build) | Out-Null
+                }
+                $edition = if ($reg.PSObject.Properties['EditionID']) { "$($reg.EditionID)" } else { '' }
+                if ($build -ge 22000) {
+                    $productCaption = "Microsoft Windows 11 $edition".Trim()
+                } elseif ($build -ge 10240) {
+                    $productCaption = "Microsoft Windows 10 $edition".Trim()
+                } else {
+                    $productCaption = "$($reg.ProductName)"
+                }
+            } catch { return $null }
+        }
+    } elseif (Test-Path '/etc/os-release') {
+        $osrel = Get-Content '/etc/os-release' -Raw -ErrorAction SilentlyContinue
+        if ($osrel -match '(?m)^PRETTY_NAME="?([^"\r\n]+)') { $productCaption = $Matches[1] }
+        elseif ($osrel -match '(?m)^NAME="?([^"\r\n]+)') { $productCaption = $Matches[1] }
+    }
+
+    if (-not $productCaption) { return $null }
+
+    # Match by family + version. Score each NSRL OsName by which family it
+    # matches; break ties by preferring the version-specific entry over a
+    # generic one (e.g. 'Windows 11 Version 25H2 X64' beats 'Windows 11').
+    $family = switch -Regex ($productCaption) {
+        'Windows Server 2025'   { 'Windows Server 2025';   break }
+        'Windows Server 2022'   { 'Windows Server 2022';   break }
+        'Windows Server 2019'   { 'Windows Server 2019';   break }
+        'Windows 11'            { 'Windows 11';            break }
+        'Windows 10'            { 'Windows 10';            break }
+        'Ubuntu 24\.\d+'        { 'Ubuntu 24';             break }
+        'Ubuntu 22\.\d+'        { 'Ubuntu 22';             break }
+        '^Debian.*13'           { 'Debian 13';             break }
+        '^Debian.*12'           { 'Debian 12';             break }
+        default                 { $null }
+    }
+    if (-not $family) { return $null }
+
+    $osMatches = @($osNames | Where-Object { $_ -match [regex]::Escape($family) })
+    if ($osMatches.Count -eq 0) { return $null }
+    if ($osMatches.Count -eq 1) { return $osMatches[0] }
+    # Prefer the LONGEST matching string as the most-specific version variant
+    # (e.g. 'Windows 11 Version 25H2 X64' > 'Windows 11').
+    return ($osMatches | Sort-Object Length -Descending | Select-Object -First 1)
+}
+
+# ---------- Resolve OsName ----------------------------------------------------
+# Locate the script directory. $PSScriptRoot is unset when the file is
+# dot-sourced from a REPL or executed via Invoke-Expression; fall back to
+# $PSCommandPath's parent, then hard-fail with an actionable message rather
+# than letting Split-Path throw a confusing 'null Path' error.
+$scriptDir = if ($PSScriptRoot) {
+    $PSScriptRoot
+} elseif ($PSCommandPath) {
+    Split-Path -Parent $PSCommandPath
+} else {
+    $null
+}
+if (-not $scriptDir) {
+    throw "Cannot locate the script directory. Run this file as a .ps1 script (not dot-sourced from a REPL or Invoke-Expression'd)."
+}
+$RepoRoot = Split-Path -Parent $scriptDir
+
+if (-not $OsName) {
+    $OsName = Resolve-DefaultOsName -RepoRoot $RepoRoot
+    if ($OsName) {
+        Write-Host ("  [auto] Detected OsName: {0}" -f $OsName) -ForegroundColor DarkGreen
+    } else {
+        # Collect diagnostic context so the operator can see WHY auto-detect
+        # failed (unrecognized caption vs. no NSRL entry vs. CIM/registry
+        # both threw). Cheap - re-runs detection just to grab the caption.
+        $diag = @{ caption = '(unavailable)'; nsrlOsList = '(unreadable)' }
+        try {
+            $os = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
+            $diag.caption = "$($os.Caption)"
+        } catch { }
+        try {
+            $diag.nsrlOsList = (Import-Csv (Join-Path $RepoRoot 'NSRL\nsrl_reduced.csv') |
+                                Where-Object OsName |
+                                Select-Object -ExpandProperty OsName |
+                                Sort-Object -Unique) -join [Environment]::NewLine
+        } catch { }
+        Write-Error @"
+Could not auto-detect OsName. Pass -OsName '<value>' explicitly.
+  Detected running OS caption : $($diag.caption)
+Distinct OsName values in NSRL\nsrl_reduced.csv:
+$($diag.nsrlOsList)
+"@
+        return
+    }
+} else {
+    # Validate that the user-supplied OsName matches an entry in the NSRL
+    # corpus. A typo (e.g. 'Windows 11' vs 'Windows 11 Version 25H2 X64')
+    # would silently misroute later - fail fast here with the available list.
+    $csvPathForCheck = Join-Path $RepoRoot 'NSRL\nsrl_reduced.csv'
+    if (Test-Path -LiteralPath $csvPathForCheck) {
+        try {
+            $knownOs = @(Import-Csv -LiteralPath $csvPathForCheck |
+                         Where-Object { $_.OsName } |
+                         Select-Object -ExpandProperty OsName |
+                         Sort-Object -Unique)
+            if ($knownOs.Count -gt 0 -and -not ($knownOs -contains $OsName)) {
+                Write-Warning @"
+OsName '$OsName' is NOT present in NSRL\nsrl_reduced.csv. Get-VTBaseline -OsFilter
+will not route these rows through any existing per-OS bucket. Known values:
+  $($knownOs -join "`n  ")
+Proceeding anyway (assume this is intentional). Ctrl+C to abort.
+"@
+            }
+        } catch {
+            # Non-fatal: if the corpus check fails we still let the user proceed.
+        }
+    }
+}
 
 # ---------- Preset resolution --------------------------------------------------
 $Presets = @{
@@ -99,7 +274,7 @@ $Presets = @{
 
 # Resolve destination CSV relative to repo root (../NSRL from this script's dir)
 if (-not $CsvPath) {
-    $CsvPath = Join-Path (Split-Path $PSScriptRoot -Parent) 'NSRL\nsrl_common_software.csv'
+    $CsvPath = Join-Path $RepoRoot 'NSRL\nsrl_common_software.csv'
 }
 if (-not (Test-Path -LiteralPath $CsvPath)) {
     Write-Host "Creating CSV: $CsvPath" -ForegroundColor DarkCyan

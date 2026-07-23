@@ -527,14 +527,28 @@ function Get-VTBaseline {
     }
 
     # --- BUILD NSRL ENTRY LISTS (with OsName per hash for slug routing) ---
+    # Reuses $nsrlCsvFiles enumerated above (line ~433). Iterates every NSRL
+    # CSV so nsrl_common_software.csv and any future vendor extension get
+    # picked up automatically. First-write-wins across CSVs (by hash) so the
+    # authoritative NIST NSRL entries in nsrl_reduced.csv (priority-sorted
+    # first) cannot be overridden by later CSVs.
     $nsrlWindowsEntries = New-Object System.Collections.Generic.List[object]
     $nsrlLinuxEntries   = New-Object System.Collections.Generic.List[object]
-    if ($doNSRL -and (Test-Path $nsrlCsvPath)) {
-        Import-Csv $nsrlCsvPath | ForEach-Object {
-            if (-not $_.Hash) { return }
-            $entry = [pscustomobject]@{ Hash = $_.Hash; OsName = $_.OsName }
-            if ($_.OsName -like '*Windows*') { $nsrlWindowsEntries.Add($entry) }
-            else                              { $nsrlLinuxEntries.Add($entry)   }
+    if ($doNSRL -and $nsrlCsvFiles -and $nsrlCsvFiles.Count -gt 0) {
+        $seenNsrlHashes = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($csvFile in $nsrlCsvFiles) {
+            try {
+                Import-Csv $csvFile.FullName | ForEach-Object {
+                    if (-not $_.Hash) { return }
+                    if (-not $seenNsrlHashes.Add($_.Hash)) { return }
+                    $entry = [pscustomobject]@{ Hash = $_.Hash; OsName = $_.OsName }
+                    if ($_.OsName -like '*Windows*') { $nsrlWindowsEntries.Add($entry) }
+                    else                              { $nsrlLinuxEntries.Add($entry)   }
+                }
+            } catch {
+                Write-Host "[WARN] Could not parse $($csvFile.Name) for NSRL entries: $($_.Exception.Message)" -ForegroundColor Yellow
+                continue
+            }
         }
         Write-Host "NSRL queue: $($nsrlWindowsEntries.Count) Windows, $($nsrlLinuxEntries.Count) Linux." -ForegroundColor DarkGray
     }

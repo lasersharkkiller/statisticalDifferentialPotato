@@ -116,9 +116,12 @@ if ($functionChoice -eq "1a") {
         Write-Host "[WARN] $nsrlCsvPath not found - per-OS continue options unavailable." -ForegroundColor Yellow
     }
 
-    # Toggleable per-run setting; default ON saves quota on signed legitimate
-    # software that has no sandbox data at VT.
-    $skipSignedBeh = $true
+    # Toggleable per-run setting. Default OFF (i.e. INCLUDE behaviors for
+    # SignedVerified samples) so the differential-analysis pipeline gets a
+    # populated goodware-side G-count on the process / module / dll dims.
+    # Default flipped 2026-07-23 to prevent the taskhostw/nss3/plugin-container
+    # false-positive class. Toggle back on with `t` for a quota-constrained run.
+    $skipSignedBeh = $false
 
     $subOptions = New-Object System.Collections.Generic.List[object]
     $i = 1
@@ -138,7 +141,7 @@ if ($functionChoice -eq "1a") {
         Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkCyan
         Write-Host "  $([char]27)[4m|        1a) Baseline Procs with VirusTotal     |$([char]27)[24m" -ForegroundColor DarkCyan
         Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkCyan
-        $stateLabel = if ($skipSignedBeh) { 'SKIP (default - saves quota)' } else { 'INCLUDE (full pull)' }
+        $stateLabel = if ($skipSignedBeh) { 'SKIP (saves quota; goodware behaviors starved)' } else { 'INCLUDE (default - full differential coverage)' }
         Write-Host ("  SignedVerified behaviors fetch: {0}" -f $stateLabel) -ForegroundColor DarkGray
         Write-Host ""
         foreach ($opt in $subOptions) {

@@ -102,11 +102,24 @@ function Get-VTBaseline {
         # Explicit credentials for the proxy. Overrides whatever -ProxyRegion would
         # have resolved. Final fallback is an interactive Get-Credential prompt.
         [pscredential]$ProxyCredential,
-        # Skip the behaviour_summary call for hashes whose destination sig is
-        # SignedVerified. Most signed legitimate binaries have no sandbox data
-        # at VT, so the call wastes a quota unit returning nothing. Default ON
-        # (skip); pass -SkipBehaviorsForSignedVerified:$false to include them.
-        [bool]$SkipBehaviorsForSignedVerified = $true,
+        # Whether to skip the behaviour_summary call for hashes whose
+        # destination sig is SignedVerified.
+        #
+        # DEFAULT $false (INCLUDE): the differential-analysis pipeline
+        # requires goodware behaviors to compute the M-vs-G differential;
+        # skipping SignedVerified samples silently starves the goodware side
+        # of the process / module / dll / dns / ip dims and produces the
+        # taskhostw/nss3/plugin-container/etc. false positives observed
+        # 2026-07-22. Default flipped 2026-07-23.
+        #
+        # MissingBehaviors.csv already deduplicates re-pulls of hashes that
+        # returned 404 on /behaviour_summary, so the throughput cost of
+        # including signed-verified samples is one-time per hash across all
+        # future runs, not one-time per run.
+        #
+        # Pass -SkipBehaviorsForSignedVerified:$true to opt out for a
+        # quota-constrained run.
+        [bool]$SkipBehaviorsForSignedVerified = $false,
         # Subset of VT API keys to use. Comma-separated 1-based positions from
         # the loaded-keys list (e.g. '1,3,5'), or 'all'/'*' for everything.
         # Bypasses the interactive prompt. Falls back to $env:VT_KEYS.

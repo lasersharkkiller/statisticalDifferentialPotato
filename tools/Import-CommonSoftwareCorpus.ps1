@@ -19,9 +19,13 @@
 
     NEXT STEPS (out of scope for this script - user runs these):
       Import-Module .\baseline\VTBaseline.psm1
-      Get-VTBaseline -Mode NSRL -OsFilter 'Windows 11' -SkipBehaviorsForSignedVerified:$false
+      Get-VTBaseline -Mode NSRL -OsFilter 'Windows 11'
       Import-Module .\agentic\Build-VTFidelityIndex.psm1
       Build-VTFidelityIndex
+
+    NOTE: as of 2026-07-23 SkipBehaviorsForSignedVerified defaults to $false
+    (INCLUDE behaviors). Pass -SkipBehaviorsForSignedVerified:$true only if
+    you need to opt out for a quota-constrained run.
 
 .PARAMETER PackageId
     winget package ID. Presets known:
@@ -213,9 +217,9 @@ Write-Host ""
 if ($rows.Count -gt 0) {
     Write-Host "Next steps to actually seed the goodware baseline with these hashes:" -ForegroundColor Yellow
     Write-Host "  1. Import-Module .\baseline\VTBaseline.psm1"
-    Write-Host "  2. Get-VTBaseline -Mode NSRL -OsFilter '$OsName' -SkipBehaviorsForSignedVerified:`$false"
-    Write-Host "     (behaviors for signed-verified files are SKIPPED by default - flip to `$false or"
-    Write-Host "      the pilot is a no-op for the process/module/dll dims we actually need to fix)"
+    Write-Host "  2. Get-VTBaseline -Mode NSRL -OsFilter '$OsName'"
+    Write-Host "     (behaviors for signed-verified files are INCLUDED by default as of 2026-07-23;"
+    Write-Host "      pass -SkipBehaviorsForSignedVerified:`$true only for a quota-constrained run)"
     Write-Host "  3. Import-Module .\agentic\Build-VTFidelityIndex.psm1"
     Write-Host "  4. Build-VTFidelityIndex   # ~10-15 min; emits Score100 + calibration_passed clears"
     Write-Host "  5. .\tools\Measure-FidelityFPs.ps1   # confirm FP-kill delta"

@@ -406,15 +406,42 @@ function Get-VTBaseline {
     }
 
     # --- BUILD NSRL HASH -> OS MAP (used for NSRL-overrules-localBaseline routing) ---
+    # Enumerate every CSV under NSRL\ (nsrl_reduced.csv is the NIST authoritative
+    # base; nsrl_common_software.csv is the researcher-added common-software
+    # corpus; any future NSRL\<vendor>.csv drops in automatically).
+    #
+    # Priority sort: nsrl_reduced.csv MUST load first so NSRL wins on conflict
+    # (per memory/folder_layout invariant). Naive Sort-Object Name would put
+    # 'nsrl_common_software.csv' first alphabetically ('c' < 'r') and — with
+    # first-write-wins semantics below — would let common-software rows
+    # override authoritative NSRL entries. Bug caught in adversarial review
+    # 2026-07-22.
     $hashToOs = @{}
-    $nsrlCsvPath = "NSRL\nsrl_reduced.csv"
-    if (Test-Path $nsrlCsvPath) {
-        Import-Csv $nsrlCsvPath | ForEach-Object {
-            if ($_.Hash -and $_.OsName) { $hashToOs[$_.Hash.ToLowerInvariant()] = $_.OsName }
+    $nsrlCsvFiles = @(Get-ChildItem -Path "NSRL" -Filter '*.csv' -File -ErrorAction SilentlyContinue |
+                      Sort-Object @{ Expression = { if ($_.Name -ieq 'nsrl_reduced.csv') { 0 } else { 1 } } }, Name)
+    if ($nsrlCsvFiles.Count -gt 0) {
+        foreach ($csvFile in $nsrlCsvFiles) {
+            $rowsBefore = $hashToOs.Count
+            try {
+                Import-Csv $csvFile.FullName | ForEach-Object {
+                    if ($_.Hash -and $_.OsName) {
+                        # First-write-wins across CSVs. With the priority sort
+                        # above, nsrl_reduced.csv (NIST authoritative) loads
+                        # first and its OsName cannot be overwritten by any
+                        # later CSV (common-software or vendor extension).
+                        $key = $_.Hash.ToLowerInvariant()
+                        if (-not $hashToOs.ContainsKey($key)) { $hashToOs[$key] = $_.OsName }
+                    }
+                }
+            } catch {
+                Write-Host "[WARN] Failed to parse $($csvFile.Name): $($_.Exception.Message)" -ForegroundColor Yellow
+                continue
+            }
+            $added = $hashToOs.Count - $rowsBefore
+            Write-Host ("Loaded NSRL[{0}]: {1} new entries ({2} total)" -f $csvFile.Name, $added, $hashToOs.Count) -ForegroundColor DarkGray
         }
-        Write-Host "Loaded NSRL map: $($hashToOs.Count) hash->OS entries." -ForegroundColor DarkGray
     } else {
-        Write-Host "[WARN] NSRL\nsrl_reduced.csv not found - NSRL routing disabled; everything goes to localBaseline." -ForegroundColor Yellow
+        Write-Host "[WARN] No CSVs found under NSRL\ - NSRL routing disabled; everything goes to localBaseline." -ForegroundColor Yellow
     }
 
     function Get-DestPaths {

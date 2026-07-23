@@ -54,7 +54,16 @@ function Build-VTFidelityIndex {
         [string]$BaselineRoot  = "output-baseline",
         [string]$AptRoot       = "apt\APTs",
         [int]   $MaxLegitNames = 5,
-        [switch]$SkipPhase2
+        [switch]$SkipPhase2,
+        # Alt-A Bayesian prior (Empirical Bayes with process-baseline volume as
+        # informed beta-prior). OFF by default per bayes-research recommendation:
+        # emit legacy + Alt-A scores SIDE BY SIDE so consumers can A/B without a
+        # rebuild. Consumer chooses via manifest / read-time preference.
+        # beta_prior = 1 + PBPriorKappa * pb(a) where pb(a) is process-baseline
+        # goodware-count for the artifact value (0 if absent).
+        [switch]$EnableAltAPrior,
+        [ValidateRange(0.0, 1000.0)]
+        [double]$PBPriorKappa  = 5.0
     )
 
     if (-not [System.IO.Path]::IsPathRooted($BaselineRoot)) {
@@ -80,24 +89,29 @@ function Build-VTFidelityIndex {
     # PS5.1 nested-hashtable corruption forbids nested @{} writes from inside
     # nested functions; pipe-separated composite keys are the existing workaround.
     # -----------------------------------------------------------------------
-    $script:_vtfi_mal   = @{}   # 'dim|value' -> int malicious count
-    $script:_vtfi_good  = @{}   # 'dim|value' -> int goodware  count
-    $script:_vtfi_legit = @{}   # 'dim|value' -> List[string] legit names
+    # Belt-and-braces OrdinalIgnoreCase: @{} defaults to case-insensitive in PS
+    # but this survives a future refactor that swaps in a strongly-typed
+    # Dictionary without an OrdinalIgnoreCase comparer.
+    $script:_vtfi_mal   = [System.Collections.Hashtable]::new([System.StringComparer]::OrdinalIgnoreCase)   # 'dim|value' -> int malicious count
+    $script:_vtfi_good  = [System.Collections.Hashtable]::new([System.StringComparer]::OrdinalIgnoreCase)   # 'dim|value' -> int goodware  count
+    $script:_vtfi_legit = [System.Collections.Hashtable]::new([System.StringComparer]::OrdinalIgnoreCase)   # 'dim|value' -> List[string] legit names
     $script:_vtfi_dims  = [System.Collections.Generic.HashSet[string]]::new(
                               [System.StringComparer]::OrdinalIgnoreCase)
     $script:_vtfi_keys  = [System.Collections.Generic.HashSet[string]]::new(
                               [System.StringComparer]::OrdinalIgnoreCase)
 
-    # Process-baseline pipeline (UNCHANGED)
-    $script:_vtfi_procG       = @{}
-    $script:_vtfi_procM       = @{}
-    $script:_vtfi_procSigners = @{}
-    $script:_vtfi_procDirs    = @{}
+    # Process-baseline pipeline. All keyed by process-basename (lowercased at
+    # write time by callers) — OrdinalIgnoreCase container per case-fix
+    # convention above.
+    $script:_vtfi_procG       = [System.Collections.Hashtable]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $script:_vtfi_procM       = [System.Collections.Hashtable]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $script:_vtfi_procSigners = [System.Collections.Hashtable]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $script:_vtfi_procDirs    = [System.Collections.Hashtable]::new([System.StringComparer]::OrdinalIgnoreCase)
     $script:_vtfi_maxLN       = $MaxLegitNames
 
     # Sandbox-artifact scrubber state (process-baseline D field).
     $script:_vtfi_scrubDropped = 0                 # total sandbox-artifact paths rejected
-    $script:_vtfi_scrubProcs   = @{}               # process-name -> drop count (for distinct-M metric)
+    $script:_vtfi_scrubProcs   = [System.Collections.Hashtable]::new([System.StringComparer]::OrdinalIgnoreCase)  # process-name -> drop count
     # Compile the sandbox-artifact rejection regex ONCE per build. Kept in exact lockstep with the runtime
     # consumer filter in elasticPotato\agentic\ElasticAlertAgent.psm1 ($sandboxOnlyTokens + $sandboxRx,
     # located inside the process-baseline masquerade check; grep for $sandboxOnlyTokens if the location has
@@ -127,7 +141,7 @@ function Build-VTFidelityIndex {
     # Corpus-wide M / G totals (incremented once per processed file)
     $script:_vtfi_Mtotal = 0
     $script:_vtfi_Gtotal = 0
-    $script:_vtfi_GoodwareSubcorpora = @{}  # cat -> file count
+    $script:_vtfi_GoodwareSubcorpora = [System.Collections.Hashtable]::new([System.StringComparer]::OrdinalIgnoreCase)  # cat -> file count
 
     # -------------------------------------------------------------------------
     # Test-IsSandboxArtifactPath: returns $true if $Path is a VT sandbox
@@ -420,18 +434,30 @@ function Build-VTFidelityIndex {
 
     function Get-ArtifactScores {
         # $L is intentionally unused: L is display-only per v2 scoring signoff.
+        #
+        # Alt-A Bayesian upgrade: -BetaPrior (default 1.0) lets callers pass an
+        # informed prior for the goodware side of the Beta posterior. Baseline
+        # (Alt-A off) uses BetaPrior=1.0 and reproduces the pre-existing
+        # Beta(M+1, g_eff+1) formula bit-identically. When enabled, callers
+        # compute BetaPrior = 1.0 + kappa * pb(a) upstream and pass it here.
         param(
             [int]   $M,
             [int]   $G,
             [int]   $L,
             [int]   $Mtotal,
             [int]   $Gtotal,
-            [double]$P95Total
+            [double]$P95Total,
+            [double]$BetaPrior = 1.0
         )
         # corpus normalization: G_eff brings goodware count onto the malware scale
         $g_eff = if ($Gtotal -gt 0) { [double]$G * ([double]$Mtotal / [double]$Gtotal) } else { [double]$G }
         $alpha = [double]$M + 1.0
-        $beta  = $g_eff + 1.0
+        $beta  = $g_eff + $BetaPrior
+        # Beta parameters must be strictly > 0 or the regularized incomplete beta
+        # returns NaN/garbage. Callers can only pass non-negative BetaPrior via
+        # ValidateRange on -PBPriorKappa, but g_eff can be 0 (G=0) - so beta
+        # must be floored to 1.0 to guarantee a valid Beta(alpha, beta).
+        if ($beta -lt 1.0) { $beta = 1.0 }
         $I = Get-RegularizedIncompleteBeta -a $alpha -b $beta -x 0.5
         $risk = 1.0 - $I
         if ($risk -lt 0.0) { $risk = 0.0 } elseif ($risk -gt 1.0) { $risk = 1.0 }
@@ -543,7 +569,18 @@ function Build-VTFidelityIndex {
         $isMalicious = $malCats -contains $cat
         $processed = 0
 
-        Write-Host "  Processing $cat ($($files.Count) files)..." -ForegroundColor DarkGray
+        # Pre-cache the main-JSON index for THIS cat: one recursive Get-ChildItem
+        # pass over $mainRoot/$cat, keyed by basename (sha256), for O(1) lookup
+        # in the per-file loop. Replaces the per-file Get-ChildItem -Recurse
+        # that was firing ~34k times for the NSRL cat alone (100% of NSRL main
+        # JSONs are nested at depth 2+). Adversarial-review perf fix 2026-07-22.
+        $mainCatRoot = Join-Path $mainRoot $cat
+        $mainIndex   = [System.Collections.Hashtable]::new([System.StringComparer]::OrdinalIgnoreCase)
+        if (Test-Path $mainCatRoot) {
+            Get-ChildItem -Path $mainCatRoot -Recurse -File -Filter "*.json" -ErrorAction SilentlyContinue |
+                ForEach-Object { $mainIndex[$_.BaseName] = $_.FullName }
+        }
+        Write-Host "  Processing $cat ($($files.Count) behavior files, $($mainIndex.Count) main-JSON indexed)..." -ForegroundColor DarkGray
 
         foreach ($f in $files) {
             $processed++; $totalProcessed++
@@ -569,8 +606,15 @@ function Build-VTFidelityIndex {
                 $certPub     = $null
                 $vtTags      = @()
 
-                # Try main JSON for either category (for cert/tag info)
-                $mainPath = Join-Path $mainRoot "$cat\$($f.BaseName).json"
+                # Main JSON lookup via pre-cached $mainIndex (built once per
+                # cat above via one recursive pass). Falls back to the flat
+                # Join-Path form for legacy behavior when the pre-cache is
+                # empty (shouldn't happen in practice but is defensive).
+                $mainPath = if ($mainIndex.ContainsKey($f.BaseName)) {
+                    $mainIndex[$f.BaseName]
+                } else {
+                    Join-Path $mainRoot "$cat\$($f.BaseName).json"
+                }
                 $attr     = $null
                 if (Test-Path $mainPath) {
                     try {
@@ -601,11 +645,14 @@ function Build-VTFidelityIndex {
                         Update-Index -Value $certPub -Dimension "cert-publisher" -IsMalicious $isMalicious -LegitName $legitName
                     }
 
-                    # vt-tag (enrichment-only)
+                    # vt-tag (enrichment-only). Canonicalize to lowercase per
+                    # manifest contract so 'CobaltStrike' and 'cobaltstrike'
+                    # collapse to one key across historical VT tag casing drift.
                     if ($attr.tags) {
                         $attr.tags | ForEach-Object {
                             if ($_ -and "$_".Length -ge 3) {
-                                Update-Index -Value "$_" -Dimension "vt-tag" -IsMalicious $isMalicious -LegitName $legitName
+                                $tagCanon = "$_".Trim().ToLowerInvariant()
+                                Update-Index -Value $tagCanon -Dimension "vt-tag" -IsMalicious $isMalicious -LegitName $legitName
                             }
                         }
                     }
@@ -613,7 +660,8 @@ function Build-VTFidelityIndex {
                         $attr.popular_threat_classification.popular_threat_name | ForEach-Object {
                             $ptn = if ($_.value) { "$($_.value)" } else { "$_" }
                             if ($ptn -and $ptn.Length -ge 3) {
-                                Update-Index -Value $ptn -Dimension "vt-tag" -IsMalicious $isMalicious -LegitName $legitName
+                                $ptnCanon = $ptn.Trim().ToLowerInvariant()
+                                Update-Index -Value $ptnCanon -Dimension "vt-tag" -IsMalicious $isMalicious -LegitName $legitName
                             }
                         }
                     }
@@ -644,17 +692,28 @@ function Build-VTFidelityIndex {
                 }
 
                 # ----- network -----
+                # IP: canonicalize via [System.Net.IPAddress] so IPv6 short/long
+                # forms (fe80::1 vs fe80:0:0:0:0:0:0:1) collapse to one key and
+                # IPv4-mapped addresses land on their v4 canonical form.
                 if ($d.ip_traffic) {
                     $d.ip_traffic | ForEach-Object {
                         if ($_.destination_ip) {
-                            Update-Index -Value $_.destination_ip -Dimension "ip" -IsMalicious $isMalicious -LegitName $legitName
+                            $ipRaw   = "$($_.destination_ip)".Trim()
+                            $ipCanon = $ipRaw
+                            try { $ipCanon = [System.Net.IPAddress]::Parse($ipRaw).ToString() } catch { $ipCanon = $ipRaw }
+                            Update-Index -Value $ipCanon -Dimension "ip" -IsMalicious $isMalicious -LegitName $legitName
                         }
                     }
                 }
+                # DNS: lowercase + trim trailing dot (root-label FQDN form) per
+                # manifest contract; DNS is case-insensitive by RFC 4343.
                 if ($d.dns_lookups) {
                     $d.dns_lookups | ForEach-Object {
                         if ($_.hostname) {
-                            Update-Index -Value $_.hostname -Dimension "dns" -IsMalicious $isMalicious -LegitName $legitName
+                            $dnsCanon = "$($_.hostname)".Trim().ToLowerInvariant().TrimEnd('.')
+                            if ($dnsCanon) {
+                                Update-Index -Value $dnsCanon -Dimension "dns" -IsMalicious $isMalicious -LegitName $legitName
+                            }
                         }
                     }
                 }
@@ -970,9 +1029,50 @@ function Build-VTFidelityIndex {
     # -----------------------------------------------------------------------
     Write-Host "`n  Scoring $($script:_vtfi_keys.Count) entries across $($script:_vtfi_dims.Count) dimensions ..." -ForegroundColor DarkCyan
 
+    # Alt-A Bayesian prior loader. Reads process-baseline.json ONCE if
+    # -EnableAltAPrior was passed. pb-lookup is a case-insensitive hashtable
+    # (process/file/module basenames are lowercased at write time). Absent
+    # entries yield pb=0 -> beta_prior = 1.0 -> Alt-A degrades to legacy formula.
+    $script:_vtfi_pbLookup = $null
+    if ($EnableAltAPrior) {
+        $pbPath = Join-Path $BaselineRoot 'process-baseline.json'
+        if (Test-Path $pbPath) {
+            $pbObj = $null
+            try {
+                $pbRaw = Get-Content $pbPath -Raw
+                $pbObj = $pbRaw | ConvertFrom-Json
+            } catch {
+                Write-Warning "[Alt-A] Failed to parse $pbPath : $($_.Exception.Message). Alt-A prior disabled for this run."
+                $pbObj = $null
+            }
+            if ($pbObj) {
+                $script:_vtfi_pbLookup = [System.Collections.Hashtable]::new([System.StringComparer]::OrdinalIgnoreCase)
+                $pbSkipped = 0
+                foreach ($p in $pbObj.PSObject.Properties) {
+                    # Per-row try/catch so a single malformed entry (missing .G,
+                    # non-numeric, null value) doesn't nuke the entire pb-lookup.
+                    try {
+                        $gCount = 0
+                        if ($p.Value -and $p.Value.PSObject.Properties['G']) { $gCount = [int]$p.Value.G }
+                        if ($gCount -gt 0) { $script:_vtfi_pbLookup[$p.Name] = $gCount }
+                    } catch {
+                        $pbSkipped++
+                    }
+                }
+                Write-Host "  [Alt-A] process-baseline pb-lookup loaded: $($script:_vtfi_pbLookup.Count) entries with G>0 (kappa=$PBPriorKappa, skipped=$pbSkipped)" -ForegroundColor DarkGreen
+                if ($pbSkipped -gt 0) {
+                    Write-Warning "[Alt-A] Skipped $pbSkipped malformed process-baseline rows during pb-lookup build."
+                }
+            }
+        } else {
+            Write-Warning "[Alt-A] $pbPath not found (built by this same run at completion; use -EnableAltAPrior only on rebuilds, not first-ever builds). Alt-A prior disabled for this run."
+        }
+    }
+
     $perDim = @{}       # dim -> @{ value -> entry-object }
     $flatOut = @{}      # 'dim|value' OR legacy bare key -> entry-object (compat)
     $uniqueCount = 0; $rareCount = 0
+    $altAUniqueCount = 0; $altARareCount = 0
     $Mtotal = [int]$script:_vtfi_Mtotal
     $Gtotal = [int]$script:_vtfi_Gtotal
 
@@ -998,6 +1098,21 @@ function Build-VTFidelityIndex {
         if ($scores.U) { $uniqueCount++ }
         if ($scores.R) { $rareCount++ }
 
+        # Alt-A Bayesian: score the same M/G with an informed beta_prior derived
+        # from process-baseline volume. beta_prior = 1 + PBPriorKappa * pb(val).
+        # Only fired when -EnableAltAPrior was passed AND the pb-lookup loaded.
+        # Emits SIDE BY SIDE with legacy fields so consumers can A/B without a
+        # rebuild. When disabled or pb=0, Alt-A degrades to legacy formula.
+        $altAScores = $null
+        $altAPB     = 0
+        if ($script:_vtfi_pbLookup) {
+            if ($script:_vtfi_pbLookup.ContainsKey($val)) { $altAPB = [int]$script:_vtfi_pbLookup[$val] }
+            $betaPriorAltA = 1.0 + ($PBPriorKappa * [double]$altAPB)
+            $altAScores    = Get-ArtifactScores -M $mc -G $gc -L $legit.Count -Mtotal $Mtotal -Gtotal $Gtotal -P95Total $p95 -BetaPrior $betaPriorAltA
+            if ($altAScores.U) { $altAUniqueCount++ }
+            if ($altAScores.R) { $altARareCount++ }
+        }
+
         # Preliminary verdict points (consumer may override per dim flag)
         $cap = if ($script:_vtfi_maxVP.ContainsKey($dim)) { [int]$script:_vtfi_maxVP[$dim] } else { 15 }
         $vp = 0
@@ -1021,6 +1136,20 @@ function Build-VTFidelityIndex {
             Score100      = $scores.Score100
             Dimension     = $dim
             VerdictPoints = $vp
+        }
+
+        # Alt-A side-by-side emission. Consumer opts in by reading Score100_AltA
+        # instead of Score100. Also emit the pb count that drove the prior so
+        # calibration passes can audit which artifacts got informed priors.
+        if ($altAScores) {
+            Add-Member -InputObject $entry -MemberType NoteProperty -Name 'AltAPrior_Enabled' -Value $true
+            Add-Member -InputObject $entry -MemberType NoteProperty -Name 'AltAPrior_Kappa'   -Value $PBPriorKappa
+            Add-Member -InputObject $entry -MemberType NoteProperty -Name 'AltAPrior_PB'      -Value $altAPB
+            Add-Member -InputObject $entry -MemberType NoteProperty -Name 'RiskScore_AltA'    -Value $altAScores.RiskScore
+            Add-Member -InputObject $entry -MemberType NoteProperty -Name 'Confidence_AltA'   -Value $altAScores.Confidence
+            Add-Member -InputObject $entry -MemberType NoteProperty -Name 'Score100_AltA'     -Value $altAScores.Score100
+            Add-Member -InputObject $entry -MemberType NoteProperty -Name 'U_AltA'            -Value $altAScores.U
+            Add-Member -InputObject $entry -MemberType NoteProperty -Name 'R_AltA'            -Value $altAScores.R
         }
 
         if (-not $perDim.ContainsKey($dim)) { $perDim[$dim] = @{} }
@@ -1293,11 +1422,22 @@ function Build-VTFidelityIndex {
     Write-Host "    Total dim entries scored     : $($script:_vtfi_keys.Count)"
     Write-Host "    Unique-to-malware (U)        : $uniqueCount"
     Write-Host "    Rare              (R)        : $rareCount"
+    if ($script:_vtfi_pbLookup) {
+        Write-Host "    Alt-A Unique (U_AltA)        : $altAUniqueCount    (kappa=$PBPriorKappa, pb-entries=$($script:_vtfi_pbLookup.Count))" -ForegroundColor DarkGreen
+        Write-Host "    Alt-A Rare   (R_AltA)        : $altARareCount" -ForegroundColor DarkGreen
+    }
     Write-Host "    Build time                   : $([Math]::Round($elapsed.TotalMinutes, 1)) minutes"
 
     if ($blockingZero.Count -gt 0) {
         Write-Warning "BLOCKING: dimensions with zero entries: $($blockingZero -join ', ')"
     }
+
+    # Capture Alt-A-related state BEFORE teardown so the return object reports
+    # the ACTUAL pb-lookup load status, not just whether the switch was passed.
+    # Distinguishes 'Alt-A ran with 0 FPs' from 'Alt-A silently disabled by a
+    # failed pb-load' - both would emit AltAEnabled=true otherwise.
+    $altAPBLoaded  = ($null -ne $script:_vtfi_pbLookup)
+    $altAPBEntries = if ($altAPBLoaded) { $script:_vtfi_pbLookup.Count } else { 0 }
 
     # Clean up module-scope working variables
     $script:_vtfi_mal = $null; $script:_vtfi_good = $null; $script:_vtfi_legit = $null
@@ -1311,6 +1451,7 @@ function Build-VTFidelityIndex {
     $script:_vtfi_GoodwareSubcorpora = $null
     $script:_vtfi_dimMeta = $null
     $script:_vtfi_maxVP = $null; $script:_vtfi_usage = $null
+    $script:_vtfi_pbLookup = $null
 
     return [PSCustomObject]@{
         SchemaVersion  = 2
@@ -1320,6 +1461,12 @@ function Build-VTFidelityIndex {
         Dimensions     = $indicesMeta.Count
         UniqueCount    = $uniqueCount
         RareCount      = $rareCount
+        AltAEnabled       = [bool]$EnableAltAPrior
+        AltAPBLookupLoaded = $altAPBLoaded
+        AltAPBEntries      = $altAPBEntries
+        AltAPriorKappa  = if ($altAPBLoaded) { $PBPriorKappa } else { $null }
+        AltAUniqueCount = if ($altAPBLoaded) { $altAUniqueCount } else { $null }
+        AltARareCount   = if ($altAPBLoaded) { $altARareCount   } else { $null }
         FilesScanned   = $totalProcessed
         Mtotal         = $Mtotal
         Gtotal         = $Gtotal

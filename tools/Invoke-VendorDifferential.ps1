@@ -105,22 +105,38 @@ foreach ($v in $cands) {
     if ([string]::IsNullOrEmpty($reason)) {
         $files = @([System.IO.Directory]::EnumerateFiles($v.FullName, '*.json', 'AllDirectories'))
         $samp  = @($files | Get-Random -Count ([Math]::Min(400, $files.Count)) -ErrorAction SilentlyContinue)
-        $win = 0; $elf = 0; $seen = 0
+        $win = 0; $elf = 0; $seen = 0; $withImports = 0
         foreach ($f in $samp) {
             try {
-                $t = (Get-Content $f -Raw | ConvertFrom-Json).data.attributes.type_description
+                $a = (Get-Content $f -Raw | ConvertFrom-Json).data.attributes
+                $t = $a.type_description
                 if (-not $t) { continue }
                 $seen++
                 if     ($t -match 'Win32|Win64|DOS|MSI|\.NET|Windows') { $win++ }
                 elseif ($t -match 'ELF|Linux')                          { $elf++ }
+                # A static import differential needs native import tables. Java
+                # bytecode, configs and archives have none, whatever their count.
+                if ($a.elf_info.import_list -or $a.pe_info.import_list) { $withImports++ }
             } catch {}
         }
         if ($seen -gt 0) {
-            $wp = $win / $seen; $ep = $elf / $seen
+            $wp = $win / $seen; $ep = $elf / $seen; $ip = $withImports / $seen
+            # Gate on IMPORT COVERAGE, not file count. Inductive-Automation has a
+            # 13,166-file baseline and 116 behaviour reports with data, so it passed
+            # every other check - but it is 94% Java Bytecode with 0% native import
+            # tables, so its differential came back with ONE distinct rarity value
+            # across 1,186 rows: non-discriminating, i.e. useless. Ignition is a Java
+            # platform; there are no native imports to be rare against.
+            if ($ip -lt 0.05) {
+                $reason = "SKIP - only $([int]($ip*100))% of baseline carries native import tables (Java/config corpus); static differential cannot discriminate"
+            }
+            # Require a MEANINGFUL fraction before claiming a platform. Without the
+            # floor, a single stray ELF file in a 400-sample set classified an entire
+            # Java vendor as ELF.
             $plat = if ($wp -ge 0.25 -and $ep -ge 0.10) { 'Mixed' }
-                    elseif ($wp -gt $ep)                { 'Windows' }
-                    elseif ($ep -gt 0)                  { 'ELF' }
-                    else                                { 'Mixed' }
+                    elseif ($wp -ge 0.05 -and $wp -gt $ep) { 'Windows' }
+                    elseif ($ep -ge 0.05)                  { 'ELF' }
+                    else                                   { 'Mixed' }
         }
     }
     $plan.Add([pscustomobject]@{

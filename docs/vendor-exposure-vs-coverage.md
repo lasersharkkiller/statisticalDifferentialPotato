@@ -1,0 +1,110 @@
+# Vendor exposure vs corpus coverage — reference for the firmware threat briefs
+
+**Generated 2026-10-23** from `OTSDP/Inventory/analysis/arng_devices_raw.json` (the census
+refreshed 2026-10-22) and the live catalogs under `firmware-staging/*/*/*/catalog.csv`.
+
+Census totals: **259,198 devices**, of which **5,811** fall in the `OT & Building Systems`
+category across **114 distinct vendors**.
+
+A note on which number to quote: a vendor's *total* device count and its *OT* count differ,
+sometimes a lot. Tridium is **604 total / 568 OT**; Digital Systems Corp is **492 total / 463
+OT**. The briefs quote the **OT** figure, and so does this table. Quoting the total inflates
+the fleet claim.
+
+---
+
+## The table
+
+"Hashes" is distinct SHA-256 count currently catalogued for that vendor in `firmware-staging`.
+"ST" is the number of states the devices appear in — a rough blast-radius indicator independent
+of raw count.
+
+| Census vendor | OT devices | States | Threat brief | Distinct hashes | Hashes / device |
+|---|---:|---:|---|---:|---:|
+| Texas Instruments | 710 | 42 | **none** | 0 | 0.0 |
+| Tridium, Inc. | 568 | 31 | `tridium` | 14,743 | 26.0 |
+| ECHELON CORP. | 566 | 28 | `echelon` | 5,986 | 10.6 |
+| Digital Systems Corp | 463 | 19 | **none** | 968 | 2.1 |
+| Johnson Controls, Inc. | 302 | 6 | `johnson-controls` | 3,520 | 11.7 |
+| AutomatedLogic Corporation | 253 | 12 | `automatedlogic` | 728 | 2.9 |
+| MERCURY SECURITY CORPORATION | 252 | 15 | `mercury-security` | 1 | 0.0 |
+| TAC AB | 252 | 9 | `tac-vista-xenta` | 267 | 1.1 |
+| Bosch Security Systems | 252 | 8 | `bosch-security` | 2 | 0.0 |
+| Aiphone co.,Ltd | 246 | 25 | `aiphone` | 2 | 0.0 |
+| VCS Video Communication Systems AG | 246 | 15 | **none** | 0 | 0.0 |
+| Axis Communications AB | 233 | 16 | `axis-communications` | 2,598 | 11.2 |
+| Digital Design Corporation | 160 | 11 | **none** | 0 | 0.0 |
+| Honeywell GmbH | 117 | 3 | `honeywell` | 0 | 0.0 |
+| Motorola Solutions Inc. | 84 | 7 | **none** | 0 | 0.0 |
+| Hanwha Vision VietNam | 72 | 4 | **none** | 0 | 0.0 |
+| Eaton Corporation | 71 | 8 | `eaton` | 50,622 | 713.0 |
+| Genetec Inc. | 66 | 7 | **none** | 0 | 0.0 |
+| SIEMENS BUILDING | 66 | 1 | `siemens` | 572,304 | **8,671.3** |
+| OSI Security Devices | 55 | 2 | **none** | 0 | 0.0 |
+| Apex, Inc. | 39 | 9 | **none** | 0 | 0.0 |
+| Trane | 38 | 4 | **none** | 0 | 0.0 |
+| AMERICAN POWER CONVERSION CORP | 37 | 27 | `apc` | 20,899 | 564.8 |
+| SQUARE D COMPANY | 35 | 8 | `schneider` | 267 | 7.6 |
+
+---
+
+## What the table says that the briefs do not
+
+**1. Corpus effort is inversely correlated with fleet exposure.**
+
+Siemens holds **572,304 hashes for 66 devices** — roughly **86% of the entire corpus** for
+**1.1% of the OT fleet**. Eaton and APC are the same shape (713 and 565 hashes per device).
+Meanwhile the four vendors at 246–252 devices each — Mercury, Bosch, Aiphone and VCS — hold
+**1, 2, 2 and 0 hashes respectively**.
+
+This is not an argument for deleting Siemens data; it is already collected and it is what made
+the file-type yield measurements possible. It *is* an argument that the next unit of effort is
+worth far more spent on the 246–252-device vendors than on deepening Siemens.
+
+**2. The largest OT "vendor" in the census is probably not a vendor.**
+
+**Texas Instruments, 710 OT devices across 42 states** — more than Tridium. TI does not sell
+building-automation controllers; this is almost certainly **OUI-only resolution**, where the
+census sees a TI network chip inside somebody else's product. Before anyone writes a TI brief,
+that classification needs resolving — the 710 devices are real, but they belong to some other
+vendor's product line, and identifying which would reassign a large block of the fleet. Same
+caution applies to the `Unclassified` top-category on nearly every OT vendor row.
+
+**3. Four vendors have real fleets and no brief at all.**
+
+| Vendor | OT devices | States | Note |
+|---|---:|---:|---|
+| **Digital Systems Corp** | 463 | 19 | = **Galaxy Control Systems**. We hold **968 hashes** pulled from VirusTotal, so the material exists — only the brief is missing. Highest-value gap. |
+| **VCS Video Communication Systems AG** | 246 | 15 | No firmware, no brief, not yet researched. |
+| **Digital Design Corporation** | 160 | 11 | No firmware, no brief. |
+| Motorola Solutions / Hanwha Vision / Genetec / OSI Security / Apex / Trane | 84 / 72 / 66 / 55 / 39 / 38 | — | Genetec is notable: it is a Mercury OEM channel, which ties to the Mercury acquisition problem. |
+
+**4. `honeywell` has a brief but zero firmware.** The staging tree holds only scaffolding. Since
+Honeywell resells Niagara-based controllers, the Tridium material now in hand may partially cover
+it — worth cross-referencing rather than acquiring separately.
+
+**5. State spread diverges from device count, and sometimes matters more.**
+
+APC appears in **27 states on 37 OT devices**; Aiphone in **25 states on 246**. Siemens Building
+sits in **1 state on 66**. A vendor present in 27 states is a wider lateral-movement surface than
+one concentrated in a single state, whatever the raw count. Tridium leads on both (568 devices,
+31 states), which is why it was the right acquisition priority.
+
+---
+
+## How to use this with the briefs
+
+- Quote the **OT** column, not the total, and say "OT & Building Systems" when citing it.
+- The **Hashes / device** column is a coverage-debt indicator, not a quality score. A low value
+  on a large fleet (Mercury, Bosch, Aiphone) means the brief rests on advisories rather than
+  on extracted firmware, and should say so.
+- Counts move. The census was refreshed 2026-10-22 and vendor totals shifted; regenerate this
+  table rather than copying these numbers forward.
+
+**Caveat on the hash counts:** they measure what has been *catalogued*, which conflates
+acquisition with analysis depth. A vendor whose firmware is one large encrypted blob (Mercury's
+EP1501) scores 1 hash while still having been analysed; a vendor shipping a sprawling Windows
+install (Siemens TIA Portal) scores hundreds of thousands with little behavioural yield — a
+measured **3.0%** real-behaviour rate overall, and **0.0%** for the HTML that made up 62% of
+submissions. Read this column alongside the yield figures in
+[vt-parallel-throughput notes], not on its own.

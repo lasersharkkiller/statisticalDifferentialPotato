@@ -1,7 +1,8 @@
 # OtBaseline.psm1
 # OT (Operational Technology) firmware baselining + opt-in VT submission.
 # Separate pipeline from Get-VTBaseline because:
-#   - Output goes to output-baseline/VirusTotal-{main,behaviors}/OT/<Vendor>/
+#   - Output goes to output-baseline/VirusTotal-{main,behaviors}/<Branch>/<Vendor>/
+#     where <Branch> defaults to OT. Use -Branch autonomousSystems for UAV/UGV.
 #     flat (per-vendor) instead of the NSRL/localBaseline/malicious hierarchy.
 #     Flat keying means a SHA256 shared across multiple products of the same
 #     vendor (e.g. Eaton ships the same Network-M2 rootfs as Industrial-
@@ -28,7 +29,15 @@ function Initialize-OtVTClient {
         [string]$ProxyRegion,
         [string]$Proxy,
         [pscredential]$ProxyCredential,
-        [string]$Keys
+        [string]$Keys,
+        # Enterprise tier - mirrors VTBaseline.psm1. The enterprise secret is
+        # named so it cannot match the free 'VT_API_Key_*' wildcard, and with
+        # -Enterprise the wildcard enumeration is skipped entirely. Free-tier
+        # constants (15s/key, 499/key/day) are calibrated and untouched.
+        [switch]$Enterprise,
+        [string]$EnterpriseSecretName = 'VT_Enterprise_Key',
+        [int]$EnterpriseMinDelayMs    = 50,
+        [int]$EnterpriseCapPerDay     = 0
     )
 
     # --- PROXY RESOLUTION ---
@@ -68,7 +77,30 @@ function Initialize-OtVTClient {
     }
 
     # --- KEY LOAD (with retry-on-locked-vault) ---
+    $script:OtVTIsEnterprise = [bool]$Enterprise
+    if ($Enterprise) {
+        if ($EnterpriseSecretName -like 'VT_API_Key_*') {
+            Write-Error ("Refusing to run: -EnterpriseSecretName '{0}' matches the free-key wildcard 'VT_API_Key_*'." -f $EnterpriseSecretName)
+            return $false
+        }
+        $ek = $null
+        try { $ek = (Get-Secret -Name $EnterpriseSecretName -AsPlainText -ErrorAction Stop).Trim() }
+        catch {
+            if (Get-Command Unlock-SecretStore -ErrorAction SilentlyContinue) {
+                try { Unlock-SecretStore -ErrorAction Stop; $ek = (Get-Secret -Name $EnterpriseSecretName -AsPlainText -ErrorAction Stop).Trim() }
+                catch { Write-Error ("Enterprise key '{0}' not readable: {1}" -f $EnterpriseSecretName, $_.Exception.Message); return $false }
+            } else { Write-Error ("Enterprise key '{0}' not found in vault." -f $EnterpriseSecretName); return $false }
+        }
+        if ([string]::IsNullOrWhiteSpace($ek)) { Write-Error "Enterprise key is empty."; return $false }
+        $script:OtVTKeys = @($ek)
+        $loadedNames     = @($EnterpriseSecretName)
+        Write-Host ("Using ENTERPRISE key ({0}) for OT baseline. Spacing {1}ms, cap {2}." -f `
+            $EnterpriseSecretName, $EnterpriseMinDelayMs,
+            $(if ($EnterpriseCapPerDay -gt 0) { $EnterpriseCapPerDay } else { 'none' })) -ForegroundColor Green
+    }
+
     $infos = $null
+    if (-not $Enterprise) {
     try {
         $infos = Get-SecretInfo -Name 'VT_API_Key_*' -ErrorAction Stop |
                  Sort-Object { if ($_.Name -match '_(\d+)$') { [int]$matches[1] } else { [int]::MaxValue } }
@@ -149,23 +181,36 @@ function Initialize-OtVTClient {
 
     Write-Host "Using $($VTKeys.Count) VT API key(s) ($($loadedNames -join ', '))." -ForegroundColor DarkCyan
 
-    # --- 499 SOFT-CAP STATE + STARTUP PROBE ---
-    $script:OtVTKeys              = $VTKeys
+    }   # end: free-tier key enumeration + subset resolution
+
+    # --- SOFT-CAP STATE + STARTUP PROBE ---
+    # $script:OtVTKeys is already set on the enterprise path; only the free path
+    # populates $VTKeys.
+    if (-not $Enterprise) { $script:OtVTKeys = $VTKeys }
     $script:OtVTLoadedNames       = $loadedNames
-    $script:OtVTMinDelayMs        = 15000
     $script:OtVTKeyLastCall       = @{}
     $script:OtVTKeyDisabledUntil  = @{}
     $script:OtVTKeyCallCount      = @{}
-    $script:OtVTKeyCapPerDay      = 499
+    if ($Enterprise) {
+        $script:OtVTMinDelayMs   = [Math]::Max(0, $EnterpriseMinDelayMs)
+        $script:OtVTKeyCapPerDay = if ($EnterpriseCapPerDay -gt 0) { $EnterpriseCapPerDay } else { [int]::MaxValue }
+    } else {
+        # Calibrated free-tier values - do not change.
+        $script:OtVTMinDelayMs   = 15000
+        $script:OtVTKeyCapPerDay = 499
+    }
 
     Write-Host "Seeding per-key daily-used counters from VT..." -ForegroundColor DarkGray
-    for ($j = 0; $j -lt $VTKeys.Count; $j++) {
+    for ($j = 0; $j -lt $script:OtVTKeys.Count; $j++) {
         $script:OtVTKeyLastCall[$j]      = [DateTime]::MinValue
         $script:OtVTKeyDisabledUntil[$j] = [DateTime]::MinValue
         $used = 0
         $probeArgs = @{
-            Uri        = "https://www.virustotal.com/api/v3/users/$($VTKeys[$j])"
-            Headers    = @{ 'x-apikey' = $VTKeys[$j] }
+            # Must read the RESOLVED key list: on the enterprise path $VTKeys
+            # is never populated (only $script:OtVTKeys is), which made this
+            # probe pass a null Uri and emit "Cannot index into a null array".
+            Uri        = "https://www.virustotal.com/api/v3/users/$($script:OtVTKeys[$j])"
+            Headers    = @{ 'x-apikey' = $script:OtVTKeys[$j] }
             TimeoutSec = 15
         }
         if ($script:OtVTProxy) {
@@ -265,9 +310,34 @@ function Submit-OtVTFile {
     param([System.IO.FileInfo]$FileInfo)
 
     if ($FileInfo.Length -le 32MB) {
-        $form = @{ file = $FileInfo }
-        $response = Invoke-OtVTRequest -Uri 'https://www.virustotal.com/api/v3/files' -Method 'POST' -Form $form
-        return $response.data.id
+        # Stage to temp before submitting. Passing the FileInfo straight to
+        # Invoke-RestMethod -Form throws UnauthorizedAccessException on files
+        # under C:\Program Files, because -Form opens the file demanding more
+        # than read access - verified 2026-10-07: [System.IO.File]::OpenRead()
+        # on the identical path succeeds while -Form fails. That silently cost
+        # 24 of 31 DJI submissions, including every DJI*Service.dll and every
+        # driver .cat/.inf. Copying first costs one local write and makes
+        # read-only install directories submittable.
+        $staged = Join-Path ([System.IO.Path]::GetTempPath()) ("vtsm-" + [Guid]::NewGuid().ToString('N') + ".bin")
+        try {
+            Copy-Item -LiteralPath $FileInfo.FullName -Destination $staged -Force -ErrorAction Stop
+            # Copy-Item preserves the source's ReadOnly attribute, and -Form opens the
+            # file demanding more than read access - so a ReadOnly source still failed
+            # here with "Access to the path '...vtsm-....bin' is denied", even though
+            # staging was supposed to be the fix for exactly that error. Extracted
+            # firmware is full of ReadOnly files: this silently skipped 1,449 of a
+            # 6,250-file submission (23%) on 2026-10-22. Clear it on our own copy.
+            $stagedItem = Get-Item -LiteralPath $staged
+            if ($stagedItem.Attributes -band [System.IO.FileAttributes]::ReadOnly) {
+                $stagedItem.Attributes = [System.IO.FileAttributes]::Normal
+                $stagedItem.Refresh()
+            }
+            $form = @{ file = $stagedItem }
+            $response = Invoke-OtVTRequest -Uri 'https://www.virustotal.com/api/v3/files' -Method 'POST' -Form $form
+            return $response.data.id
+        } finally {
+            Remove-Item -LiteralPath $staged -Force -ErrorAction SilentlyContinue
+        }
     }
 
     # Two-step path for >32MB
@@ -277,20 +347,67 @@ function Submit-OtVTFile {
         throw "VT did not return an upload_url (account tier may not allow >32MB uploads)"
     }
 
-    # The one-time upload URL embeds auth, so we don't reuse Invoke-OtVTRequest
-    # (which would attach x-apikey + count against rotation). Direct POST.
-    $reqArgs = @{
-        Uri        = $uploadUrl
-        Method     = 'POST'
-        Form       = @{ file = $FileInfo }
-        TimeoutSec = 600
+    # TWO bugs were in play here, diagnosed 2026-10-01. Both real:
+    #
+    # 1. The big-file POST REQUIRES the x-apikey header. The original comment
+    #    asserted the one-time URL "embeds auth" and deliberately omitted it.
+    #    Unauthenticated, VT answers 401 AuthenticationRequiredError.
+    # 2. Independently, .NET's multipart serialisation is rejected by the
+    #    blobstore handler at bigfiles.virustotal.com with HTTP 400 "Malformed
+    #    multipart body." - with or without x-apikey, with Invoke-RestMethod
+    #    -Form or a hand-built MultipartFormDataContent, with the boundary
+    #    quoted or unquoted, and with or without an explicit Content-Length.
+    #    A 2 KB file fails identically to a 335 MB one, so it is framing, not
+    #    size. curl sends a body the same endpoint accepts (verified: 200 +
+    #    analysis id on the same URL and file), so this path shells out to
+    #    curl.exe, which ships with Windows 10+.
+    #
+    # The key is passed via a -K config file, never on the command line, so it
+    # does not appear in the process table. The file is written to the user
+    # profile (not a world-readable temp dir) and deleted in finally.
+    $curl = (Get-Command curl.exe -ErrorAction SilentlyContinue).Source
+    if (-not $curl) {
+        throw "curl.exe not found - required for VT uploads >32MB (see Submit-OtVTFile). Files <=32MB are unaffected."
     }
-    if ($script:OtVTProxy) {
-        $reqArgs['Proxy'] = $script:OtVTProxy
-        if ($script:OtVTProxyCredential) { $reqArgs['ProxyCredential'] = $script:OtVTProxyCredential }
+    $cfg = Join-Path ([System.IO.Path]::GetTempPath()) ("vtup-" + [Guid]::NewGuid().ToString('N') + ".cfg")
+
+    # Third bug, found 2026-10-01: every >32MB upload failed with
+    # "curl: (26) Failed to open/read local data from file/application".
+    # curl.exe opens files through the ANSI Win32 API, so unlike .NET it cannot
+    # read a path longer than 260 characters - and several OT extraction paths
+    # run 300-550. Independently, curl's -F/form syntax treats ',' as a
+    # separator between file specs and ';' as the start of a parameter, and OT
+    # firmware really does ship directories like
+    # "RHEL 8-9, Alma 8-9, Ubuntu 20-24, SUSE 15". Staging the file at a short,
+    # plain temp path fixes both at once, and costs one local copy.
+    $staged = Join-Path ([System.IO.Path]::GetTempPath()) ("vtup-" + [Guid]::NewGuid().ToString('N') + ".bin")
+    Copy-Item -LiteralPath $FileInfo.FullName -Destination $staged -Force
+    # Keep the real filename for VT's UI, minus characters curl's form parser eats.
+    $safeName = ($FileInfo.Name -replace '[,;"]', '_')
+
+    try {
+        $cfgLines = @(
+            'header = "x-apikey: ' + $script:OtVTKeys[0] + '"'
+            'request = POST'
+            'form = "file=@' + ($staged.Replace([char]92,[char]47)) + ';filename=' + $safeName + '"'
+            'silent'
+            'show-error'
+            'max-time = 1800'
+            'write-out = "\nHTTPSTATUS:%{http_code}"'
+        )
+        if ($script:OtVTProxy) { $cfgLines += ('proxy = "' + $script:OtVTProxy + '"') }
+        Set-Content -LiteralPath $cfg -Value $cfgLines -Encoding UTF8
+        $raw = & $curl -K $cfg $uploadUrl 2>&1 | Out-String
+        $code = if ($raw -match 'HTTPSTATUS:(\d+)') { [int]$Matches[1] } else { 0 }
+        $json = ($raw -replace 'HTTPSTATUS:\d+\s*$','').Trim()
+        if ($code -lt 200 -or $code -ge 300) {
+            throw ("VT big-file upload failed: HTTP {0} - {1}" -f $code, $json)
+        }
+        return ($json | ConvertFrom-Json).data.id
+    } finally {
+        Remove-Item -LiteralPath $cfg    -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $staged -Force -ErrorAction SilentlyContinue
     }
-    $response = Invoke-RestMethod @reqArgs
-    return $response.data.id
 }
 
 function Resolve-OtCatalogContext {
@@ -311,6 +428,36 @@ function Resolve-OtCatalogContext {
     }
 }
 
+function Test-IsExecutableArtifact {
+    # True when the file's magic says it can execute or carries code:
+    # ELF (Linux binaries, .so, .ko), shebang scripts, PE (Windows),
+    # zip/jar containers, Java class files.
+    #
+    # Used by -ExecutableOnly. Extension matching is not good enough here:
+    # embedded Linux trees carry versioned libraries (libfoo.so.1.2.3),
+    # extensionless binaries in /bin, and .ko modules, while ~84% of a
+    # firmware catalog is inert text, packaging metadata and assets that
+    # VT has no intelligence on. Reads 4 bytes via .NET so long (>260
+    # char) paths still open - Windows' own APIs refuse those.
+    param([string]$Path)
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
+    $n = 0
+    try {
+        $fs = [System.IO.File]::OpenRead($Path)
+        try {
+            $b = [byte[]]::new(4)
+            $n = $fs.Read($b, 0, 4)
+        } finally { $fs.Dispose() }
+    } catch { return $false }
+    if ($n -lt 2) { return $false }
+    if ($b[0] -eq 0x7F -and $b[1] -eq 0x45 -and $b[2] -eq 0x4C -and $b[3] -eq 0x46) { return $true }  # ELF
+    if ($b[0] -eq 0x23 -and $b[1] -eq 0x21) { return $true }                                          # shebang
+    if ($b[0] -eq 0x4D -and $b[1] -eq 0x5A) { return $true }                                          # PE/MZ
+    if ($b[0] -eq 0x50 -and $b[1] -eq 0x4B -and $b[2] -eq 0x03 -and $b[3] -eq 0x04) { return $true }  # zip/jar
+    if ($b[0] -eq 0xCA -and $b[1] -eq 0xFE -and $b[2] -eq 0xBA -and $b[3] -eq 0xBE) { return $true }  # Java class
+    return $false
+}
+
 function Get-OtBaseline {
     [CmdletBinding()]
     param(
@@ -321,7 +468,24 @@ function Get-OtBaseline {
         [string]$ProxyRegion,
         [string]$Proxy,
         [pscredential]$ProxyCredential,
-        [string]$Keys
+        [string]$Keys,
+        [switch]$ExecutableOnly,
+        # Corpus branch under output-baseline. Defaults to OT so every existing
+        # caller is unchanged; 'autonomousSystems' keeps UAV/UGV (DJI, Yahboom)
+        # out of both the OT and IT corpora, which matters because the fidelity
+        # index treats each branch as a separate population.
+        [string]$Branch = 'OT',
+        # Enterprise tier - see Initialize-OtVTClient. Free-tier throttle
+        # constants (15s/key, 499/key/day) are calibrated and unaffected.
+        [switch]$Enterprise,
+        [string]$EnterpriseSecretName = 'VT_Enterprise_Key',
+        [int]$EnterpriseMinDelayMs    = 50,
+        [int]$EnterpriseCapPerDay     = 0,
+        # Set by the parallel orchestrator: new 404s are appended to
+        # MissingHashes<suffix>.csv instead of the shared tracker, because
+        # Export-Csv -Append is not safe across processes. The orchestrator
+        # merges the parts when every worker has finished.
+        [string]$TrackerSuffix = ''
     )
 
     if (-not (Test-Path -LiteralPath $CatalogCsv)) {
@@ -349,23 +513,28 @@ function Get-OtBaseline {
     Write-Host "  Category: $Category"
     Write-Host "  Product:  $Product"
 
-    if (-not (Initialize-OtVTClient -ProxyRegion $ProxyRegion -Proxy $Proxy -ProxyCredential $ProxyCredential -Keys $Keys)) {
+    if (-not (Initialize-OtVTClient -ProxyRegion $ProxyRegion -Proxy $Proxy -ProxyCredential $ProxyCredential -Keys $Keys -Enterprise:$Enterprise -EnterpriseSecretName $EnterpriseSecretName -EnterpriseMinDelayMs $EnterpriseMinDelayMs -EnterpriseCapPerDay $EnterpriseCapPerDay)) {
         return
     }
 
     # Flat per-vendor cache so SHA256s shared across products of the same
     # vendor (rebadged firmware, common libc, busybox, etc.) only consume
     # one VT lookup. Per-product mapping lives in catalog.csv.
-    $mainBase = "output-baseline\VirusTotal-main\OT\$Vendor"
-    $behBase  = "output-baseline\VirusTotal-behaviors\OT\$Vendor"
+    $mainBase = "output-baseline\VirusTotal-main\$Branch\$Vendor"
+    $behBase  = "output-baseline\VirusTotal-behaviors\$Branch\$Vendor"
     New-Item -ItemType Directory -Path $mainBase -Force | Out-Null
     New-Item -ItemType Directory -Path $behBase  -Force | Out-Null
 
     # Load 404 trackers
-    $missingHashesPath = "output\MissingHashes.csv"
+    $missingHashesPath = if ($TrackerSuffix) { "output\MissingHashes$TrackerSuffix.csv" } else { "output\MissingHashes.csv" }
     $missingHashes = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-    if (Test-Path $missingHashesPath) {
-        Import-Csv $missingHashesPath | ForEach-Object { if ($_.Hash) { [void]$missingHashes.Add($_.Hash) } }
+    # Explicit list, NOT MissingHashes*.csv - that glob also matches the sync
+    # orchestrator's MissingHashesRemove.sync<N>.csv files, which would load
+    # deregistrations as if they were fresh 404s.
+    $mhParts = @($missingHashesPath) + @(Get-ChildItem 'output\MissingHashes.q*.csv' -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+    if ($TrackerSuffix) { $mhParts += 'output\MissingHashes.csv' }
+    foreach ($mf in @($mhParts | Sort-Object -Unique | Where-Object { Test-Path $_ })) {
+        Import-Csv $mf | ForEach-Object { if ($_.Hash) { [void]$missingHashes.Add($_.Hash) } }
     }
     $missingBehaviorsPath = "output\MissingBehaviors.csv"
     $missingBehaviors = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
@@ -374,6 +543,11 @@ function Get-OtBaseline {
     }
 
     $rows = @(Import-Csv $CatalogCsv)
+    if ($ExecutableOnly) {
+        $before = $rows.Count
+        $rows = @($rows | Where-Object { Test-IsExecutableArtifact $_.FullPath })
+        Write-Host ("  Filter:   -ExecutableOnly kept {0} of {1} rows ({2} skipped)" -f $rows.Count, $before, ($before - $rows.Count)) -ForegroundColor DarkCyan
+    }
     Write-Host "  Hashes:   $($rows.Count)"
     Write-Host ""
 
@@ -460,7 +634,19 @@ function Submit-OtFilesNotInVT {
         [string]$Keys,
         # Hard ceiling - VT's documented per-file maximum is 650MB; anything
         # larger gets skipped with a warning rather than attempted.
-        [int64]$MaxFileSizeBytes = 650MB
+        [int64]$MaxFileSizeBytes = 650MB,
+        # See -Branch on Get-OtBaseline.
+        [string]$Branch = 'OT',
+        # Set by the parallel orchestrator so concurrent workers never append to
+        # the same CSV (Export-Csv -Append is not safe across processes). Worker
+        # files are merged back into the real trackers when the run finishes.
+        [string]$TrackerSuffix = '',
+        # Enterprise tier - see Initialize-OtVTClient. Free-tier throttle
+        # constants (15s/key, 499/key/day) are calibrated and unaffected.
+        [switch]$Enterprise,
+        [string]$EnterpriseSecretName = 'VT_Enterprise_Key',
+        [int]$EnterpriseMinDelayMs    = 50,
+        [int]$EnterpriseCapPerDay     = 0
     )
 
     if (-not (Test-Path -LiteralPath $CatalogCsv)) {
@@ -482,7 +668,7 @@ function Submit-OtFilesNotInVT {
     Write-Host "  Catalog:  $CatalogCsv"
     Write-Host "  Vendor:   $Vendor / $Category / $Product"
 
-    if (-not (Initialize-OtVTClient -ProxyRegion $ProxyRegion -Proxy $Proxy -ProxyCredential $ProxyCredential -Keys $Keys)) {
+    if (-not (Initialize-OtVTClient -ProxyRegion $ProxyRegion -Proxy $Proxy -ProxyCredential $ProxyCredential -Keys $Keys -Enterprise:$Enterprise -EnterpriseSecretName $EnterpriseSecretName -EnterpriseMinDelayMs $EnterpriseMinDelayMs -EnterpriseCapPerDay $EnterpriseCapPerDay)) {
         return
     }
 
@@ -493,15 +679,15 @@ function Submit-OtFilesNotInVT {
         Import-Csv $missingHashesPath | ForEach-Object { if ($_.Hash) { [void]$missingHashes.Add($_.Hash) } }
     }
 
-    $pendingPath = "output\PendingVTSubmissions.csv"
+    $pendingPath = if ($TrackerSuffix) { "output\PendingVTSubmissions$TrackerSuffix.csv" } else { "output\PendingVTSubmissions.csv" }
     $pendingHashes = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-    if (Test-Path $pendingPath) {
-        Import-Csv $pendingPath | ForEach-Object { if ($_.Hash) { [void]$pendingHashes.Add($_.Hash) } }
+    foreach ($pf in @(Get-ChildItem 'output\PendingVTSubmissions*.csv' -ErrorAction SilentlyContinue)) {
+        Import-Csv $pf.FullName | ForEach-Object { if ($_.Hash) { [void]$pendingHashes.Add($_.Hash) } }
     }
 
     # Flat per-vendor cache (same scheme as Get-OtBaseline).
-    $mainBase = "output-baseline\VirusTotal-main\OT\$Vendor"
-    $behBase  = "output-baseline\VirusTotal-behaviors\OT\$Vendor"
+    $mainBase = "output-baseline\VirusTotal-main\$Branch\$Vendor"
+    $behBase  = "output-baseline\VirusTotal-behaviors\$Branch\$Vendor"
 
     $rows = @(Import-Csv $CatalogCsv)
 
@@ -527,9 +713,15 @@ function Submit-OtFilesNotInVT {
             continue
         }
         $fi = Get-Item -LiteralPath $fp
-        if ($fi.Length -eq 0) { Write-Host "  [SKIP] $($row.FileName): zero bytes" -ForegroundColor Yellow; $skippedNoFile++; continue }
+        if ($fi.Length -eq 0) {
+            Write-Host "  [SKIP] $($row.FileName): zero bytes" -ForegroundColor Yellow
+            [void]$pendingHashes.Add($h)   # content-derived: no other path for this hash will differ
+            $skippedNoFile++
+            continue
+        }
         if ($fi.Length -gt $MaxFileSizeBytes) {
             Write-Host ("  [SKIP] {0}: too large ({1:N1}MB > {2:N0}MB direct-upload limit)" -f $row.FileName, ($fi.Length / 1MB), ($MaxFileSizeBytes / 1MB)) -ForegroundColor Yellow
+            [void]$pendingHashes.Add($h)
             $skippedBig++
             continue
         }
@@ -548,6 +740,35 @@ function Submit-OtFilesNotInVT {
                 MainOutputPath      = $mainOutPath
                 BehaviorsOutputPath = $behOutPath
             } | Export-Csv -Path $pendingPath -Append -NoTypeInformation
+            # Durable, append-only record of what WE introduced to VT. Required
+            # because PendingVTSubmissions.csv has rows removed as analyses
+            # complete, so it cannot answer "what did we contribute". A 404'd
+            # hash means VT had never seen it, so we are the first submitter.
+            try {
+                $ledgerPath = if ($TrackerSuffix) { "output\metrics\VTSubmissionLedger$TrackerSuffix.csv" } else { "output\metrics\VTSubmissionLedger.csv" }
+                $ledgerDir  = Split-Path $ledgerPath -Parent
+                if (-not (Test-Path $ledgerDir)) { New-Item -ItemType Directory -Path $ledgerDir -Force | Out-Null }
+                $nowUtc = [DateTime]::UtcNow
+                [PSCustomObject]@{
+                    Hash               = $h
+                    Branch             = 'OT'
+                    CatalogPath        = "$Vendor\$Category\$Product"
+                    WeekISO            = ('{0}-W{1:D2}' -f [System.Globalization.ISOWeek]::GetYear($nowUtc), [System.Globalization.ISOWeek]::GetWeekOfYear($nowUtc))
+                    FirstSubmissionUtc = $nowUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
+                    UniqueSources      = 1
+                    TimesSubmitted     = ''
+                    SizeBytes          = $fi.Length
+                    Provenance         = 'ledger-exact'
+                } | Export-Csv -Path $ledgerPath -Append -NoTypeInformation
+            } catch {
+                Write-Host "    [WARN] ledger append failed: $($_.Exception.Message)" -ForegroundColor DarkYellow
+            }
+
+            # Track in-memory too: the same content hash recurs across many catalog
+            # rows (same file at different paths / in different firmware images).
+            # Without this the hash is resubmitted once per row - one hash was
+            # submitted 257 times, wasting ~34% of a submission run's quota.
+            [void]$pendingHashes.Add($h)
             Write-Host "    [OK] analysis_id=$analysisId" -ForegroundColor Green
             $submitted++
         } catch {
@@ -556,8 +777,19 @@ function Submit-OtFilesNotInVT {
                 $script:OtQuotaHit = $true
                 break
             }
-            Write-Host "    [ERROR] $($_.Exception.Message)" -ForegroundColor Red
-            $errors++
+            if ($_.Exception.Message -like '*Access to the path*is denied*') {
+                # Keep the real message: this class of error is usually NOT an
+                # ACL problem on the source file (see Submit-OtVTFile).
+                Write-Host "    [SKIP] $($row.FileName): access denied - $($_.Exception.Message)" -ForegroundColor Yellow
+                [void]$pendingHashes.Add($h)
+                $skippedNoFile++
+            } else {
+                Write-Host "    [ERROR] $($_.Exception.Message)" -ForegroundColor Red
+                # Suppress per-row retry storms for this hash within this run; a
+                # later run retries it, since it never reached the pending CSV.
+                [void]$pendingHashes.Add($h)
+                $errors++
+            }
         }
     }
 
@@ -578,10 +810,22 @@ function Sync-VTPendingSubmissions {
         [string]$ProxyRegion,
         [string]$Proxy,
         [pscredential]$ProxyCredential,
-        [string]$Keys
+        [string]$Keys,
+        # Enterprise tier - see Initialize-OtVTClient. Free-tier throttle
+        # constants (15s/key, 499/key/day) are calibrated and unaffected.
+        [switch]$Enterprise,
+        [string]$EnterpriseSecretName = 'VT_Enterprise_Key',
+        [int]$EnterpriseMinDelayMs    = 50,
+        [int]$EnterpriseCapPerDay     = 0,
+        # Set by the parallel orchestrator. Each worker polls its own slice of the
+        # pending tracker and, instead of rewriting MissingHashes.csv (where the
+        # last writer would clobber every other worker's deregistrations), writes
+        # what it confirmed into MissingHashesRemove<suffix>.csv for the
+        # orchestrator to apply exactly once.
+        [string]$TrackerSuffix = ''
     )
 
-    $pendingPath = "output\PendingVTSubmissions.csv"
+    $pendingPath = if ($TrackerSuffix) { "output\PendingVTSubmissions$TrackerSuffix.csv" } else { "output\PendingVTSubmissions.csv" }
     if (-not (Test-Path $pendingPath)) {
         Write-Host "No pending submissions tracker at $pendingPath - nothing to do."
         return
@@ -596,9 +840,12 @@ function Sync-VTPendingSubmissions {
     Write-Host ""
     Write-Host "=== Polling $($rows.Count) pending VT submissions ===" -ForegroundColor Cyan
 
-    if (-not (Initialize-OtVTClient -ProxyRegion $ProxyRegion -Proxy $Proxy -ProxyCredential $ProxyCredential -Keys $Keys)) {
+    if (-not (Initialize-OtVTClient -ProxyRegion $ProxyRegion -Proxy $Proxy -ProxyCredential $ProxyCredential -Keys $Keys -Enterprise:$Enterprise -EnterpriseSecretName $EnterpriseSecretName -EnterpriseMinDelayMs $EnterpriseMinDelayMs -EnterpriseCapPerDay $EnterpriseCapPerDay)) {
         return
     }
+
+    # Hashes this worker confirmed VT now has (sharded mode only).
+    $confirmedHashes = New-Object System.Collections.Generic.List[string]
 
     # Load 404 tracker so we can DEREGISTER hashes that successfully complete
     $missingHashesPath = "output\MissingHashes.csv"
@@ -641,7 +888,11 @@ function Sync-VTPendingSubmissions {
                     if ($_.Exception.Message -like 'VT_ALL_KEYS_EXHAUSTED*') { $script:OtQuotaHit = $true }
                 }
                 # Remove this hash from MissingHashes since VT now knows it
-                $missingHashes = @($missingHashes | Where-Object { $_.Hash -ne $row.Hash })
+                if ($TrackerSuffix) {
+                    [void]$confirmedHashes.Add($row.Hash)
+                } else {
+                    $missingHashes = @($missingHashes | Where-Object { $_.Hash -ne $row.Hash })
+                }
                 $completed++
             } else {
                 Write-Host "    [STILL $($status.ToUpper())]" -ForegroundColor DarkGray
@@ -669,6 +920,18 @@ function Sync-VTPendingSubmissions {
         Remove-Item -LiteralPath $pendingPath -Force
     } else {
         $remaining | Export-Csv -Path $pendingPath -NoTypeInformation
+    }
+
+    if ($TrackerSuffix) {
+        # Sharded: hand deregistrations to the orchestrator; never touch the
+        # shared MissingHashes.csv from a worker.
+        $removePath = "output\MissingHashesRemove$TrackerSuffix.csv"
+        @($confirmedHashes | ForEach-Object { [pscustomobject]@{ Hash = $_ } }) |
+            Export-Csv -Path $removePath -NoTypeInformation
+        Write-Host ""
+        Write-Host "[DONE] completed=$completed still-pending=$stillPending expired=$expired errors=$errors deregistered=$($confirmedHashes.Count)"
+        if ($script:OtQuotaHit) { Write-Host "       Stopped early due to VT quota." -ForegroundColor Yellow }
+        return
     }
 
     # Rewrite MissingHashes (we may have removed some)

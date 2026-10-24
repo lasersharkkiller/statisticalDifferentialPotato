@@ -149,3 +149,96 @@
 - MITRE ATT&CK ICS T0857 System Firmware: https://attack.mitre.org/techniques/T0857/
 - MITRE ATT&CK ICS T0873 Project File Infection: https://attack.mitre.org/techniques/T0873/
 - MITRE ATT&CK ICS T0836 Modify Parameter: https://attack.mitre.org/techniques/T0836/
+
+---
+
+## SAGE RTU + PowerLink G3 — extracted firmware — 2026-10-22
+
+Acquired from Schneider's **public** Software & Firmware download facet on `se.com`
+(no login), while searching for TAC Xenta. **Neither package is Xenta** — the search term
+`911` matched unrelated product lines. Recording them anyway: one is a substation RTU, which
+is a higher-consequence device class than the Xenta gateways originally wanted.
+
+| Package | Product | Files | Distinct SHA256 |
+|---|---|---:|---:|
+| `C3414-500-S02L0_Firmware_Update.zip` | **SAGE RTU** (ex-Telvent) SCADA remote terminal unit | 295 | 153 |
+| `500 Level Controller Firmware Files.7z` | **PowerLink G3 / NF500 G3** lighting controller (Square D) | 9 | 9 |
+
+PowerLink G3 was **100% already known to VirusTotal** (9 of 9). SAGE was not: 42 of 142
+non-key files known, **100 submitted as new baseline**.
+
+### SAGE RTU platform
+
+| Property | Value |
+|---|---|
+| Kernel | `vxWorks`, 6,869,899 B — **ELF 32-bit LSB, Intel i386, statically linked** |
+| OS | **VxWorks 6.9**, build **`Cougar_VSB_69412_K6P2`** → **6.9.4.12** |
+| Application | `C3414-500-S02L0.out` (3,083,136 B, ELF relocatable, **not stripped**) |
+| Web/CLI | `WebCLI` (2,023,328 B, ELF relocatable, **with debug_info**) |
+| Services | `VxWorks login:` prompt, `220 Wind River FTP server %s ready.` |
+| Build path leak | `V:/Workspace/Cougar_VxWorks_996L0` |
+| Vendor string | `Copyright 1984-2004 Wind River Systems, Inc.` |
+
+### URGENT/11 — stack present, version at the fix line, patch status undetermined
+
+The **Interpeak IPnet stack that URGENT/11 targets is present**: 1,850 `ipnet`, 2,061 `ipcom`
+and 16 `Interpeak` references in the kernel image. URGENT/11 affects **VxWorks 6.5 and later**,
+and Tenable's detection treats **6.9.4** as the fixed baseline.
+
+This build is **6.9.4.12**, i.e. **at or above that line**. So the honest reading is:
+*the vulnerable component ships, and the version is not below the published fix threshold.*
+**Whether this specific maintenance build carries the July-2019 URGENT/11 patches cannot be
+determined from version strings alone** — 6.9.4.x point releases span both sides of that date,
+and Wind River issued per-release patches rather than a single version bump. Confirming it
+needs Wind River's advisory or Schneider's product bulletin. **No CVE is asserted as
+applicable here**; this is a flagged candidate, not a finding.
+
+### Shipped private key material — the significant finding
+
+The update package contains **private keys**, and the same RSA private key is **byte-identical
+across four bundled locations**:
+
+| Key | SHA256 (first 16) | Locations |
+|---|---|---|
+| `rsa_pvt.key` | `613e04dd11bb4200` | `SSH/RTU_keys/`, **and all three** `*_USERS.tar.gz` bundles |
+| `Admin_OpenSSH_private.key` | `b2c73d113e1656d1` | `SSH/Admin_keys/` |
+| `SSL/server.key` | `c76143753d9ecbde` | `SSL/` |
+
+Also present: `Admin_no_password.ppk` (a PuTTY key explicitly without a passphrase),
+`dsa_pvt.key`, and named user keys `DeanLopez.pk2` / `DeanUser.pk2` — personal names, which
+suggests this package was assembled from a working environment rather than from sanitised
+templates.
+
+`SSL/server.crt` is **self-signed**:
+
+```
+subject = C=US, ST=Texas, L=Houston, O=Telvent, OU=RTU, CN=192.168.1.1
+issuer  = (same - self-signed)
+valid   = 2012-03-30  ->  2042-03-30     (30-year lifetime)
+SHA256  = 16:AD:C5:7C:BE:F2:F4:E8:07:C4:8B:18:2F:D3:61:AF:78:77:C0:A6:E8:20:31:9A:AF:C8:7D:E3:97:4C:04:EE
+```
+
+`CN=192.168.1.1` is a default device address, not a hostname, so the certificate cannot
+meaningfully authenticate any particular RTU.
+
+**Why the duplication matters.** A host key that is identical in `RTU_keys/` *and* in every
+bundled `USERS` configuration is a **shipped default**, not per-deployment material. Any RTU
+provisioned from these bundles presents the same SSH host key, so host-key verification cannot
+distinguish a real RTU from an impersonator, and anyone holding this public package holds that
+key.
+
+**Confirmed vs not confirmed.** Confirmed: the key is byte-identical in four locations inside
+this publicly downloadable package, and **all 11 key files are already present in VirusTotal**,
+so the material has been circulating. Not confirmed: that any deployed ARNG RTU actually uses
+these keys — operators may regenerate on commissioning, and one bundle is named
+`SAGERTU_Class_Example_1`, which reads like training material. **The check worth running is
+on real devices: compare the live SSH host-key fingerprint against the shipped key.** That is
+a cheap, decisive test and it converts this from a packaging observation into a finding.
+
+### Handling note
+
+Key material is catalogued but **excluded from VT submission** by keeping it out of
+`catalog.csv` (the file the submit orchestrator reads) and listing it in
+`KEY-MATERIAL-DO-NOT-SUBMIT.csv`; the full inventory is preserved in
+`catalog-full-including-keys.csv`. Submitting private keys to a sample-sharing service is an
+irreversible republication, and it was not needed here — VirusTotal already holds all 11.

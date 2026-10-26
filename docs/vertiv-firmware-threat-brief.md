@@ -167,3 +167,12 @@ Top 8 — ordered by detection value per ingest dollar:
 - [MITRE ATT&CK for ICS — System Firmware (T0857)](https://attack.mitre.org/techniques/T0857/)
 - [CISA/NSA/FBI/ASD — Best Practices for Event Logging and Threat Detection (2024)](https://www.cisa.gov/resources-tools/resources/best-practices-event-logging-and-threat-detection)
 - [Forescout 2025 OT Threat Report — BACnet now 3rd-most-targeted protocol](https://www.forescout.com/blog/2025-threat-report-exploitation-grows-across-it-iot-and-ot/)
+
+---
+
+## Apex, Inc. (OUI 00:02:99) — reclassified into this brief, 2026-10-26
+
+The ARNG census lists **39 OT devices in 9 states under "Apex, Inc."** A dedicated-brief research pass resolved that OUI to the **Avocent lineage this brief already covers**: Apex PC Solutions / Apex Inc. (Redmond WA) merged with Cybex in July 2000 to form **Avocent**, which became Emerson Network Power and then **Vertiv**. So "Apex" devices are legacy KVM / serial console-switch hardware in the Avocent/Vertiv family — the same console-server class this brief flags as a Volt Typhoon target. They are folded here rather than given a standalone brief, as Andover/Square D were folded into Schneider.
+
+**CVE caution — deliberately not asserted as applicable.** Research surfaced real Avocent/Vertiv CVEs (e.g. CVE-2019-9507 on a *current* Vertiv Avocent management appliance; CVE-2013-6030 / CVE-2013-0526 on Emerson-era KVM-over-IP). Their IDs are genuine, but the 39 census devices carry a **~2000-era Apex OUI** and are almost certainly discontinued KVM switches that predate those products. Mapping a 2019 appliance CVE onto 25-year-old hardware would be misattribution, so no CVE is claimed against these specific devices here — the actionable step is to physically identify what the 39 endpoints are before assigning any advisory.
+

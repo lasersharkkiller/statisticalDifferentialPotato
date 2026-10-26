@@ -108,3 +108,41 @@ install (Siemens TIA Portal) scores hundreds of thousands with little behavioura
 measured **3.0%** real-behaviour rate overall, and **0.0%** for the HTML that made up 62% of
 submissions. Read this column alongside the yield figures in
 [vt-parallel-throughput notes], not on its own.
+
+---
+
+## OSINT brief coverage added 2026-10-26
+
+The "none" entries in the table above are being closed. A 12-vendor research workflow (one
+researcher per vendor + an adversarial pass that independently re-verified every CVE against
+NVD/CISA/vendor records before it could be written) produced **11 new OSINT/advisory briefs** —
+no firmware held for any of these, so they rest on public disclosure only.
+
+| New brief | Census vendor | OT dev | Confirmed CVEs | Identity resolved to |
+|---|---|---:|---:|---|
+| vcs-video-communication | VCS Video Communication Systems AG | 246 | 3 | Bosch VideoJet/VIP encoders (now Keenfinity) |
+| sensormatic-software-house | Sensormatic Electronics LLC | 27 | 6 | Johnson Controls Software House (C-CURE/iSTAR) |
+| motorola-solutions-avigilon | Motorola Solutions Inc. | 84 | 6 | Motorola / Avigilon / Ava |
+| hanwha-vision | Hanwha Vision VietNam | 72 | 5 | Hanwha Vision (ex-Samsung Techwin) |
+| genetec | Genetec Inc. | 66 | 6 | Genetec Security Center (Mercury OEM channel) |
+| osi-dormakaba-omnilock | OSI Security Devices | 55 | 0 | dormakaba / BEST Omnilock |
+| apex | Apex, Inc. | 39 | — | **folded into Vertiv** (Avocent/KVM lineage) |
+| trane | Trane | 38 | 8 | Trane Tracer BAS controllers |
+| digital-design-corp-advanced-network-devices | Digital Design Corporation | 160 | 0 | Advanced Network Devices (IP mass-notification) — **not** Galaxy/Digital Systems Corp |
+| gallagher | Gallagher Group Limited | 17 | 6 | Gallagher Command Centre / Controller 6000 |
+| daikin | Daikin Industries, Ltd. | 16 | 3 | Daikin HVAC / SVMPC controllers |
+| sierra-monitor-fieldserver | Sierra Monitor Corp. | 15 | 3 | MSA FieldServer protocol gateways |
+
+**46 CVEs confirmed, 0 fabricated** — the adversarial pass dropped every candidate it could not
+tie to a real record; three were independently re-fetched by hand (Daikin ICSA-22-284-02, Sierra
+Monitor/MSA FieldServer CVE-2024-45494, Hanwha CVE-2024-54013) and all resolved on-vendor.
+
+**Two honest zeroes.** Digital Design Corp (Advanced Network Devices) and OSI (dormakaba Omnilock)
+returned no confirmable CVE — recorded as absence of information, not safety.
+
+**Identity corrections worth carrying forward:** "Digital Design Corporation" is Advanced Network
+Devices (IP speakers), a different company from "Digital Systems Corp" (Galaxy Control Systems);
+"Apex, Inc." is the Avocent/Vertiv KVM lineage, not a standalone vendor; "VCS" and "Sensormatic"
+are Bosch and Johnson Controls lineage respectively but cover distinct product lines from the
+existing Bosch-camera and JCI-Metasys briefs. **Texas Instruments (710 devices) remains excluded**
+as an almost-certain OUI artifact and still needs reclassification before it is treated as a vendor.

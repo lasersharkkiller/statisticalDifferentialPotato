@@ -121,6 +121,51 @@ $targets = @(
     @{ Vendor='VCS-Bosch-Video';  Category='Video';           Product='VideoJet-Encoders'
        Queries=@('name:"videojet" bosch','name:"VIP X"','name:"configuration manager" bosch','name:"bvms"')
        MustMatch='videojet|vip[-_ ]?x|bvms|bosch.?config' }
+
+    # --- 2026-10-26: gated missing-vendors whose firmware may still sit in VT ---
+    @{ Vendor='Hikvision';        Category='Video';           Product='IP-Camera-Firmware'
+       Queries=@('name:"digicap.dav"','name:"hikvision"','name:"DS-2CD"','name:"IPC_" hikvision')
+       MustMatch='digicap|hikvision|ds-2cd|ds-7|hikcentral' }
+
+    @{ Vendor='Vivotek';          Category='Video';           Product='IP-Camera-Firmware'
+       Queries=@('name:"vivotek"','name:"VVTK"','name:"FD8" firmware','name:"shepherd" vivotek')
+       MustMatch='vivotek|vvtk|fe8|fd8|ib9|shepherd' }
+
+    @{ Vendor='Suprema';          Category='Access-Control';  Product='BioStar'
+       Queries=@('name:"biostar"','name:"biostation"','name:"suprema"','name:"BioEntry"')
+       MustMatch='biostar|biostation|suprema|bioentry|facestation' }
+
+    @{ Vendor='LOYTEC';           Category='Building-Automation'; Product='L-INX'
+       Queries=@('name:"loytec"','name:"L-INX"','name:"LINX-" loytec','name:"L-VIS"')
+       MustMatch='loytec|l-inx|linx-|l-vis|lgate|lroc' }
+
+    @{ Vendor='Paxton-Access';    Category='Access-Control';  Product='Net2'
+       Queries=@('name:"paxton"','name:"Net2" paxton','name:"Paxton10"','name:"paxlock"')
+       MustMatch='paxton|net2|paxlock|paxton10' }
+
+    @{ Vendor='Alerton';          Category='Building-Automation'; Product='BACtalk'
+       Queries=@('name:"alerton"','name:"bactalk"','name:"envision" alerton','name:"Ascent" alerton')
+       MustMatch='alerton|bactalk|envision.?for.?bactalk|ascent' }
+
+    @{ Vendor='KMC-Controls';     Category='Building-Automation'; Product='Conquest'
+       Queries=@('name:"KMC Connect"','name:"KMC Conquest"','name:"flexstat"')
+       MustMatch='kmc.?connect|kmc.?conquest|flexstat|kmc.?controls' }
+
+    @{ Vendor='Phoenix-Contact';  Category='PLC';             Product='PLCnext'
+       Queries=@('name:"plcnext"','name:"AXC F 2152"','name:"AXC F 1152"','name:"phoenix contact" firmware')
+       MustMatch='plcnext|axc.?f.?[12]152|phoenix.?contact' }
+
+    @{ Vendor='Electro-Industries'; Category='Power-Meter';   Product='Nexus-Shark'
+       Queries=@('name:"Communicator" EIG','name:"MeterManager"','name:"EnergyPQA"','name:"Nexus" meter')
+       MustMatch='communicatorpqa|metermanager|energypqa|electro.?industries|gauge.?tech' }
+
+    @{ Vendor='FLIR';             Category='Video';           Product='FLIR-Security'
+       Queries=@('name:"FLIR" DNA','name:"FLIR Latitude"','name:"Elara FC"','name:"flir" firmware')
+       MustMatch='flir.?(dna|latitude|united|elara|fc-)|flir.?security' }
+
+    @{ Vendor='Sur-Gard';         Category='Alarm';           Product='System-Receivers'
+       Queries=@('name:"sur-gard"','name:"surgard"','name:"SG-System"','name:"System 5" surgard')
+       MustMatch='sur-?gard|sg-system|system.?[5i]' }
 )
 
 if ($Vendors) { $targets = @($targets | Where-Object { $Vendors -contains $_.Vendor }) }

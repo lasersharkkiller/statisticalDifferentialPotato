@@ -146,3 +146,102 @@ Devices (IP speakers), a different company from "Digital Systems Corp" (Galaxy C
 are Bosch and Johnson Controls lineage respectively but cover distinct product lines from the
 existing Bosch-camera and JCI-Metasys briefs. **Texas Instruments (710 devices) remains excluded**
 as an almost-certain OUI artifact and still needs reclassification before it is treated as a vendor.
+
+---
+
+## Missing-vendor accounting (2026-10-26)
+
+Of the 114 OT & Building Systems vendors in the census, after excluding OUI artifacts and IT misfiles, coverage of genuine OT devices is **~89%**. The residual splits three ways.
+
+### Covered by corporate lineage (12 vendors, 232 devices)
+
+These appear as separate census strings but belong to a vendor whose firmware/software we already hold. They are **covered by lineage**, not separate gaps:
+
+| Census vendor | OT dev | Covered via |
+|---|---:|---|
+| Honeywell GmbH | 117 | Honeywell resells Niagara-based controllers (Tridium, acquired) and has an OSINT brief; Honeywell-branded device firmware still gated |
+| OSI Security Devices | 55 | OSI Security Devices = dormakaba (BEST/Omnilock); dormakaba Saflok software acquired this session |
+| TELEMECANIQUE ELECTRIQUE | 21 | Telemecanique is a Schneider Electric brand; Schneider firmware acquired |
+| Honeywell Connected Building | 16 | Honeywell resells Niagara-based controllers (Tridium, acquired) and has an OSINT brief; Honeywell-branded device firmware still gated |
+| ROSEMOUNT CONTROLS | 6 | Rosemount is an Emerson brand (process controls) |
+| Invensys | 3 | Invensys was absorbed into Schneider Electric / AVEVA |
+| Honeywell Security (China) Co., Ltd. | 3 | Honeywell resells Niagara-based controllers (Tridium, acquired) and has an OSINT brief; Honeywell-branded device firmware still gated |
+| Honeywell | 3 | Honeywell resells Niagara-based controllers (Tridium, acquired) and has an OSINT brief; Honeywell-branded device firmware still gated |
+| Emerson Network Power Co.,Ltd | 2 | Emerson Network Power was renamed Vertiv (acquired/Apex lineage) |
+| POWER MEASUREMENT LTD. | 2 | Power Measurement Ltd = Schneider ION power meters |
+| Red Lion Controls Inc. | 2 | Red Lion has an existing brief |
+| Honeywell Life Safety | 2 | Honeywell resells Niagara-based controllers (Tridium, acquired) and has an OSINT brief; Honeywell-branded device firmware still gated |
+
+### Not a firmware target (13 vendors, 34 devices)
+
+OUI artifacts, IT endpoints, component chips inside other products, and our own tooling. No vendor firmware exists to acquire:
+
+| Census vendor | OT dev | Why excluded |
+|---|---:|---|
+| Unknown | 7 | unresolved OUI |
+| Super Micro Computer, Inc. | 5 | server/IT hardware |
+| JK microsystems, Inc. | 5 | embedded SBC component module |
+| Lantronix | 3 | serial-to-Ethernet module chip (component OUI) |
+| DigiBoard | 3 | serial device-server component (Digi) |
+| ASIX ELECTRONICS CORP. | 2 | Ethernet controller chip (OUI inside other products) |
+| Dragos, Inc. | 2 | our own OT monitoring sensor, not a target |
+| sunweit industrial limited | 2 | generic component OUI |
+| Samsung Electronics Co.,Ltd | 1 | IT/consumer (generic Samsung, not Hanwha) |
+| HP Inc. | 1 | IT endpoint |
+| ASUSTek COMPUTER INC. | 1 | IT endpoint |
+| ASIX Electronics Corporation | 1 | Ethernet controller chip (OUI inside other products) |
+| Universal Global Scientific Industrial., Ltd | 1 | contract manufacturer / component |
+
+### Genuine OT vendors still missing firmware (46 vendors, 269 devices)
+
+Real acquisition targets, all sizes. An acquire-and-analyze pass (public download + VT-Intelligence pull + full pipeline) was launched across **all** of these on 2026-10-26, regardless of device count:
+
+| Census vendor | OT dev | States |
+|---|---:|---:|
+| IQSIGHT B.V. | 33 | 1 |
+| PRONET GMBH | 31 | 11 |
+| Electro Industries/Gauge Tech | 27 | 3 |
+| Xytronix Research & Design, Inc. | 20 | 2 |
+| CONTEMPORARY CONTROL | 14 | 4 |
+| Arecont Vision | 14 | 3 |
+| Resideo | 12 | 4 |
+| LOYTEC electronics GmbH | 12 | 3 |
+| Paxton Access Ltd | 11 | 1 |
+| Hangzhou Hikvision Digital Technology Co.,Ltd. | 10 | 1 |
+| Sur-Gard Security | 8 | 5 |
+| 2N TELEKOMUNIKACE a.s. | 8 | 2 |
+| Vivotek, Inc. | 7 | 3 |
+| Server Technology, Inc. | 6 | 1 |
+| Suprema Inc. | 4 | 2 |
+| Planmeca Oy | 4 | 2 |
+| Barix AG | 4 | 3 |
+| Sensaphone | 4 | 3 |
+| Integrated Control Technology Limitied | 4 | 1 |
+| Wyze Labs Inc | 3 | 1 |
+| IT Watchdogs, Inc | 3 | 2 |
+| ALERTON TECHNOLOGIES, INC. | 3 | 1 |
+| DYNACOLOR, INC. | 2 | 1 |
+| Phoenix Contact GmbH & Co. KG | 2 | 1 |
+| eGauge Systems LLC | 2 | 1 |
+| Interalia Inc. | 1 | 5 |
+| Magicard Ltd | 1 | 1 |
+| SHENZHEN BILIAN ELECTRONIC CO.，LTD | 1 | 1 |
+| EliteGroup Computer Systems Co., LTD | 1 | 2 |
+| KMC CONTROLS | 1 | 0 |
+| SAMSUNG TECHWIN CO.,LTD | 1 | 0 |
+| NetBurner | 1 | 0 |
+| Proxmox Server Solutions GmbH | 1 | 1 |
+| Basler AG | 1 | 1 |
+| RESOL Elektronische Regelungen GmbH | 1 | 1 |
+| WIRELESS-TEK TECHNOLOGY LIMITED | 1 | 1 |
+| Schneider Electric | 1 | 3 |
+| Telematica Sistems Inteligente | 1 | 1 |
+| Dish Technologies Corp | 1 | 1 |
+| Jabil Circuit Hungary Ltd. | 1 | 1 |
+| FLIR Systems | 1 | 1 |
+| ENGAGE NETWORKS, INC. | 1 | 1 |
+| Framework Computer Inc. | 1 | 1 |
+| Tercel technology co.,ltd | 1 | 1 |
+| Shanghai Chint Power Systems Co., Ltd. | 1 | 1 |
+| MOXA TECHNOLOGIES CORP., LTD. | 1 | 1 |
+

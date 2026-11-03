@@ -55,6 +55,13 @@ param(
     [switch]$IncludeUnresolvedHashes,
     [string]$Repo              = (Split-Path $PSScriptRoot -Parent),
     [string]$OutRoot           = 'output\vendor-differential',
+    # Route the differential's VT calls (hash resolution + behaviour_summary)
+    # through VT_Enterprise_Key instead of the free VT_API_Key_1/2. The per-vendor
+    # behaviour fetches are what consume the personal/free VT licence; -Enterprise
+    # moves them onto the enterprise quota. Default OFF = unchanged free path.
+    [switch]$Enterprise,
+    [string]$EnterpriseSecretName = 'VT_Enterprise_Key',
+    [int]$EnterpriseMinDelayMs    = 50,
     [switch]$WhatIfPlan
 )
 
@@ -249,7 +256,8 @@ foreach ($p in $runnable) {
         Get-TargetedMalwareAnalysis -CsvPath $csv `
             -BaselinePaths       @((Join-Path $mainRoot $p.Vendor)) `
             -BaselineBehavePaths @((Join-Path $behRoot  $p.Vendor)) `
-            -MinDetections $MinDetections
+            -MinDetections $MinDetections `
+            -Enterprise:$Enterprise -EnterpriseSecretName $EnterpriseSecretName -EnterpriseMinDelayMs $EnterpriseMinDelayMs
         $produced = @(Get-ChildItem $outDir -Filter 'Targeted*DifferentialAnalysis.json' -ErrorAction SilentlyContinue)
         Write-Host ("  [OK] {0} differential files in {1:N1} min -> {2}" -f $produced.Count, ((Get-Date)-$t0).TotalMinutes, $outDir) -ForegroundColor Green
     } catch {

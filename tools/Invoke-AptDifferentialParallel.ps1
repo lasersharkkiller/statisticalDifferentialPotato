@@ -45,6 +45,13 @@ param(
     [string]$Repo       = (Split-Path $PSScriptRoot -Parent),
     [string]$LogDir     = $(Join-Path ([System.IO.Path]::GetTempPath()) 'apt-diff-parallel'),
     [switch]$OnlyMissingElf,
+    # Route every worker's VT calls through VT_Enterprise_Key instead of the free
+    # VT_API_Key_1/2, so parallel APT differentials do not drain the personal/free
+    # VT licence. Each worker spaces its own calls by -EnterpriseMinDelayMs; with
+    # one shared enterprise key and N workers, combined rate ~= N / spacing.
+    [switch]$Enterprise,
+    [string]$EnterpriseSecretName = 'VT_Enterprise_Key',
+    [int]$EnterpriseMinDelayMs    = 50,
     [switch]$WhatIfPlan
 )
 
@@ -104,7 +111,8 @@ if ($WhatIfPlan) { Write-Host '  -WhatIfPlan: stopping before launch.' -Foregrou
 
 $workerScript = Join-Path $LogDir 'aptworker.ps1'
 @'
-param([string]$Repo, [string]$JobFile, [int]$MinDetections)
+param([string]$Repo, [string]$JobFile, [int]$MinDetections,
+      [switch]$Enterprise, [string]$EnterpriseSecretName = 'VT_Enterprise_Key', [int]$EnterpriseMinDelayMs = 50)
 $ErrorActionPreference = 'Continue'
 Set-Location $Repo
 Import-Module (Join-Path $Repo 'baseline\VTBaseline.psm1') -Force
@@ -114,11 +122,13 @@ foreach ($j in (Import-Csv $JobFile)) {
     $t0 = Get-Date
     try {
         # The store paths are the point: without them this resolves via the VT
-        # API on free keys at ~15s per hash.
+        # API. On free keys that is ~15s per hash; with -Enterprise it uses
+        # VT_Enterprise_Key and does not touch the free quota.
         Get-TargetedMalwareAnalysis -CsvPath $j.Csv `
             -MaliciousStoragePath $j.Main `
             -BehaviorsStoragePath $j.Beh `
-            -MinDetections $MinDetections
+            -MinDetections $MinDetections `
+            -Enterprise:$Enterprise -EnterpriseSecretName $EnterpriseSecretName -EnterpriseMinDelayMs $EnterpriseMinDelayMs
         $elf = Join-Path (Split-Path $j.Csv -Parent) 'TargetedElfDifferentialAnalysis.json'
         Write-Host ("  [DONE] {0} in {1:N1} min (ELF file: {2})" -f $j.Actor, ((Get-Date)-$t0).TotalMinutes, (Test-Path $elf))
     } catch {
@@ -134,8 +144,11 @@ foreach ($w in ($plan.Keys | Sort-Object)) {
     $jf = Join-Path $LogDir ("job{0}.csv" -f $w)
     $plan[$w] | Select-Object Actor, Csv, Rows, Main, Beh | Export-Csv -LiteralPath $jf -NoTypeInformation
     $log = Join-Path $LogDir ("aptworker{0}.log" -f $w)
+    $wargs = @('-NoProfile','-File',$workerScript,'-Repo',$Repo,'-JobFile',$jf,'-MinDetections',$MinDetections,
+               '-EnterpriseSecretName',$EnterpriseSecretName,'-EnterpriseMinDelayMs',$EnterpriseMinDelayMs)
+    if ($Enterprise) { $wargs += '-Enterprise' }   # switch: present=on (absent=free path)
     $procs += Start-Process -FilePath 'pwsh' -PassThru -WindowStyle Hidden `
-        -ArgumentList @('-NoProfile','-File',$workerScript,'-Repo',$Repo,'-JobFile',$jf,'-MinDetections',$MinDetections) `
+        -ArgumentList $wargs `
         -RedirectStandardOutput $log -RedirectStandardError ($log -replace '\.log$','.err')
     Write-Host ("  launched worker {0} (pid {1})" -f $w, $procs[-1].Id)
 }

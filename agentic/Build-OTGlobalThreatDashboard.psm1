@@ -29,7 +29,7 @@ function Build-OTGlobalThreatDashboard {
             into)
 
         Dataset-to-Purdue-layer mapping is driven from the per-vendor
-        threat briefs (docs/<vendor>-firmware-threat-brief.md). Datasets
+        threat briefs (firmware-threat-briefs/<vendor>-firmware-threat-brief.md). Datasets
         that genuinely span multiple layers are tagged with their primary
         layer plus a secondary list.
 
@@ -99,7 +99,7 @@ function Build-OTGlobalThreatDashboard {
 
     # ----- Dataset -> Purdue-layer mapping (from per-vendor briefs) ----------
     # Primary layer per dataset, with secondary if the vendor genuinely
-    # spans multiple layers (per the briefs in docs/).
+    # spans multiple layers (per the briefs in firmware-threat-briefs/).
     $purdueMap = @{
         'NSRL/Windows-11'           = @{ Primary='L4'; Secondary=@('L3','L3.5'); Note='Admin workstations + EWS hosts' }
         'NSRL/Windows-Server-2025'  = @{ Primary='L3'; Secondary=@();             Note='SCADA / Historian / EWS server tier' }

@@ -72,7 +72,10 @@ The interactive entry point is `statisticalDifferentialPotato_Main.ps1`. It impo
 
 ### 4. OT firmware extraction + NSRL catalog
 
-Auto-discovers ZIPs / firmware blobs under `..\firmware-staging\<Vendor>\**\raw\*`. Runs `tools\Expand-EatonFirmware.ps1` then `tools\Build-OsCatalog.ps1`. Per-vendor variants `4a` (Eaton), `4b` (APC), `4c` (Vertiv), `4d` (SEL), `4e-4h` (Honeywell / Schneider / Rockwell / Siemens via consolidated `vendorMap`).
+Auto-discovers ZIPs / firmware blobs under `..\firmware-staging\<Vendor>\**\raw\*`. Runs `tools\Expand-EatonFirmware.ps1` then `tools\Build-OsCatalog.ps1`. Per-vendor variants `4a` (Eaton), `4b` (APC), `4c` (Vertiv), `4d` (SEL), and `4e-4r` via the consolidated `vendorMap`:
+
+- **Industrial automation** - `4e` Honeywell, `4f` Schneider, `4g` Rockwell, `4h` Siemens.
+- **Building automation / facilities / physical security** - `4i` Johnson Controls, `4j` Tridium, `4k` AutomatedLogic, `4l` Echelon, `4m` CyberPower, `4n` Aiphone, `4o` Sensormatic, `4p` Vivotek, `4q` Bosch Security, `4r` Valcom. Added from the OTSDP network inventory; see each `firmware-staging\<Vendor>\README.md` for download sources and which vendors gate firmware behind a partner login.
 
 ### 5. OT baselining + VT submission
 
@@ -81,6 +84,13 @@ Auto-discovers ZIPs / firmware blobs under `..\firmware-staging\<Vendor>\**\raw\
 | **5a** | Pull VT metadata for firmware hashes in each `catalog.csv` | `Get-OtBaseline` |
 | **5b** | Opt-in submit 404'd firmware files to VT | `Submit-OtFilesNotInVT` |
 | **5z** | Poll pending VT submissions until analysis completes | `Sync-VTPendingSubmissions` |
+
+`5a` accepts **`-ExecutableOnly`** (opt-in, default off): filters the catalog by
+file **magic** — ELF, shebang, PE, zip/jar, Java class — before querying VT.
+Extension matching is not sufficient for embedded Linux trees, which carry
+versioned libraries (`libfoo.so.1.2.3`), extensionless binaries in `/bin`, and
+`.ko` modules. On the Eaton WebCardLXE catalog this keeps 5,922 of 36,720 unique
+hashes (~84% fewer VT lookups: roughly 6 days instead of 37 at ~1000/day).
 
 ---
 

@@ -20,7 +20,14 @@ function Initialize-AptVTRotator {
         [pscredential]$ProxyCredential,
         # Subset of VT API keys to use (e.g. '1,3' or 'all'). Falls back to
         # $env:VT_KEYS. Matches Get-VTBaseline's -Keys parameter.
-        [string]$Keys
+        [string]$Keys,
+        # Enterprise/GTI tier. The free-tier constants below (15000ms per key,
+        # 499/key/day) are calibrated and deliberately left untouched; this adds a
+        # separate path rather than retuning them.
+        [switch]$Enterprise,
+        [string]$EnterpriseSecretName = 'VT_Enterprise_Key',
+        [int]$EnterpriseMinDelayMs    = 12,
+        [int]$EnterpriseCapPerDay     = 0
     )
 
     # --- PROXY RESOLUTION (mirrors Get-VTBaseline; uses VTBaseline's exported
@@ -99,6 +106,46 @@ function Initialize-AptVTRotator {
     if ($VTKeys.Count -eq 0) {
         Write-Error "No VT API keys found in vault (expected one or more VT_API_Key_* secrets)."
         return $null
+    }
+
+    # Enterprise short-circuit MUST sit here: the key-subset block below
+    # prompts with Read-Host when -Keys is blank, which hangs every
+    # non-interactive worker. The free keys are already loaded above, so the
+    # separation guard inside still works.
+    if ($Enterprise) {
+        try {
+            $entKey = (Get-Secret -Name $EnterpriseSecretName -AsPlainText -ErrorAction Stop).Trim()
+        } catch {
+            Write-Host "[!] Could not read enterprise secret '$EnterpriseSecretName': $($_.Exception.Message)" -ForegroundColor Red
+            return $false
+        }
+        if ([string]::IsNullOrWhiteSpace($entKey)) {
+            Write-Host "[!] Enterprise secret '$EnterpriseSecretName' is empty." -ForegroundColor Red
+            return $false
+        }
+        # Guard against the enterprise key having been stored under a free-key
+        # name (or vice versa) - they must stay separable.
+        if ($VTKeys -contains $entKey) {
+            Write-Host "[!] The enterprise key is also present among the free keys - refusing to run until they are separated." -ForegroundColor Red
+            return $false
+        }
+        $script:AptVTKeys         = @($entKey)
+        $script:AptVTLoadedNames  = @($EnterpriseSecretName)
+        $script:AptVTMinDelayMs   = $EnterpriseMinDelayMs
+        $script:AptVTKeyCapPerDay = if ($EnterpriseCapPerDay -gt 0) { $EnterpriseCapPerDay } else { [int]::MaxValue }
+        $script:AptVTKeyLastCall  = @{ 0 = [DateTime]::MinValue }
+        $script:AptVTKeyDisabled  = @{ 0 = [DateTime]::MinValue }
+        $script:AptVTKeyCallCount = @{ 0 = 0 }
+        Write-Host ("Using ENTERPRISE key ($EnterpriseSecretName) for APT intel. Spacing {0}ms, cap {1}." -f `
+            $EnterpriseMinDelayMs, $(if ($EnterpriseCapPerDay -gt 0) { $EnterpriseCapPerDay } else { 'none' })) -ForegroundColor Cyan
+        try {
+            $u = Invoke-RestMethod -Uri "https://www.virustotal.com/api/v3/users/$entKey" -Headers @{ 'x-apikey' = $entKey } -TimeoutSec 15
+            $script:AptVTKeyCallCount[0] = [int]$u.data.attributes.quotas.api_requests_daily.used
+            Write-Host ("  {0} used today: {1}" -f $EnterpriseSecretName, $script:AptVTKeyCallCount[0]) -ForegroundColor DarkGray
+        } catch {
+            Write-Host ("  [WARN] daily-used probe failed: {0}" -f $_.Exception.Message) -ForegroundColor Yellow
+        }
+        return $true
     }
 
     # --- KEY SUBSET RESOLUTION (mirrors Get-VTBaseline) ---
@@ -379,18 +426,25 @@ function Process-AptHash {
 }
 
 function Initialize-AptMissingHashTracker {
-    $missingHashesPath = "output\MissingHashes.csv"
+    param([string]$TrackerSuffix = '')
+    # Parallel workers must not append to one shared CSV; see the sharding notes
+    # in tools\Invoke-AptBehaviorsParallel.ps1.
+    $missingHashesPath = if ($TrackerSuffix) { "output\MissingHashes$TrackerSuffix.csv" } else { "output\MissingHashes.csv" }
     $missingHashes = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-    if (Test-Path $missingHashesPath) {
+    # A sharded worker WRITES to its own file but must still READ the shared
+    # tracker, or it re-queries every known 404 the corpus already proved absent.
+    $readFrom = @("output\MissingHashes.csv")
+    if ($TrackerSuffix) { $readFrom += $missingHashesPath }
+    foreach ($mf in @($readFrom | Sort-Object -Unique | Where-Object { Test-Path $_ })) {
         try {
-            Import-Csv -Path $missingHashesPath | ForEach-Object {
+            Import-Csv -Path $mf | ForEach-Object {
                 if ($_.Hash) { [void]$missingHashes.Add($_.Hash) }
             }
-            Write-Host "Loaded $($missingHashes.Count) known-404 hashes from MissingHashes.csv." -ForegroundColor DarkGray
         } catch {
-            Write-Host "[WARN] Could not read MissingHashes.csv: $($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host "[WARN] Could not read $mf - $($_.Exception.Message)" -ForegroundColor Yellow
         }
     }
+    if ($missingHashes.Count) { Write-Host "Loaded $($missingHashes.Count) known-404 hashes." -ForegroundColor DarkGray }
     return [PSCustomObject]@{ Path = $missingHashesPath; Set = $missingHashes }
 }
 
@@ -438,21 +492,28 @@ function Get-AptMasterIntelVTAll {
         [string]$ProxyRegion,
         [string]$Proxy,
         [pscredential]$ProxyCredential,
-        [string]$Keys
+        [string]$Keys,
+        # Enterprise/GTI tier - see Initialize-AptVTRotator. Free-tier constants
+        # (15s/key, 499/key/day) are untouched.
+        [switch]$Enterprise,
+        [string]$EnterpriseSecretName = 'VT_Enterprise_Key',
+        [int]$EnterpriseMinDelayMs    = 12,
+        [int]$EnterpriseCapPerDay     = 0,
+        [string]$TrackerSuffix        = ''
     )
 
     if (-not (Test-Path $AptRoot)) {
         Write-Error "APT root not found at '$AptRoot'."
         return
     }
-    if (-not (Initialize-AptVTRotator -ProxyRegion $ProxyRegion -Proxy $Proxy -ProxyCredential $ProxyCredential -Keys $Keys)) { return }
+    if (-not (Initialize-AptVTRotator -ProxyRegion $ProxyRegion -Proxy $Proxy -ProxyCredential $ProxyCredential -Keys $Keys -Enterprise:$Enterprise -EnterpriseSecretName $EnterpriseSecretName -EnterpriseMinDelayMs $EnterpriseMinDelayMs -EnterpriseCapPerDay $EnterpriseCapPerDay)) { return }
 
     $mainBaseRoot      = "output-baseline\VirusTotal-main\apt-master-intel"
     $behaviorsBaseRoot = "output-baseline\VirusTotal-behaviors\apt-master-intel"
     New-Item -ItemType Directory -Path $mainBaseRoot      -Force | Out-Null
     New-Item -ItemType Directory -Path $behaviorsBaseRoot -Force | Out-Null
 
-    $missing = Initialize-AptMissingHashTracker
+    $missing = Initialize-AptMissingHashTracker -TrackerSuffix $TrackerSuffix
     Build-AptVTLocalIndex
     $script:AptVTQuotaHit = $false
 
@@ -508,7 +569,14 @@ function Get-AptMasterIntelVTByActor {
         [string]$ProxyRegion,
         [string]$Proxy,
         [pscredential]$ProxyCredential,
-        [string]$Keys
+        [string]$Keys,
+        # Enterprise/GTI tier - see Initialize-AptVTRotator. Free-tier constants
+        # (15s/key, 499/key/day) are untouched.
+        [switch]$Enterprise,
+        [string]$EnterpriseSecretName = 'VT_Enterprise_Key',
+        [int]$EnterpriseMinDelayMs    = 12,
+        [int]$EnterpriseCapPerDay     = 0,
+        [string]$TrackerSuffix        = ''
     )
 
     if (-not (Test-Path $AptRoot)) {
@@ -541,14 +609,14 @@ function Get-AptMasterIntelVTByActor {
     Write-Host "Matched $($csvFiles.Count) file(s):" -ForegroundColor DarkCyan
     $csvFiles | ForEach-Object { Write-Host "  $($_.FullName)" -ForegroundColor DarkGray }
 
-    if (-not (Initialize-AptVTRotator -ProxyRegion $ProxyRegion -Proxy $Proxy -ProxyCredential $ProxyCredential -Keys $Keys)) { return }
+    if (-not (Initialize-AptVTRotator -ProxyRegion $ProxyRegion -Proxy $Proxy -ProxyCredential $ProxyCredential -Keys $Keys -Enterprise:$Enterprise -EnterpriseSecretName $EnterpriseSecretName -EnterpriseMinDelayMs $EnterpriseMinDelayMs -EnterpriseCapPerDay $EnterpriseCapPerDay)) { return }
 
     $mainBaseRoot      = "output-baseline\VirusTotal-main\apt-master-intel"
     $behaviorsBaseRoot = "output-baseline\VirusTotal-behaviors\apt-master-intel"
     New-Item -ItemType Directory -Path $mainBaseRoot      -Force | Out-Null
     New-Item -ItemType Directory -Path $behaviorsBaseRoot -Force | Out-Null
 
-    $missing = Initialize-AptMissingHashTracker
+    $missing = Initialize-AptMissingHashTracker -TrackerSuffix $TrackerSuffix
     Build-AptVTLocalIndex
     $script:AptVTQuotaHit = $false
 

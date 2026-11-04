@@ -418,7 +418,12 @@ function Test-FidelityIndexCalibration {
         Skipped  = 0
         Details  = New-Object System.Collections.Generic.List[string]
     }
-    $valueSchemaFields = @('M','G','RiskScore','Confidence','PMI','Score100','Dimension')
+    # M_obs / G_obs / Phase2 added 2026-09-26 alongside the Tier-0 fixes: M and G
+    # are now per-sample document frequency, with raw occurrence counts preserved
+    # as M_obs / G_obs, and Phase2 flags keys whose evidence came from the APT
+    # differential merge (withheld from verdict points by default). Asserted here
+    # so a regression that drops them fails calibration instead of passing quietly.
+    $valueSchemaFields = @('M','G','M_obs','G_obs','Phase2','RiskScore','Confidence','PMI','Score100','Dimension')
     if ($manifest) {
         $structuralFailures = New-Object System.Collections.Generic.List[string]
         $structuralChecked  = 0

@@ -14,7 +14,7 @@ function Build-OTEDRGapMatrix {
         This visualization is MORE CURATED and LESS data-derived than the
         Dashboard / Capability Matrix. Tool coverage capabilities come from
         vendor documentation + our research (collected in
-        docs/purdue-layered briefs + the inventory-strategy doc); the
+        firmware-threat-briefs/purdue-layered briefs + the inventory-strategy doc); the
         data-derived part is per-row "how relevant is this dimension to
         my baseline" — pulled from the actual VT-behaviors corpus.
 

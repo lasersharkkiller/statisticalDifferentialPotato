@@ -63,7 +63,48 @@ function Build-VTFidelityIndex {
         # goodware-count for the artifact value (0 if absent).
         [switch]$EnableAltAPrior,
         [ValidateRange(0.0, 1000.0)]
-        [double]$PBPriorKappa  = 5.0
+        [double]$PBPriorKappa  = 5.0,
+
+        # --- Tier-0 data-integrity controls (added 2026-09-26) -------------
+        # Item 1 (STAGED; default preserves legacy behavior so rebuilds stay
+        # comparable). apt-master-intel holds 96,129 usable MALWARE samples --
+        # VT last_analysis_stats.malicious median 46.5 with 93% at >=5
+        # detections, against median 0.0 for NSRL/OT/localBaseline -- yet it
+        # has always been counted as goodware, i.e. 76% of the good side is
+        # malware. Set 'Malicious' to put it on the correct side, rebuild, and
+        # diff the FP set with tools\Measure-FidelityFPs.ps1 -PriorRunJson.
+        [ValidateSet('Goodware','Malicious')]
+        [string]$AptMasterIntelRole = 'Goodware',
+
+        # Item 3: Phase-2 rows are DERIVED from the same VT samples Phase 1
+        # already counted (the Targeted*DifferentialAnalysis.json files are
+        # produced from this corpus), so letting them score double-counts the
+        # same evidence. They stay in the index for provenance but contribute
+        # no verdict points unless this is set.
+        [switch]$Phase2FeedsScoring,
+
+        # Item 2 escape hatch: score on raw occurrence counts (legacy,
+        # pre-fix behavior) instead of per-sample document frequency.
+        [switch]$ScoreOnOccurrenceCounts,
+
+        # EFFECT-SIZE GATE (staged; 0 = off, which is the current behaviour).
+        # RiskScore is a posterior tail probability, i.e. it answers "is this
+        # rate difference real?" - and at corpus sizes like ours nearly any
+        # difference is real, so it saturates near 1.0 on features with no
+        # practical discriminating power. Measured examples: cert-status
+        # 'Unsigned' scores 100 with VerdictPoints 20 at a lift of 1.03x, and
+        # the Windows Defender service ('windefend') takes the full 25-point cap
+        # at 1.7x. Requiring a minimum lift before a feature may carry weight
+        # removes ~54% of all scoring entries (44,742 -> 20,438 measured
+        # 2026-09-29), including every entry in command-execution and
+        # cert-status - meaning nothing in those two dimensions has real
+        # discriminating power today.
+        #
+        # lift = (M/Mtotal) / ((G+0.5)/Gtotal); the +0.5 keeps G=0 finite.
+        # Suggested starting value 2.0, NOT calibrated - pick it from the Lift
+        # column that tools\Get-GoodwareCoverageGaps.ps1 reports.
+        [ValidateRange(0.0, 1000.0)]
+        [double]$MinLiftForVerdictPoints = 0.0
     )
 
     if (-not [System.IO.Path]::IsPathRooted($BaselineRoot)) {
@@ -99,6 +140,28 @@ function Build-VTFidelityIndex {
                               [System.StringComparer]::OrdinalIgnoreCase)
     $script:_vtfi_keys  = [System.Collections.Generic.HashSet[string]]::new(
                               [System.StringComparer]::OrdinalIgnoreCase)
+
+    # Item 2: M/G are DOCUMENT FREQUENCY -- the number of distinct samples
+    # exhibiting the feature -- not raw occurrence counts. Before this fix
+    # Update-Index incremented once per array element, so mitre-technique
+    # reached M=44,048 against Mtotal=19,735: rates above 1.0, and
+    # Get-ArtifactScores divides M/G (observations) by Mtotal/Gtotal (samples),
+    # which is dimensionally invalid. It also let a single chatty sample
+    # dominate a feature, since VT caps most behavior arrays at 300 entries.
+    # Raw occurrence counts are preserved as M_obs / G_obs for enrichment.
+    # _vtfi_seen is cleared once per sample file in the Phase-1 walk.
+    $script:_vtfi_malObs  = [System.Collections.Hashtable]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $script:_vtfi_goodObs = [System.Collections.Hashtable]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $script:_vtfi_seen    = [System.Collections.Generic.HashSet[string]]::new(
+                                [System.StringComparer]::OrdinalIgnoreCase)
+    $script:_vtfi_dfMode  = -not $ScoreOnOccurrenceCounts
+    # Count of entries whose verdict points were zeroed by the effect-size gate.
+    $script:_vtfi_liftGated = 0
+
+    # Item 3: composite keys Phase 2 created or mutated, so the emitter can
+    # flag them and withhold verdict points.
+    $script:_vtfi_phase2  = [System.Collections.Generic.HashSet[string]]::new(
+                                [System.StringComparer]::OrdinalIgnoreCase)
 
     # Process-baseline pipeline. All keyed by process-basename (lowercased at
     # write time by callers) — OrdinalIgnoreCase container per case-fix
@@ -217,10 +280,18 @@ function Build-VTFidelityIndex {
         $k = "$Dimension|$v"
         [void]$script:_vtfi_keys.Add($k)
         [void]$script:_vtfi_dims.Add($Dimension)
+        # Occurrence counts always accumulate. M/G accumulate at most once per
+        # sample while document-frequency mode is on (the default); _vtfi_seen
+        # is cleared per file in the Phase-1 walk. Phase 2 writes M/G directly
+        # and deliberately bypasses this path.
+        $firstForSample = $script:_vtfi_seen.Add($k)
+        $countIt = $firstForSample -or (-not $script:_vtfi_dfMode)
         if ($IsMalicious) {
-            $script:_vtfi_mal[$k] = [int]($script:_vtfi_mal[$k]) + 1
+            $script:_vtfi_malObs[$k] = [int]($script:_vtfi_malObs[$k]) + 1
+            if ($countIt) { $script:_vtfi_mal[$k] = [int]($script:_vtfi_mal[$k]) + 1 }
         } else {
-            $script:_vtfi_good[$k] = [int]($script:_vtfi_good[$k]) + 1
+            $script:_vtfi_goodObs[$k] = [int]($script:_vtfi_goodObs[$k]) + 1
+            if ($countIt) { $script:_vtfi_good[$k] = [int]($script:_vtfi_good[$k]) + 1 }
             if ($LegitName) {
                 if (-not $script:_vtfi_legit.ContainsKey($k)) {
                     $script:_vtfi_legit[$k] = [System.Collections.Generic.List[string]]::new()
@@ -547,8 +618,15 @@ function Build-VTFidelityIndex {
     # Both goodware and malicious buckets NEED -Recurse now that the
     # sub-bucket organization is nested, not flat. Previous flat globs
     # returned 0 files silently and skipped the whole goodware side.
-    $malCats  = @("malicious")
-    $goodCats = @("NSRL","OT","localBaseline","apt-master-intel")
+    # Item 1 (staged) -- see -AptMasterIntelRole in the param block.
+    if ($AptMasterIntelRole -eq 'Malicious') {
+        $malCats  = @("malicious","apt-master-intel")
+        $goodCats = @("NSRL","OT","localBaseline")
+        Write-Host "  [corpus] apt-master-intel => MALICIOUS side (-AptMasterIntelRole Malicious)" -ForegroundColor Yellow
+    } else {
+        $malCats  = @("malicious")
+        $goodCats = @("NSRL","OT","localBaseline","apt-master-intel")
+    }
     $allCats  = $malCats + $goodCats
 
     $totalFiles = 0; $totalProcessed = 0
@@ -584,6 +662,9 @@ function Build-VTFidelityIndex {
 
         foreach ($f in $files) {
             $processed++; $totalProcessed++
+            # Item 2: one sample = one document. Must be cleared before any
+            # Update-Index call for this file so M/G count samples.
+            $script:_vtfi_seen.Clear()
             # Corpus totals: 1 file = 1 increment, regardless of which dims fire
             if ($isMalicious) { $script:_vtfi_Mtotal++ }
             else {
@@ -599,6 +680,22 @@ function Build-VTFidelityIndex {
                 $raw = Get-Content $f.FullName -Raw
                 $j = $raw | ConvertFrom-Json
                 $d = $j.data
+
+                # TIER-1 FIX 2026-09-28 (Shape B): two report shapes exist in the
+                # corpus. Shape A puts the feature arrays directly on data.*;
+                # Shape B wraps them as data = {id, type, attributes} with
+                # type='file_behaviour_summary' and every feature one level
+                # deeper at data.attributes.*. 6,095 reports (2,890 malicious +
+                # 3,205 apt-master-intel) are Shape B, and because every
+                # extractor below reads $d.<field> they contributed exactly
+                # nothing. Unwrap so both shapes feed the index identically.
+                if ($d -and $d.PSObject.Properties['attributes'] -and $d.attributes) {
+                    $isWrapped = $true
+                    if ($d.PSObject.Properties['type'] -and $d.type) {
+                        $isWrapped = ("$($d.type)" -eq 'file_behaviour_summary')
+                    }
+                    if ($isWrapped) { $d = $d.attributes }
+                }
 
                 $legitName   = ""
                 $legitSigner = ""
@@ -815,8 +912,17 @@ function Build-VTFidelityIndex {
                 }
 
                 # ----- behavior_summary side-channels -----
-                $bs = $d.behavior_summary
-                if (-not $bs -and $d.PSObject -and $d.PSObject.Properties['summary']) { $bs = $d.summary }
+                # TIER-1 FIX 2026-09-28: this block was unreachable dead code.
+                # It gated on $d.behavior_summary with a fallback to $d.summary,
+                # and NEITHER key exists in any of the 204,824 behavior reports
+                # in the corpus (byte-scanned, 0 occurrences). $d IS already the
+                # behaviour summary -- command_executions / services_* are direct
+                # children of $d, siblings of the processes_created and
+                # mutexes_created that the working dimensions read. So $bs was
+                # always $null and the four extractors below never ran, which is
+                # why fidelity-{service,scheduled-task,pipe,command-execution}
+                # .json were all 4-byte '{}' files.
+                $bs = $d
                 if ($bs) {
                     # service
                     foreach ($svcProp in @('services_created','services_opened')) {
@@ -868,8 +974,17 @@ function Build-VTFidelityIndex {
                 # only raw APIs should filter on keys NOT starting with 'sig:'. Both
                 # contribute zero verdict points by default (dimension_gates disables
                 # win-api verdict_points; see manifest).
-                if ($d.signatures) {
-                    $d.signatures | Where-Object { $_.severity -ge 7 } | ForEach-Object {
+                # TIER-1 FIX 2026-09-28: $d.signatures exists in exactly ONE
+                # file corpus-wide; the real VT field is signature_matches. Read
+                # the correct field and keep the legacy one as a fallback so a
+                # report carrying either shape still contributes.
+                $sigSrc = if ($d.PSObject.Properties['signature_matches'] -and $d.signature_matches) {
+                              $d.signature_matches
+                          } elseif ($d.PSObject.Properties['signatures'] -and $d.signatures) {
+                              $d.signatures
+                          } else { $null }
+                if ($sigSrc) {
+                    $sigSrc | Where-Object { $_.severity -ge 7 } | ForEach-Object {
                         if ($_.name) {
                             Update-Index -Value "sig:$($_.name)" -Dimension "win-api" -IsMalicious $isMalicious -LegitName $legitName
                         }
@@ -967,14 +1082,19 @@ function Build-VTFidelityIndex {
                         elseif ($gc -gt 0 -and $gc -lt ($existingG * 0.5)) { $allowOverwrite = $true }
                         if ($allowOverwrite -and $gc -lt $existingG) {
                             $script:_vtfi_good[$compKey] = $gc
+                            [void]$script:_vtfi_phase2.Add($compKey)
                             $aptUpdated++
                         }
-                        if ($mc -gt [int]($script:_vtfi_mal[$compKey])) { $script:_vtfi_mal[$compKey] = $mc }
+                        if ($mc -gt [int]($script:_vtfi_mal[$compKey])) {
+                            $script:_vtfi_mal[$compKey] = $mc
+                            [void]$script:_vtfi_phase2.Add($compKey)
+                        }
                     } else {
                         $script:_vtfi_mal[$compKey]  = $mc
                         $script:_vtfi_good[$compKey] = $gc
                         [void]$script:_vtfi_keys.Add($compKey)
                         [void]$script:_vtfi_dims.Add($dim)
+                        [void]$script:_vtfi_phase2.Add($compKey)
                         $aptAdded++
                     }
                 }
@@ -1123,9 +1243,32 @@ function Build-VTFidelityIndex {
             if ($vp -gt $cap) { $vp = $cap }
         }
 
+        # Effect size, always computed so it can be inspected even when the gate
+        # is off. Additive 0.5 on G keeps never-seen-in-goodware features finite
+        # instead of infinite.
+        $lift = if ($Gtotal -gt 0 -and $Mtotal -gt 0) {
+                    ([double]$mc / [double]$Mtotal) / ((([double]$gc + 0.5)) / [double]$Gtotal)
+                } else { 0.0 }
+
+        if ($MinLiftForVerdictPoints -gt 0.0 -and $vp -gt 0 -and $lift -lt $MinLiftForVerdictPoints) {
+            $vp = 0
+            $script:_vtfi_liftGated++
+        }
+
+        # Item 3: Phase-2-derived evidence is double-counted (those rows come
+        # from the same VT samples Phase 1 already scored), so it earns no
+        # verdict points unless -Phase2FeedsScoring. The entry is still emitted
+        # with Phase2=$true so consumers keep the provenance.
+        $isP2 = $script:_vtfi_phase2.Contains($k)
+        if ($isP2 -and -not $Phase2FeedsScoring) { $vp = 0 }
+
         $entry = [PSCustomObject]@{
             M             = $mc
             G             = $gc
+            Lift          = [Math]::Round($lift, 2)
+            M_obs         = [int]($script:_vtfi_malObs[$k])
+            G_obs         = [int]($script:_vtfi_goodObs[$k])
+            Phase2        = $isP2
             S             = $legacyS
             U             = $scores.U
             R             = $scores.R
@@ -1175,6 +1318,12 @@ function Build-VTFidelityIndex {
     # -----------------------------------------------------------------------
     # WRITE PHASE
     # -----------------------------------------------------------------------
+    if ($MinLiftForVerdictPoints -gt 0.0) {
+        Write-Host ("  Effect-size gate: lift >= {0} -> {1} entr{2} had VerdictPoints zeroed" -f `
+            $MinLiftForVerdictPoints, $script:_vtfi_liftGated,
+            $(if ($script:_vtfi_liftGated -eq 1) { 'y' } else { 'ies' })) -ForegroundColor Yellow
+    }
+
     Write-Host "`n  Writing per-dimension index files ..." -ForegroundColor DarkCyan
     $indicesMeta = @()
     $blockingZero = @()
@@ -1451,6 +1600,9 @@ function Build-VTFidelityIndex {
     $script:_vtfi_GoodwareSubcorpora = $null
     $script:_vtfi_dimMeta = $null
     $script:_vtfi_maxVP = $null; $script:_vtfi_usage = $null
+    $script:_vtfi_liftGated = $null
+    $script:_vtfi_malObs = $null; $script:_vtfi_goodObs = $null
+    $script:_vtfi_seen = $null; $script:_vtfi_phase2 = $null; $script:_vtfi_dfMode = $null
     $script:_vtfi_pbLookup = $null
 
     return [PSCustomObject]@{

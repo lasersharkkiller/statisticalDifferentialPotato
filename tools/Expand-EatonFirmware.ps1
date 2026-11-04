@@ -423,6 +423,50 @@ if ($wslAvailable) {
     }
 }
 
+# --- Step 7: unwrap OpenPGP containers (signed-but-not-encrypted payloads) ---
+# Some vendors ship firmware payloads inside OpenPGP containers that are
+# SIGNED but NOT encrypted: the real tarball sits in the clear inside a
+# compressed / onepass_sig / literal-data / signature packet sequence.
+# binwalk does not recurse into OpenPGP, so Step 6 leaves those as opaque
+# .gpg blobs. Eaton Tripp Lite WebCardLXE is the canonical case - 17 .gpg
+# payloads that produced 19 catalog rows before this step and ~49,700 after
+# (kernel modules, Java runtime, rootfs, an ext2 X-server image).
+#
+# Runs AFTER Step 6 because binwalk is what exposes the .gpg files in the
+# first place (they live inside the outer .tar it carves open).
+#
+# Genuinely encrypted containers (pubkey_enc / symkey_enc packets) are
+# reported and skipped - those need the vendor's key.
+
+$wslGpgAvailable = $false
+try {
+    & wsl.exe --status *>$null
+    if ($LASTEXITCODE -eq 0) {
+        & wsl.exe --user root -d Ubuntu -- bash -c 'test -x /usr/bin/gpg' *>$null
+        if ($LASTEXITCODE -eq 0) { $wslGpgAvailable = $true }
+    }
+} catch {}
+
+$pgpFiles = @(Get-ChildItem -LiteralPath $OutputDir -Recurse -File -ErrorAction SilentlyContinue |
+              Where-Object { $_.Extension -in @('.gpg','.pgp') })
+
+if ($pgpFiles.Count -gt 0 -and $wslGpgAvailable) {
+    if (-not $Quiet) {
+        Write-Host ""
+        Write-Host ("Step 7: unwrap {0} OpenPGP container(s)" -f $pgpFiles.Count) -ForegroundColor DarkCyan
+    }
+    $unwrapWsl = '/mnt/c/githubProjects/statisticalDifferentialPotato/tools/unwrap-openpgp.sh'
+    $wslRoot   = '/mnt/c' + ($OutputDir -replace '^C:','' -replace '\\','/')
+    $out = & wsl.exe --user root -d Ubuntu -- bash "$unwrapWsl" "$wslRoot" 2>&1
+    if (-not $Quiet -and $out) { $out | ForEach-Object { Write-Host $_ -ForegroundColor DarkGray } }
+} elseif ($pgpFiles.Count -gt 0) {
+    if (-not $Quiet) {
+        Write-Host ""
+        Write-Host ("Step 7: skipped - {0} .gpg/.pgp file(s) found but WSL gpg unavailable" -f $pgpFiles.Count) -ForegroundColor DarkGray
+        Write-Host "  wsl --user root -d Ubuntu -- apt install -y gnupg e2fsprogs xz-utils" -ForegroundColor DarkGray
+    }
+}
+
 # --- Done ---
 if (-not $Quiet) {
     $allFiles = @(Get-ChildItem -LiteralPath $OutputDir -Recurse -File -ErrorAction SilentlyContinue)

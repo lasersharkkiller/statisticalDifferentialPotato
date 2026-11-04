@@ -334,6 +334,8 @@ try {
 }
 
 $rows        = [System.Collections.Generic.List[object]]::new()
+# Paths for hashes already present in the NSRL CSV - manifest backfill only.
+$pathOnly    = [System.Collections.Generic.List[object]]::new()
 $scannedFiles = 0
 $dupes        = 0
 foreach ($p in $scanPaths) {
@@ -350,12 +352,24 @@ foreach ($p in $scanPaths) {
         $scannedFiles++
         try {
             $hash = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256 -ErrorAction Stop).Hash.ToLowerInvariant()
-            if ($existing.ContainsKey($hash)) { $dupes++; continue }
+            if ($existing.ContainsKey($hash)) {
+                # Hash already in the NSRL CSV - no new corpus row. But the
+                # sidecar path manifest is a SEPARATE concern: without this the
+                # manifest can never be backfilled for software imported before
+                # the manifest existed, and -SubmitMissingToVT would have no
+                # path for those hashes.
+                $dupes++
+                $pathOnly.Add([PSCustomObject]@{ Hash = $hash; FullPath = $f.FullName; OsName = $OsName })
+                continue
+            }
             $existing[$hash] = $true
             $rows.Add([PSCustomObject]@{
                 Hash     = $hash
                 FileName = $f.Name
                 OsName   = $OsName
+                # Captured for the sidecar path manifest only; never written to
+                # the NSRL CSV, which stays portable Hash,FileName,OsName.
+                FullPath = $f.FullName
             })
         } catch {
             Write-Warning "Hash failed for $($f.FullName): $($_.Exception.Message)"
@@ -377,6 +391,50 @@ if ($rows.Count -gt 0) {
     }
     Add-Content -LiteralPath $CsvPath -Value $lines -Encoding UTF8
 }
+
+# ---------- Path manifest (for enterprise VT submission) ------------------
+# The NSRL CSV schema is Hash,FileName,OsName - deliberately no full path,
+# because it is a hash corpus, not a file index. But Get-VTBaseline
+# -SubmitMissingToVT needs to LOCATE a file to upload it, and a hash alone
+# cannot be uploaded. So record Hash -> FullPath alongside, as a sidecar.
+#
+# Kept separate from the NSRL CSV on purpose: the manifest is
+# machine-specific (these paths exist on THIS host only) whereas the hash
+# corpus is portable. It is also the allow-list that bounds what submission
+# is permitted to upload - submission never walks arbitrary paths.
+if ((@($rows).Count + @($pathOnly).Count) -gt 0) {
+# MUST NOT live under NSRL\ : Get-VTBaseline enumerates EVERY *.csv there as a
+# hash corpus, so a sidecar placed beside nsrl_common_software.csv gets ingested
+# as if it were one - it claims the hashes first, leaves the real corpus adding
+# "0 new entries", and breaks -Mode CommonSoftware (which filters on Source).
+# Observed 2026-09-29. Keep generated artefacts in output\ like MissingHashes.csv.
+$manifestDir = Join-Path (Split-Path (Split-Path $CsvPath -Parent) -Parent) 'output'
+if (-not (Test-Path -LiteralPath $manifestDir)) { New-Item -ItemType Directory -Path $manifestDir -Force | Out-Null }
+$manifestPath = Join-Path $manifestDir 'nsrl_common_software_paths.csv'
+$haveManifest = Test-Path -LiteralPath $manifestPath
+if (-not $haveManifest) {
+    'Hash,FullPath,OsName' | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+}
+$seenManifest = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+if ($haveManifest) {
+    try { Import-Csv -LiteralPath $manifestPath | ForEach-Object { if ($_.Hash) { [void]$seenManifest.Add($_.Hash) } } } catch {}
+}
+$mLines = foreach ($r in (@($rows) + @($pathOnly))) {
+    if (-not $r.FullPath) { continue }
+    if (-not $seenManifest.Add($r.Hash)) { continue }
+    $fp = $r.FullPath
+    if ($fp -match '[",]') { $fp = '"' + ($fp -replace '"','""') + '"' }
+    $os = $r.OsName
+    if ($os -match '[",]') { $os = '"' + ($os -replace '"','""') + '"' }
+    "$($r.Hash),$fp,$os"
+}
+$mLines = @($mLines)
+if ($mLines.Count -gt 0) {
+    Add-Content -LiteralPath $manifestPath -Value $mLines -Encoding UTF8
+    Write-Host ("  Path manifest: +{0} rows -> {1}" -f $mLines.Count, $manifestPath) -ForegroundColor DarkGray
+}
+}
+
 
 # ---------- Summary ------------------------------------------------------------
 Write-Host ""

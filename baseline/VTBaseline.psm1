@@ -88,7 +88,13 @@ function Get-PlatformBaselineRoots {
 function Get-VTBaseline {
     [CmdletBinding()]
     param(
-        [ValidateSet('All','NSRL','NSRLOs','LocalBaseline','Malicious')]
+        # CommonSoftware added 2026-09-29: queues ONLY the researcher-added
+        # common-software corpus (NSRL/nsrl_common_software.csv) instead of the
+        # full NSRL base. Routing and destination folders are unchanged - these
+        # are still NSRL-class goodware and still land in NSRL/<os>/<sig>/ -
+        # but the queue skips the ~40k authoritative NIST rows, so a targeted
+        # run does not have to walk them to reach a few hundred new hashes.
+        [ValidateSet('All','NSRL','NSRLOs','CommonSoftware','LocalBaseline','Malicious')]
         [string]$Mode = 'All',
         [string]$OsFilter,
         [string]$AttributionPattern = "equifax",
@@ -126,13 +132,70 @@ function Get-VTBaseline {
         # Useful for parallel shells - e.g. Window A '-Keys 1,2', Window B
         # '-Keys 3,4,5' - so the two shells use disjoint key sets at VT's
         # quota counter.
-        [string]$Keys
+        [string]$Keys,
+
+        # === ENTERPRISE / PREMIUM TIER (added 2026-09-29) ==================
+        # The 6 free keys live in the vault as VT_API_Key_1..6 and are found by
+        # the 'VT_API_Key_*' wildcard below. The enterprise key is DELIBERATELY
+        # named so it does NOT match that wildcard, so it can never be picked
+        # up as one of the free pool by accident. When -Enterprise is set the
+        # wildcard enumeration is skipped entirely and ONLY this secret loads.
+        [switch]$Enterprise,
+        [string]$EnterpriseSecretName = 'VT_Enterprise_Key',
+
+        # Free-tier throttle constants (15s/key spacing, 499/key/day) are
+        # calibrated and intentionally NOT touched by any of this. These apply
+        # only on the -Enterprise path.
+        #
+        # Default set from the licence's ACTUAL reported allowance rather than
+        # guessed (measured 2026-09-29 against /api/v3/users/<key>):
+        #   api_requests_hourly  600,000
+        #   api_requests_daily   100,000,000
+        # 600k/hour is 166/sec. 50ms spacing = 20/sec = 72,000/hour, i.e. ~12%
+        # of the hourly allowance - roughly 80x the free-tier effective rate
+        # while leaving substantial headroom for other tooling sharing the key.
+        # Lower it if a run needs to go faster; there is a lot of room.
+        [int]$EnterpriseMinDelayMs = 50,
+        # 0 = no daily cap (the licence's 100M/day is effectively unlimited
+        # for this pipeline's volumes).
+        [int]$EnterpriseCapPerDay  = 0,
+
+        # Submit files VT has never seen. ENTERPRISE ONLY - hard-refused on the
+        # free path. Requires -PathManifest because a hash alone cannot be
+        # uploaded: NSRL rows carry Hash/FileName/OsName and no full path, so
+        # the file has to be located on disk first.
+        [switch]$SubmitMissingToVT,
+        [string]$PathManifest
     )
 
     if ($Mode -eq 'NSRLOs' -and [string]::IsNullOrWhiteSpace($OsFilter)) {
         Write-Error "Mode 'NSRLOs' requires -OsFilter to be specified."
         return
     }
+
+    # --- SUBMISSION PRE-FLIGHT (must run BEFORE any key handling) ------------
+    # Uploading a file to VirusTotal PUBLISHES it: VT makes submitted samples
+    # available to its premium-subscriber ecosystem. Acceptable for the public
+    # OS / application binaries the NSRL corpora consist of; NOT acceptable for
+    # anything proprietary. Hence: refused outright on the free tier, and
+    # restricted to files named in an explicit manifest - never a path walk.
+    # Validated up front so a misuse fails immediately instead of after the
+    # interactive key prompt.
+    if ($SubmitMissingToVT) {
+        if (-not $Enterprise) {
+            Write-Error "-SubmitMissingToVT requires -Enterprise. Refusing to submit files using free-tier keys."
+            return
+        }
+        if ([string]::IsNullOrWhiteSpace($PathManifest)) {
+            Write-Error "-SubmitMissingToVT requires -PathManifest (CSV with Hash,FullPath). A hash on its own cannot be uploaded - NSRL rows carry no path, so the file must be located on disk first."
+            return
+        }
+        if (-not (Test-Path -LiteralPath $PathManifest)) {
+            Write-Error "PathManifest not found: $PathManifest"
+            return
+        }
+    }
+
 
     # --- PROXY RESOLUTION ---
     if ([string]::IsNullOrWhiteSpace($ProxyRegion)) { $ProxyRegion = $env:VT_PROXY_REGION }
@@ -170,6 +233,37 @@ function Get-VTBaseline {
     # --- API SETUP ---
     $VTKeys = @()
     $infos = $null
+    $script:VTIsEnterprise = [bool]$Enterprise
+
+    if ($Enterprise) {
+        # Load ONLY the enterprise secret. No wildcard, so a free key cannot
+        # leak into this path even if someone names one VT_API_Key_Enterprise.
+        try {
+            $entKey = (Get-Secret -Name $EnterpriseSecretName -AsPlainText -ErrorAction Stop).Trim()
+        } catch {
+            if (Get-Command Unlock-SecretStore -ErrorAction SilentlyContinue) {
+                Write-Host "[INFO] Vault read failed - attempting Unlock-SecretStore..." -ForegroundColor DarkYellow
+                try { Unlock-SecretStore -ErrorAction Stop; $entKey = (Get-Secret -Name $EnterpriseSecretName -AsPlainText -ErrorAction Stop).Trim() }
+                catch { Write-Error ("Enterprise key '{0}' not readable: {1}" -f $EnterpriseSecretName, $_.Exception.Message); return }
+            } else {
+                Write-Error ("Enterprise key '{0}' not found in vault." -f $EnterpriseSecretName); return
+            }
+        }
+        if ([string]::IsNullOrWhiteSpace($entKey)) {
+            Write-Error ("Enterprise key '{0}' is empty." -f $EnterpriseSecretName); return
+        }
+        if ($EnterpriseSecretName -like 'VT_API_Key_*') {
+            Write-Error ("Refusing to run: -EnterpriseSecretName '{0}' matches the free-key wildcard 'VT_API_Key_*'. Rename the secret so the two tiers cannot be confused." -f $EnterpriseSecretName)
+            return
+        }
+        $VTKeys      = @($entKey)
+        $loadedNames = @($EnterpriseSecretName)
+        Write-Host ("Using ENTERPRISE key ({0}). Spacing {1}ms, daily cap {2}." -f `
+            $EnterpriseSecretName, $EnterpriseMinDelayMs,
+            $(if ($EnterpriseCapPerDay -gt 0) { $EnterpriseCapPerDay } else { 'none' })) -ForegroundColor Green
+    }
+
+    if (-not $Enterprise) {
     try {
         $infos = Get-SecretInfo -Name 'VT_API_Key_*' -ErrorAction Stop |
                  Sort-Object { if ($_.Name -match '_(\d+)$') { [int]$matches[1] } else { [int]::MaxValue } }
@@ -251,16 +345,51 @@ function Get-VTBaseline {
     }
 
     Write-Host "Using $($VTKeys.Count) VT API key(s) ($($loadedNames -join ', ')). Rotating with 15s spacing per key (~$($VTKeys.Count * 4) req/min combined)." -ForegroundColor DarkCyan
+    }   # end: free-tier key enumeration + subset resolution
 
-    $script:VTMinDelayMs       = 15000
+    # Throttle profile. The free-tier values (15000ms / 499) are calibrated -
+    # see memory note 'VT throttle hands-off' - and are left exactly as they
+    # were. Only the enterprise branch differs.
+    if ($Enterprise) {
+        $script:VTMinDelayMs   = [Math]::Max(0, $EnterpriseMinDelayMs)
+        $script:VTKeyCapPerDay = if ($EnterpriseCapPerDay -gt 0) { $EnterpriseCapPerDay } else { [int]::MaxValue }
+    } else {
+        $script:VTMinDelayMs   = 15000
+        # Stop 1 short of VT's 500/day per-account cap so VT doesn't email
+        # "quota exhausted" notifications. Tracked per-key locally + seeded
+        # from VT's current api_requests_daily.used at startup so cross-window
+        # / earlier-today usage is respected.
+        $script:VTKeyCapPerDay = 499
+    }
+
+    # --- SUBMISSION MANIFEST LOAD (pre-flight already validated above) -------
+    $script:VTSubmitEnabled = $false
+    $script:VTPathMap       = $null
+    $script:VTSubmitLog     = Join-Path 'output' 'VTSubmissions.csv'
+    if ($SubmitMissingToVT) {
+        $script:VTPathMap = [System.Collections.Hashtable]::new([System.StringComparer]::OrdinalIgnoreCase)
+        $mf = 0
+        foreach ($row in (Import-Csv -LiteralPath $PathManifest)) {
+            if ($row.Hash -and $row.FullPath) { $script:VTPathMap[$row.Hash.Trim()] = $row.FullPath; $mf++ }
+        }
+        if ($mf -eq 0) { Write-Error "PathManifest '$PathManifest' yielded no Hash/FullPath rows."; return }
+        $script:VTSubmitEnabled = $true
+        # Seed from the audit log so a re-run never re-uploads the same file.
+        $script:VTSubmitted = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        if (Test-Path -LiteralPath $script:VTSubmitLog) {
+            try { Import-Csv -LiteralPath $script:VTSubmitLog | ForEach-Object { if ($_.Hash) { [void]$script:VTSubmitted.Add($_.Hash) } } } catch {}
+        }
+        Write-Host ("Submission ENABLED (enterprise): {0} hash->path entries from {1}" -f $mf, $PathManifest) -ForegroundColor Yellow
+        if ($script:VTSubmitted.Count -gt 0) {
+            Write-Host ("  {0} hash(es) already uploaded previously - will not re-submit" -f $script:VTSubmitted.Count) -ForegroundColor DarkGray
+        }
+        Write-Host ("  Every upload is appended to {0}" -f $script:VTSubmitLog) -ForegroundColor DarkGray
+    }
+
+    # Rotation state - common to both tiers.
     $script:VTKeyLastCall      = @{}
     $script:VTKeyDisabledUntil = @{}
     $script:VTKeyCallCount     = @{}
-    # Stop 1 short of VT's 500/day per-account cap so VT doesn't email
-    # "quota exhausted" notifications. Tracked per-key locally + seeded from
-    # VT's current api_requests_daily.used at startup so cross-window /
-    # earlier-today usage is respected.
-    $script:VTKeyCapPerDay     = 499
 
     Write-Host "Seeding per-key daily-used counters from VT..." -ForegroundColor DarkGray
     for ($j = 0; $j -lt $VTKeys.Count; $j++) {
@@ -383,7 +512,7 @@ function Get-VTBaseline {
 
     # --- MODE FLAGS ---
     $doProcs     = ($Mode -in @('All','LocalBaseline'))
-    $doNSRL      = ($Mode -in @('All','NSRL','NSRLOs'))
+    $doNSRL      = ($Mode -in @('All','NSRL','NSRLOs','CommonSoftware'))
     $doMalicious = ($Mode -in @('All','Malicious'))
     $doDrivers   = ($Mode -in @('All','LocalBaseline'))
     Write-Host "Mode: $Mode  (procs=$doProcs nsrl=$doNSRL malicious=$doMalicious drivers=$doDrivers$(if($OsFilter){"  osFilter=$OsFilter"}))" -ForegroundColor DarkCyan
@@ -474,6 +603,43 @@ function Get-VTBaseline {
         }
     }
 
+    # --- SUBMIT HELPER (enterprise only; returns analysis id or $null) -------
+    function Submit-VTMissingFile {
+        param([string]$Hash)
+        if (-not $script:VTSubmitEnabled) { return $null }
+        $path = $script:VTPathMap[$Hash]
+        if ([string]::IsNullOrWhiteSpace($path)) {
+            Write-Host "    [no-submit] $Hash not in PathManifest - cannot upload a hash without its file." -ForegroundColor DarkGray
+            return $null
+        }
+        if (-not (Test-Path -LiteralPath $path)) {
+            Write-Host "    [no-submit] $Hash manifest path missing on disk: $path" -ForegroundColor DarkYellow
+            return $null
+        }
+        $fi = Get-Item -LiteralPath $path
+        try {
+            $args = @{ Headers = @{ 'x-apikey' = $VTKeys[0] }; TimeoutSec = 600 }
+            if ($Proxy) { $args['Proxy'] = $Proxy; if ($ProxyCredential) { $args['ProxyCredential'] = $ProxyCredential } }
+            if ($fi.Length -le 32MB) {
+                $resp = Invoke-RestMethod -Uri 'https://www.virustotal.com/api/v3/files' -Method POST -Form @{ file = $fi } @args
+            } else {
+                $u = Invoke-RestMethod -Uri 'https://www.virustotal.com/api/v3/files/upload_url' @args
+                if ([string]::IsNullOrWhiteSpace($u.data)) { throw "VT returned no upload_url (tier may not allow >32MB)" }
+                $resp = Invoke-RestMethod -Uri $u.data -Method POST -Form @{ file = $fi } -TimeoutSec 600
+            }
+            $aid = $resp.data.id
+            Write-Host ("    [SUBMITTED] {0} ({1:N0} bytes) -> analysis {2}" -f $fi.Name, $fi.Length, $aid) -ForegroundColor Green
+            [PSCustomObject]@{
+                Hash = $Hash; FullPath = $path; Bytes = $fi.Length
+                AnalysisId = $aid; SubmittedUtc = ([DateTime]::UtcNow).ToString('yyyy-MM-ddTHH:mm:ssZ')
+            } | Export-Csv -Path $script:VTSubmitLog -Append -NoTypeInformation
+            return $aid
+        } catch {
+            Write-Host ("    [submit-failed] {0}: {1}" -f $fi.Name, $_.Exception.Message) -ForegroundColor Red
+            return $null
+        }
+    }
+
     # --- LOAD MISSING HASHES TRACKER (404s on /files/{hash}) ---
     $missingHashesPath = "output\MissingHashes.csv"
     $missingHashes = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
@@ -541,7 +707,7 @@ function Get-VTBaseline {
                 Import-Csv $csvFile.FullName | ForEach-Object {
                     if (-not $_.Hash) { return }
                     if (-not $seenNsrlHashes.Add($_.Hash)) { return }
-                    $entry = [pscustomobject]@{ Hash = $_.Hash; OsName = $_.OsName }
+                    $entry = [pscustomobject]@{ Hash = $_.Hash; OsName = $_.OsName; Source = $csvFile.Name }
                     if ($_.OsName -like '*Windows*') { $nsrlWindowsEntries.Add($entry) }
                     else                              { $nsrlLinuxEntries.Add($entry)   }
                 }
@@ -549,6 +715,15 @@ function Get-VTBaseline {
                 Write-Host "[WARN] Could not parse $($csvFile.Name) for NSRL entries: $($_.Exception.Message)" -ForegroundColor Yellow
                 continue
             }
+        }
+        if ($Mode -eq 'CommonSoftware') {
+            $cswBefore = $nsrlWindowsEntries.Count + $nsrlLinuxEntries.Count
+            $nsrlWindowsEntries = [System.Collections.Generic.List[object]](
+                @($nsrlWindowsEntries | Where-Object { $_.Source -ieq 'nsrl_common_software.csv' }))
+            $nsrlLinuxEntries   = [System.Collections.Generic.List[object]](
+                @($nsrlLinuxEntries   | Where-Object { $_.Source -ieq 'nsrl_common_software.csv' }))
+            $cswAfter = $nsrlWindowsEntries.Count + $nsrlLinuxEntries.Count
+            Write-Host ("Mode CommonSoftware: queue narrowed {0} -> {1} entries (nsrl_common_software.csv only)" -f $cswBefore, $cswAfter) -ForegroundColor DarkCyan
         }
         Write-Host "NSRL queue: $($nsrlWindowsEntries.Count) Windows, $($nsrlLinuxEntries.Count) Linux." -ForegroundColor DarkGray
     }
@@ -563,7 +738,19 @@ function Get-VTBaseline {
         )
 
         if ($missingHashes.Contains($Hash)) {
-            Write-Host "  [SKIP] $Hash is in MissingHashes.csv - known 404." -ForegroundColor DarkGray
+            # A known-404 is precisely what submission exists for: VT has never
+            # seen this file. Skipping here first (the pre-submission behaviour)
+            # meant -SubmitMissingToVT could never fire on the very population
+            # it targets, because those hashes never reach the API call that
+            # would 404. So when submission is enabled, upload instead of skip -
+            # once per hash, tracked in VTSubmissions.csv across runs.
+            if ($script:VTSubmitEnabled -and -not $script:VTSubmitted.Contains($Hash)) {
+                Write-Host "  [404-known] $Hash - VT has never seen it; submitting." -ForegroundColor DarkCyan
+                $null = Submit-VTMissingFile -Hash $Hash
+                [void]$script:VTSubmitted.Add($Hash)
+            } else {
+                Write-Host "  [SKIP] $Hash is in MissingHashes.csv - known 404." -ForegroundColor DarkGray
+            }
             return
         }
 
@@ -597,6 +784,12 @@ function Get-VTBaseline {
                     $script:QuotaHit = $true
                     return
                 } elseif ($code -eq 404) {
+                    # Enterprise + manifest: upload it so VT has it next run.
+                    # Still recorded as missing for THIS run - the analysis is
+                    # queued, not complete, so the report is not available yet.
+                    if ($script:VTSubmitEnabled) {
+                        $null = Submit-VTMissingFile -Hash $Hash
+                    }
                     Write-Host "  [404] $Hash not found in VT. Adding to MissingHashes.csv." -ForegroundColor DarkGray
                     [void]$missingHashes.Add($Hash)
                     [PSCustomObject]@{ Hash = $Hash; DateChecked = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ") } |
@@ -682,7 +875,19 @@ function Get-VTBaseline {
             $h  = $entry.Hash
             $os = $entry.OsName
             if ($Mode -eq 'NSRLOs' -and $os -ne $OsFilter) { continue }
-            if ($missingHashes.Contains($h)) { continue }
+            # Known-404 = VT has never seen this file. That is exactly the
+            # submission target population, so when -SubmitMissingToVT is on we
+            # upload instead of skipping. NOTE there are two known-404 gates -
+            # this loop-level one and the one inside Process-Hash - and THIS one
+            # fires first, so patching only the other left submission dead.
+            if ($missingHashes.Contains($h)) {
+                if ($script:VTSubmitEnabled -and -not $script:VTSubmitted.Contains($h)) {
+                    Write-Host "  [404-known] $h - VT has never seen it; submitting." -ForegroundColor DarkCyan
+                    $null = Submit-VTMissingFile -Hash $h
+                    [void]$script:VTSubmitted.Add($h)
+                }
+                continue
+            }
 
             $slug = Get-NSRLOsSlug $os
             $sigOrder = @('SignedVerified','unverified','unsignedWin')

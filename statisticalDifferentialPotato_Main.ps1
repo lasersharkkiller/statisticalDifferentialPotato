@@ -1,4 +1,4 @@
-#Requirements
+﻿#Requirements
 #Install-Module -Scope CurrentUser Microsoft.PowerShell.SecretManagement, Microsoft.Powershell.SecretStore -Force
 #Register-SecretVault -Name LocalSecrets -ModuleName Microsoft.PowerShell.SecretStore -DefaultVault
 #VirusTotal API (multiple keys spread the rate limit)
@@ -74,6 +74,8 @@ Write-Host "  $([char]27)[4m+----------------------------------------------+$([c
 Write-Host "  $([char]27)[4m|                  Report Creation               |$([char]27)[24m" -ForegroundColor Gray
 Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor Gray
 Write-Host "3a) Iterate through APT Analyses and Create API Matrix" -ForegroundColor Gray
+Write-Host "3b) Weekly progress metrics (VT coverage before/after, files contributed, TTP yield)" -ForegroundColor Gray
+Write-Host "     -> Appends one row per ISO week to output\metrics\weekly-progress.csv + renders a markdown report" -ForegroundColor DarkGray
 Write-Host ""
 
 # -- GROUP 4: Firmware Extraction (NextGen NSRL Building) ---------------------
@@ -88,6 +90,25 @@ Write-Host "4e) Honeywell (Niagara / Experion / ControlEdge / HC900): Extract fi
 Write-Host "4f) Schneider Electric (Modicon / EcoStruxure / Magelis / Altivar): Extract firmware bundles + build NSRL catalogs" -ForegroundColor DarkYellow
 Write-Host "4g) Rockwell (ControlLogix / CompactLogix / FactoryTalk / Studio 5000): Extract firmware bundles + build NSRL catalogs" -ForegroundColor DarkYellow
 Write-Host "4h) Siemens (SIMATIC / SCALANCE / SINAMICS / RUGGEDCOM / TIA Portal): Extract firmware bundles + build NSRL catalogs" -ForegroundColor DarkYellow
+Write-Host "-- Building automation / facilities / physical security (from OTSDP network inventory) --" -ForegroundColor DarkGray
+Write-Host "4i) Johnson Controls (Metasys NAE/NIE/SNE/SNC): Extract firmware bundles + build NSRL catalogs" -ForegroundColor DarkYellow
+Write-Host "4j) Tridium (Niagara 4 / JACE-8000 / JACE-9000 / Edge 10): Extract firmware bundles + build NSRL catalogs" -ForegroundColor DarkYellow
+Write-Host "4k) AutomatedLogic (WebCTRL / LGR routers / SE controllers): Extract firmware bundles + build NSRL catalogs" -ForegroundColor DarkYellow
+Write-Host "4l) Echelon (i.LON / SmartServer IoT / LonWorks): Extract firmware bundles + build NSRL catalogs" -ForegroundColor DarkYellow
+Write-Host "4m) CyberPower (RMCARD / PDU / PowerPanel): Extract firmware bundles + build NSRL catalogs" -ForegroundColor DarkYellow
+Write-Host "4n) Aiphone (IX / IXG intercom): Extract firmware bundles + build NSRL catalogs" -ForegroundColor DarkYellow
+Write-Host "4o) Sensormatic (Tyco EAS / American Dynamics): Extract firmware bundles + build NSRL catalogs" -ForegroundColor DarkYellow
+Write-Host "4p) Vivotek (IP cameras / NVR): Extract firmware bundles + build NSRL catalogs" -ForegroundColor DarkYellow
+Write-Host "4q) Bosch Security (IP cameras / intrusion panels): Extract firmware bundles + build NSRL catalogs" -ForegroundColor DarkYellow
+Write-Host "4r) Valcom (IP paging / intercom endpoints): Extract firmware bundles + build NSRL catalogs" -ForegroundColor DarkYellow
+Write-Host "-- Added from the ARNG OT census (1,908 devices, Sept 2026) --" -ForegroundColor DarkGray
+Write-Host "4s) Mercury Security (HID Mercury LP/EP access panels): Extract firmware bundles + build NSRL catalogs" -ForegroundColor DarkYellow
+Write-Host "4t) Axis Communications (IP cameras / ACAP): Extract firmware bundles + build NSRL catalogs" -ForegroundColor DarkYellow
+Write-Host "4u) Digital Systems Corp (physical security): Extract firmware bundles + build NSRL catalogs" -ForegroundColor DarkYellow
+Write-Host "4v) Digital Design (intercom): Extract firmware bundles + build NSRL catalogs" -ForegroundColor DarkYellow
+Write-Host "4w) Motorola Solutions (access control / Avigilon / Pelco): Extract firmware bundles + build NSRL catalogs" -ForegroundColor DarkYellow
+Write-Host "4x) Genetec (Security Center VMS): Extract firmware bundles + build NSRL catalogs" -ForegroundColor DarkYellow
+Write-Host "4y) Trane (Tracer SC / BAS HVAC): Extract firmware bundles + build NSRL catalogs" -ForegroundColor DarkYellow
 Write-Host ""
 
 # -- GROUP 5: OT Firmware Baselining ------------------------------------------
@@ -197,7 +218,23 @@ elseif ($functionChoice -eq "1b") {
     }
 }
 elseif ($functionChoice -eq "1d") {
-    Build-VTFidelityIndex
+    # Tier-0 controls surfaced so a rebuild is an explicit choice. Defaults:
+    # per-sample document frequency ON, Phase-2 rows scored OFF, apt-master-intel
+    # still counted as goodware (legacy). See Build-VTFidelityIndex param help.
+    Write-Host ""
+    Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkCyan
+    Write-Host "  $([char]27)[4m|        1d) Build VT fidelity index           |$([char]27)[24m" -ForegroundColor DarkCyan
+    Write-Host "  $([char]27)[4m+----------------------------------------------+$([char]27)[24m" -ForegroundColor DarkCyan
+    Write-Host "   1) Default           (doc-frequency M/G; apt-master-intel = goodware)" -ForegroundColor DarkCyan
+    Write-Host "   2) apt-master-intel as MALICIOUS (recommended; rebuild then compare FPs)" -ForegroundColor DarkCyan
+    Write-Host "   3) Legacy occurrence counts      (pre-2026-09-26 M/G behaviour)" -ForegroundColor DarkCyan
+    Write-Host ""
+    $dChoice = (Read-Host "Please enter a 1d sub-option (blank = 1)").Trim()
+    switch ($dChoice) {
+        '2'     { Build-VTFidelityIndex -AptMasterIntelRole Malicious }
+        '3'     { Build-VTFidelityIndex -ScoreOnOccurrenceCounts }
+        default { Build-VTFidelityIndex }
+    }
 }
 elseif ($functionChoice -eq "1e") {
     $inputPath = Read-Host -Prompt "Path to hash list (TXT or CSV)"
@@ -227,6 +264,11 @@ elseif ($functionChoice -eq "2b") {
 # -- GROUP 3: Reports ---------------------------------------------------------
 elseif ($functionChoice -eq "3a") {
     New-ApiMatrixDashboard
+}
+
+elseif ($functionChoice -eq "3b") {
+    # Local-only: reads the on-disk VT corpus and trackers, makes no API calls.
+    & (Join-Path $PSScriptRoot 'tools\Measure-WeeklyProgress.ps1')
 }
 
 # -- GROUP 4: Firmware Extraction (NextGen NSRL Building) ---------------------
@@ -561,7 +603,7 @@ elseif ($functionChoice -eq "4d") {
         }
     }
 }
-elseif ($functionChoice -in @("4e","4f","4g","4h")) {
+elseif ($functionChoice -in @("4e","4f","4g","4h","4i","4j","4k","4l","4m","4n","4o","4p","4q","4r","4s","4t","4u","4v","4w","4x","4y")) {
     # 4e/4f/4g/4h: Honeywell / Schneider / Rockwell / Siemens.
     # Same flow as 4a/4b/4c/4d -- factored into one block since the
     # vendor-specific bits are just the staging-root path, the extension
@@ -592,6 +634,122 @@ elseif ($functionChoice -in @("4e","4f","4g","4h")) {
             Dir   = 'Siemens'
             Exts  = '.zip','.exe','.upd','.zap','.s7p','.fwl','.fwu','.tar','.iso','.img','.bin'
             Note  = 'Siemens Industry Online Support requires a free PIA account.'
+        }
+        # --- Added from the OTSDP network inventory (forescout_inventory_22Sept26).
+        #     These are the vendors actually observed on the wire; the eight
+        #     entries above are industrial-automation vendors with zero devices
+        #     in that inventory. See firmware-staging\<Dir>\README.md for sources.
+        '4i' = @{
+            Name  = 'Johnson Controls'
+            Dir   = 'Johnson-Controls'
+            Exts  = '.zip','.exe','.bin','.tar','.gz','.iso','.img','.upd'
+            Note  = 'Metasys firmware sits behind the JCI Building Technologies partner portal (login). 56 devices in inventory - largest single OT vendor.'
+        }
+        '4j' = @{
+            Name  = 'Tridium'
+            Dir   = 'Tridium'
+            Exts  = '.zip','.exe','.dist','.par','.jar','.tar','.gz','.img','.bin'
+            Note  = 'Niagara 4 builds come from Niagara Central (partner login) - the same wall already noted on the Honeywell entry. 36 devices in inventory.'
+        }
+        '4k' = @{
+            Name  = 'AutomatedLogic'
+            Dir   = 'AutomatedLogic'
+            Exts  = '.zip','.exe','.bin','.tar','.gz','.img','.dmg','.cfg'
+            Note  = 'WebCTRL / LGR / SE firmware via the Carrier-ALC dealer portal (login).'
+        }
+        '4l' = @{
+            Name  = 'Echelon'
+            Dir   = 'Echelon'
+            Exts  = '.zip','.exe','.bin','.tar','.gz','.img','.apb','.nxe'
+            Note  = 'Echelon -> Adesto -> Renesas. Legacy i.LON images are archived; SmartServer IoT ships via Renesas.'
+        }
+        '4m' = @{
+            Name  = 'CyberPower'
+            Dir   = 'CyberPower'
+            Exts  = '.zip','.exe','.bin','.tar','.gz','.img','.dld'
+            Note  = 'OPEN DOWNLOAD - no login. RMCARD / PDU firmware at cyberpowersystems.com/products/software/firmware/'
+        }
+        '4n' = @{
+            Name  = 'Aiphone'
+            Dir   = 'Aiphone'
+            Exts  = '.zip','.exe','.bin','.tar','.gz','.img','.bnr'
+            Note  = 'OPEN DOWNLOAD - no login. IX / IXG firmware archive at aiphone.com/kbtopic/firmware'
+        }
+        '4o' = @{
+            Name  = 'Sensormatic'
+            Dir   = 'Sensormatic'
+            Exts  = '.zip','.exe','.bin','.tar','.gz','.iso','.img','.upg'
+            Note  = 'Tyco / JCI partner portal (login). Covers the Sur-Gard alarm-monitoring device in inventory as well.'
+        }
+        '4p' = @{
+            Name  = 'Vivotek'
+            Dir   = 'Vivotek'
+            Exts  = '.zip','.exe','.bin','.tar','.gz','.img','.flash','.pkg'
+            Note  = 'OPEN DOWNLOAD - no login. Camera / NVR firmware at vivotek.com/downloads'
+        }
+        '4q' = @{
+            Name  = 'Bosch Security'
+            Dir   = 'Bosch-Security'
+            Exts  = '.zip','.exe','.bin','.tar','.gz','.iso','.img','.fw'
+            Note  = 'OPEN DOWNLOAD - no login. downloadstore.boschsecurity.com'
+        }
+        '4r' = @{
+            Name  = 'Valcom'
+            Dir   = 'Valcom'
+            Exts  = '.zip','.exe','.bin','.tar','.gz','.img'
+            Note  = 'IP paging / intercom endpoints. Firmware via valcom.com/support.'
+        }
+        # --- Added from the ARNG OT census (arng_ot_devices.csv, 1,908 devices,
+        #     ForeScout_East_and_West_28Sept26). These 7 cover 686 of the 886
+        #     devices with no firmware coverage. NOT scaffolded on purpose:
+        #     Texas Instruments (251) and Dell (15) are OUI artifacts - TI
+        #     supplies embedded MCU/radio modules inside other vendors'
+        #     controllers and the devices have no hostnames, so they need model
+        #     identification, not TI firmware. TAC AB (78) folds into the
+        #     existing Schneider tree (TAC Vista/Xenta is now Schneider
+        #     EcoStruxure Building); SIEMENS BUILDING (7) into Siemens and
+        #     Eaton Corporation (8) into Eaton, for the same reason.
+        '4s' = @{
+            Name  = 'Mercury Security'
+            Dir   = 'Mercury-Security'
+            Exts  = '.zip','.exe','.bin','.tar','.gz','.img','.crc','.hex'
+            Note  = 'HID Mercury LP/EP access-control panels. 99 devices, real DNS names. Firmware via the HID partner portal (login); Mercury is now part of HID Global.'
+        }
+        '4t' = @{
+            Name  = 'Axis Communications'
+            Dir   = 'Axis'
+            Exts  = '.zip','.bin','.tar','.gz','.img','.frm','.eap'
+            Note  = 'GATED - VERIFIED 2026-09-28. 243 devices (v3 inventory; the 1,908-device OT census undercounted at 76). The pub_soft directory LISTING is public and browsable (axis.com/ftp/pub_soft/PACS/<model>/latest/) but fetching the .bin redirects to MyAxis auth via Curity - a download returns a 6KB HTML login page, not firmware. Needs a MyAxis account. .eap are ACAP application packages, a separate product line.'
+        }
+        '4u' = @{
+            Name  = 'Digital Systems Corp'
+            Dir   = 'Digital-Systems-Corp'
+            Exts  = '.zip','.exe','.bin','.tar','.gz','.img'
+            Note  = 'LARGEST single gap - 163 devices, almost all Physical Security. Resolved up from the 26 previously in the uncertain bucket. IP-only, no hostnames: confirm the actual product line before hunting firmware. No known public portal.'
+        }
+        '4v' = @{
+            Name  = 'Digital Design'
+            Dir   = 'Digital-Design'
+            Exts  = '.zip','.exe','.bin','.tar','.gz','.img'
+            Note  = '100 devices, ALL classified Intercom. Hosts carry a ForeScout NC_IP_REUSE annotation rather than DNS names. No known public portal - identify the product line first.'
+        }
+        '4w' = @{
+            Name  = 'Motorola Solutions'
+            Dir   = 'Motorola-Solutions'
+            Exts  = '.zip','.exe','.bin','.tar','.gz','.img','.fw'
+            Note  = '84 devices - access control, physical security, IP cameras. Motorola owns Avigilon and Pelco, so the firmware may sit under those brands. Partner portal (login).'
+        }
+        '4x' = @{
+            Name  = 'Genetec'
+            Dir   = 'Genetec'
+            Exts  = '.zip','.exe','.msi','.tar','.gz','.iso'
+            Note  = '51 devices. Security Center is VMS SOFTWARE, so it stages like AVEVA/Ignition rather than controller firmware. Via the Genetec Technical Assistance Portal (login).'
+        }
+        '4y' = @{
+            Name  = 'Trane'
+            Dir   = 'Trane'
+            Exts  = '.zip','.exe','.bin','.tar','.gz','.img'
+            Note  = '35 devices, HVAC. Tracer SC / Tracer BAS controllers. Partner portal (login). Trane is Trane Technologies, formerly Ingersoll Rand.'
         }
     }
     $cfg = $vendorMap[$functionChoice]
@@ -688,7 +846,7 @@ elseif ($functionChoice -eq "5a" -or $functionChoice -eq "5b") {
                       Sort-Object FullName)
     }
     if ($catalogs.Count -eq 0) {
-        Write-Host "[WARN] No catalog.csv files found under $stagingRoot - run option 4a / 4b / 4c first." -ForegroundColor Yellow
+        Write-Host "[WARN] No catalog.csv files found under $stagingRoot - run the matching extract option (4a-4r) first." -ForegroundColor Yellow
     } else {
         $verb = if ($functionChoice -eq "5a") { 'Baseline' } else { "Submit 404'd files for" }
         # Group catalogs by vendor for clearer display
